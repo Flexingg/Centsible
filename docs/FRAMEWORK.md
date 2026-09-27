@@ -1,6 +1,6 @@
 # Actual × Monarch for Android: Framework Design
 
-**Status:** v0.3 (Phase 0 built: bridge + Android shell, tested against Actual 26.9.0) · **Date:** 2026-09-27
+**Status:** v0.4 (Phase 1 built; see "Progress" below) · **Date:** 2026-09-27
 **Goal:** A native Android app that sits on a self-hosted **Actual Budget** server. It supports all of Actual's features, uses a **Monarch-style** UI/UX, and survives Actual upgrades without rewrites. Once the core works, it gets an extension layer for new features.
 
 ---
@@ -386,6 +386,21 @@ object CategoryIconsModule {
 | **Optional: Embedded engine** | loot-core on device behind `BudgetEngine` | Airplane-mode editing with correct budget math |
 
 ---
+
+## Progress
+
+| Phase | State | Notes |
+|---|---|---|
+| 0: Foundations | ✅ Done | Bridge, contract, household auth, Android shell, CI, Renovate |
+| 1: Core parity MVP | ✅ Built, not yet tried on a device | Transaction create/edit/delete, splits, transfers, search and filters; account detail, add, rename, close and reopen; category and group management; envelope budget editing; budget switcher; currency from budget preferences; encrypted offline read cache with an offline banner |
+| 2: Full parity | Next | Rules, schedules/recurring, payees, bank sync, import, reconcile, tags, reports, goal templates, E2E budgets, **offline write outbox** |
+
+Phase 1 notes, verified against Actual 26.9.0:
+- `updateTransaction`/`deleteTransaction` resolve one macrotask before their writes land, so the bridge waits a tick before reading back.
+- Split editing uses the internal `transactions-batch-update` handler behind the `transactions.splits` capability.
+- AQL has no `$in`; use `$or`.
+- Closing an account with no transactions deletes it (the API returns 204).
+- Offline mode is read-only for now: writes show an error until the bridge is reachable. The Phase 2 outbox makes them queue instead.
 
 ## 12. Decisions (locked 2026-09-27)
 

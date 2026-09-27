@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import app.canopy.core.data.CapabilitiesRepository
 import app.canopy.core.designsystem.component.MoneyFormat
 import app.canopy.core.domain.BudgetEngine
+import app.canopy.core.domain.ConnectionStatus
 import app.canopy.core.domain.SessionStore
 import app.canopy.core.model.BudgetId
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -30,7 +31,10 @@ class AppViewModel @Inject constructor(
     sessions: SessionStore,
     private val capabilities: CapabilitiesRepository,
     private val engine: BudgetEngine,
+    connection: ConnectionStatus,
 ) : ViewModel() {
+    val offline: StateFlow<Boolean> = connection.offline
+
     val state: StateFlow<AppState> = sessions.session
         .map {
             val budget = it?.selectedBudget

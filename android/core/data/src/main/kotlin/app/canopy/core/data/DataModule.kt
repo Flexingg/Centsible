@@ -1,6 +1,7 @@
 package app.canopy.core.data
 
 import app.canopy.core.domain.BudgetChanges
+import app.canopy.core.domain.ConnectionStatus
 import app.canopy.core.domain.BudgetEngine
 import app.canopy.core.domain.HouseholdGateway
 import app.canopy.core.domain.PairingGateway
@@ -33,7 +34,7 @@ abstract class DataModule {
     companion object {
         @Provides
         @Singleton
-        fun bridgeClient(sessions: SessionStore): BridgeClient = BridgeClient(
+        fun bridgeClient(sessions: SessionStore, cache: RoomResponseCache): BridgeClient = BridgeClient(
             sessions,
             OkHttp.create {
                 config {
@@ -43,7 +44,13 @@ abstract class DataModule {
                     retryOnConnectionFailure(true)
                 }
             },
+            cache,
         )
+
+        @Provides
+        fun connectionStatus(client: BridgeClient): ConnectionStatus = object : ConnectionStatus {
+            override val offline = client.offline
+        }
 
         @Provides
         @Singleton

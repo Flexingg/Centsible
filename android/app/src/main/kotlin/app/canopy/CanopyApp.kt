@@ -1,6 +1,10 @@
 package app.canopy
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.ui.unit.dp
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ReceiptLong
 import androidx.compose.material.icons.rounded.AccountBalance
@@ -70,19 +74,20 @@ private object Routes {
 @Composable
 fun CanopyApp(pairingLink: String?, viewModel: AppViewModel = hiltViewModel()) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val offline by viewModel.offline.collectAsStateWithLifecycle()
     CanopyTheme {
         when (val s = state) {
             AppState.Starting -> LoadingState()
             AppState.NeedsPairing -> PairingRoute(deepLink = pairingLink)
             AppState.NeedsBudget -> BudgetPickerRoute()
             // Switching budgets rebuilds navigation and every screen's state.
-            is AppState.Ready -> key(s.budget) { MainScaffold() }
+            is AppState.Ready -> key(s.budget) { MainScaffold(offline) }
         }
     }
 }
 
 @Composable
-private fun MainScaffold() {
+private fun MainScaffold(offline: Boolean) {
     val nav = rememberNavController()
     val backStack by nav.currentBackStackEntryAsState()
     val current = backStack?.destination?.route
@@ -90,6 +95,7 @@ private fun MainScaffold() {
     val colors = CanopyTheme.colors
     Scaffold(
         containerColor = colors.canvas,
+        topBar = { if (offline) OfflineBanner() },
         floatingActionButton = {
             if (tab?.canAdd == true) {
                 FloatingActionButton(onClick = { nav.navigate(Routes.transaction(null)) }, containerColor = colors.accent, contentColor = colors.card) {
@@ -138,6 +144,22 @@ private fun MainScaffold() {
             composable(Routes.CATEGORIES) { CategoryManagerRoute(onBack = { nav.popBackStack() }) }
         }
     }
+}
+
+/** Shown while reads come from the offline cache; writes will fail until back online. */
+@Composable
+private fun OfflineBanner() {
+    val colors = CanopyTheme.colors
+    Text(
+        "Offline · showing saved data. Changes need a connection.",
+        style = androidx.compose.material3.MaterialTheme.typography.labelMedium,
+        color = colors.textPrimary,
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(colors.warning.copy(alpha = 0.25f))
+            .statusBarsPadding()
+            .padding(horizontal = 16.dp, vertical = 6.dp),
+    )
 }
 
 private fun NavHostController.goToTab(route: String) = navigate(route) {

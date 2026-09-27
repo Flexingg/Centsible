@@ -94,4 +94,25 @@ class BridgeClientTest {
         val client = BridgeClient(InMemorySessionStore(session), MockEngine { respond("<html>Bad gateway</html>", HttpStatusCode.BadGateway) })
         assertTrue(runCatching { client.get<HealthDto>("/v1/health") }.exceptionOrNull() is BridgeException.Network)
     }
+
+    @Test
+    fun `serves cached reads while offline and recovers`() = runTest {
+        var online = true
+        val cache = InMemoryResponseCache()
+        val client = BridgeClient(InMemorySessionStore(session), MockEngine {
+            if (online) respond(health, headers = jsonHeaders) else throw java.io.IOException("no route to host")
+        }, cache)
+        client.get<HealthDto>("/v1/health")
+        assertTrue(!client.offline.value)
+
+        online = false
+        assertEquals("ok", client.get<HealthDto>("/v1/health").status)
+        assertTrue(client.offline.value)
+        // Nothing cached for this URL: the network error surfaces.
+        assertTrue(runCatching { client.get<HealthDto>("/v1/other") }.exceptionOrNull() is BridgeException.Network)
+
+        online = true
+        client.get<HealthDto>("/v1/health")
+        assertTrue(!client.offline.value)
+    }
 }

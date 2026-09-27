@@ -26,3 +26,23 @@ class AccountsScreenshotTest {
         compose.onRoot().captureRoboImage("screenshots/accounts_light.png")
     }
 }
+
+@RunWith(RobolectricTestRunner::class)
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
+@Config(sdk = [35], qualifiers = "w411dp-h891dp-xxhdpi")
+class AccountDetailScreenshotTest {
+    @get:Rule val compose = createComposeRule()
+
+    @Test fun account_detail_light() {
+        val visa = SampleHousehold.accounts.first { it.name == "Visa Signature" }
+        val detail = AccountDetail(
+            account = visa,
+            transactions = SampleHousehold.transactions.filter { it.accountId == visa.id },
+            nextCursor = null,
+            otherAccounts = SampleHousehold.accounts.filter { it.id != visa.id },
+            categoryNames = SampleHousehold.budgetMonth.groups.flatMap { it.categories }.associate { it.id.raw to it.name },
+        )
+        compose.setContent { CanopyTheme(darkTheme = false) { AccountDetailScreen(AccountDetailUiState(Loadable.Ready(detail), canWrite = true), onBack = {}, onRetry = {}) } }
+        compose.onRoot().captureRoboImage("screenshots/account_detail_light.png")
+    }
+}

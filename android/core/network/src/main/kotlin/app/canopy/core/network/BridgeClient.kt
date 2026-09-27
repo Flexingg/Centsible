@@ -20,6 +20,9 @@ import io.ktor.http.contentType
 import io.ktor.http.isSuccess
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.Json
@@ -31,7 +34,13 @@ import kotlinx.serialization.json.Json
 class BridgeClient(
     private val sessions: SessionStore,
     engine: HttpClientEngine,
+    private val cache: ResponseCache? = null,
 ) {
+    private val offlineState = MutableStateFlow(false)
+
+    /** True while reads are being served from the offline cache. */
+    val offline: StateFlow<Boolean> = offlineState.asStateFlow()
+
     val json = Json {
         ignoreUnknownKeys = true // newer bridges may add fields
         coerceInputValues = true // unknown enum-ish values fall back to defaults
@@ -68,7 +77,29 @@ class BridgeClient(
     ): HttpResponse = send(bridgeUrl, method, path, null, cfId, cfSecret, configure).also { ensureSuccess(it) }
 
     suspend inline fun <reified T> get(path: String, noinline configure: HttpRequestBuilder.() -> Unit = {}): T =
-        execute(HttpMethod.Get, path, configure).body()
+        json.decodeFromString(getText(path, configure))
+
+    /**
+     * GET with an offline fallback: successful responses are cached; when the bridge
+     * can't be reached, the last cached response for the same URL is returned instead.
+     */
+    suspend fun getText(path: String, configure: HttpRequestBuilder.() -> Unit = {}): String {
+        val session = sessions.current() ?: throw BridgeException.Unauthorized("This device is not paired")
+        val key = HttpRequestBuilder().apply {
+            url(session.bridgeUrl.trimEnd('/') + path)
+            configure()
+        }.url.buildString()
+        return try {
+            execute(HttpMethod.Get, path, configure).bodyAsText().also {
+                cache?.put(key, it)
+                offlineState.value = false
+            }
+        } catch (e: BridgeException.Network) {
+            val cached = cache?.get(key) ?: throw e
+            offlineState.value = true
+            cached
+        }
+    }
 
     suspend inline fun <reified B : Any, reified T> send(method: HttpMethod, path: String, body: B, noinline configure: HttpRequestBuilder.() -> Unit = {}): T =
         execute(method, path) {
@@ -96,6 +127,7 @@ class BridgeClient(
             }
             res.status == HttpStatusCode.Unauthorized -> {
                 sessions.clear()
+                cache?.clear()
                 false
             }
             else -> false
