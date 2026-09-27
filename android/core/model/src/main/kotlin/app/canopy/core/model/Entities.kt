@@ -8,6 +8,9 @@ data class Account(
     val offBudget: Boolean,
     val closed: Boolean,
     val balance: Money,
+    /** Bank sync provider once the account is linked in Actual (null = manual). */
+    val syncSource: String? = null,
+    val lastSync: String? = null,
 )
 
 data class Category(

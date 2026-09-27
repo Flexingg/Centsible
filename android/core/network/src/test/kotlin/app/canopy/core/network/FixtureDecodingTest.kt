@@ -28,6 +28,15 @@ class FixtureDecodingTest {
         "problem-unauthorized" to ProblemDto.serializer(),
         "transaction-updated" to TransactionDto.serializer(),
         "preferences" to PreferencesDto.serializer(),
+        "schedule" to ScheduleDto.serializer(),
+        "rule" to RuleDto.serializer(),
+        "payee-stats" to ItemsDto.serializer(PayeeStatDto.serializer()),
+        "job" to JobDto.serializer(),
+        "import-preview" to ImportPreviewDto.serializer(),
+        "reconcile-status" to ReconcileStatusDto.serializer(),
+        "report-cash-flow" to CashFlowDto.serializer(),
+        "report-spending" to SpendingDto.serializer(),
+        "report-net-worth" to NetWorthDto.serializer(),
     )
 
     @Test

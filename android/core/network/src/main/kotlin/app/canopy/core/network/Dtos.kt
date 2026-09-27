@@ -49,6 +49,8 @@ import kotlinx.serialization.Serializable
     val closed: Boolean,
     val balance: Long,
     val accountGroupId: String? = null,
+    val syncSource: String? = null,
+    val lastSync: String? = null,
 )
 
 @Serializable data class CategoryDto(val id: String, val name: String, val groupId: String, val isIncome: Boolean, val hidden: Boolean)

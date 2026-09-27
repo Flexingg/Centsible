@@ -11,7 +11,7 @@ import androidx.compose.material.icons.rounded.AccountBalance
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.rounded.PieChart
-import androidx.compose.material.icons.rounded.Settings
+import androidx.compose.material.icons.rounded.Menu
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
@@ -48,6 +48,14 @@ import app.canopy.feature.dashboard.DashboardRoute
 import app.canopy.feature.onboarding.BudgetPickerRoute
 import app.canopy.feature.onboarding.PairingRoute
 import app.canopy.feature.settings.SettingsRoute
+import app.canopy.feature.settings.MoreItem
+import app.canopy.feature.settings.MoreScreen
+import app.canopy.feature.planning.MerchantsRoute
+import app.canopy.feature.planning.RecurringRoute
+import app.canopy.feature.planning.RulesRoute
+import app.canopy.feature.planning.TagsRoute
+import app.canopy.feature.reports.ReportsRoute
+import app.canopy.feature.transactions.TransactionsViewModel
 import app.canopy.feature.transactions.TransactionEditorRoute
 import app.canopy.feature.transactions.TransactionEditorViewModel
 import app.canopy.feature.transactions.TransactionsRoute
@@ -57,7 +65,7 @@ private enum class Tab(val route: String, val label: String, val icon: ImageVect
     Accounts("accounts", "Accounts", Icons.Rounded.AccountBalance, canAdd = true),
     Transactions("transactions", "Transactions", Icons.AutoMirrored.Rounded.ReceiptLong, canAdd = true),
     Budget("budget", "Budget", Icons.Rounded.PieChart, canAdd = false),
-    More("settings", "More", Icons.Rounded.Settings, canAdd = false),
+    More("more", "More", Icons.Rounded.Menu, canAdd = false),
 }
 
 private object Routes {
@@ -65,6 +73,15 @@ private object Routes {
     const val TRANSACTION = "transaction?${TransactionEditorViewModel.ARG_ID}={${TransactionEditorViewModel.ARG_ID}}&" +
         "${TransactionEditorViewModel.ARG_ACCOUNT}={${TransactionEditorViewModel.ARG_ACCOUNT}}"
     const val CATEGORIES = "budget/categories"
+    const val SETTINGS = "settings"
+    const val RECURRING = "recurring"
+    const val REPORTS = "reports"
+    const val MERCHANTS = "merchants"
+    const val RULES = "rules"
+    const val TAGS = "tags"
+    const val SEARCH = "transactions/search?${TransactionsViewModel.ARG_QUERY}={${TransactionsViewModel.ARG_QUERY}}"
+
+    fun search(q: String) = "transactions/search?${TransactionsViewModel.ARG_QUERY}=" + java.net.URLEncoder.encode(q, "UTF-8")
 
     fun account(id: AccountId) = "account/${id.raw}"
     fun transaction(id: TransactionId?, account: AccountId? = null) =
@@ -130,7 +147,29 @@ private fun MainScaffold(offline: Boolean) {
             composable(Tab.Accounts.route) { AccountsRoute(onOpenAccount = { nav.navigate(Routes.account(it)) }) }
             composable(Tab.Transactions.route) { TransactionsRoute(onOpen = { nav.navigate(Routes.transaction(it)) }) }
             composable(Tab.Budget.route) { BudgetRoute(onManageCategories = { nav.navigate(Routes.CATEGORIES) }) }
-            composable(Tab.More.route) { SettingsRoute() }
+            composable(Tab.More.route) {
+                MoreScreen(onOpen = { item ->
+                    nav.navigate(
+                        when (item) {
+                            MoreItem.Recurring -> Routes.RECURRING
+                            MoreItem.Reports -> Routes.REPORTS
+                            MoreItem.Merchants -> Routes.MERCHANTS
+                            MoreItem.Rules -> Routes.RULES
+                            MoreItem.Tags -> Routes.TAGS
+                            MoreItem.Settings -> Routes.SETTINGS
+                        },
+                    )
+                })
+            }
+            composable(Routes.SETTINGS) { SettingsRoute() }
+            composable(Routes.RECURRING) { RecurringRoute(onBack = { nav.popBackStack() }) }
+            composable(Routes.REPORTS) { ReportsRoute(onBack = { nav.popBackStack() }) }
+            composable(Routes.MERCHANTS) { MerchantsRoute(onBack = { nav.popBackStack() }) }
+            composable(Routes.RULES) { RulesRoute(onBack = { nav.popBackStack() }) }
+            composable(Routes.TAGS) { TagsRoute(onBack = { nav.popBackStack() }, onSearch = { nav.navigate(Routes.search(it)) }) }
+            composable(Routes.SEARCH, arguments = listOf(navArgument(TransactionsViewModel.ARG_QUERY) { type = NavType.StringType; defaultValue = "" })) {
+                TransactionsRoute(onOpen = { nav.navigate(Routes.transaction(it)) })
+            }
             composable(Routes.ACCOUNT, arguments = listOf(navArgument(AccountDetailViewModel.ARG_ID) { type = NavType.StringType })) {
                 AccountDetailRoute(onBack = { nav.popBackStack() }, onOpenTransaction = { nav.navigate(Routes.transaction(it)) })
             }
@@ -172,7 +211,9 @@ private fun NavHostController.go(d: Destination) = when (d) {
     Destination.Accounts -> goToTab(Tab.Accounts.route)
     Destination.Transactions -> goToTab(Tab.Transactions.route)
     Destination.Budget -> goToTab(Tab.Budget.route)
-    Destination.Settings -> goToTab(Tab.More.route)
+    Destination.Settings -> navigate(Routes.SETTINGS)
+    Destination.Recurring -> navigate(Routes.RECURRING)
+    Destination.Reports -> navigate(Routes.REPORTS)
     is Destination.Account -> navigate(Routes.account(d.id))
     is Destination.Transaction -> navigate(Routes.transaction(d.id, d.account))
 }

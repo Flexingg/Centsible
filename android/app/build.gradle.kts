@@ -29,6 +29,8 @@ dependencies {
     implementation(project(":feature:transactions"))
     implementation(project(":feature:budget"))
     implementation(project(":feature:settings"))
+    implementation(project(":feature:planning"))
+    implementation(project(":feature:reports"))
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)

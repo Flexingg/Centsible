@@ -26,6 +26,10 @@ data class CanopyColors(
     val negativeSoft: Color,
     val warning: Color,
     val track: Color,
+    /** Chart series (validated for color-blind separation and 3:1 contrast on [card]). */
+    val series1: Color,
+    val series2: Color,
+    val chartGrid: Color,
     val isDark: Boolean,
 )
 
@@ -45,6 +49,9 @@ val LightCanopyColors = CanopyColors(
     negativeSoft = Color(0xFFFCE8E8),
     warning = Color(0xFFE59A1C),
     track = Color(0xFFEEECE8),
+    series1 = Color(0xFF2A78D6),
+    series2 = Color(0xFFEB6834),
+    chartGrid = Color(0xFFEDEBE7),
     isDark = false,
 )
 
@@ -64,6 +71,9 @@ val DarkCanopyColors = CanopyColors(
     negativeSoft = Color(0xFF3A1B1C),
     warning = Color(0xFFF5B342),
     track = Color(0xFF2A2D33),
+    series1 = Color(0xFF3987E5),
+    series2 = Color(0xFFD95926),
+    chartGrid = Color(0xFF2A2D33),
     isDark = true,
 )
 

@@ -54,6 +54,8 @@ sealed interface Destination {
     data object Transactions : Destination
     data object Budget : Destination
     data object Settings : Destination
+    data object Recurring : Destination
+    data object Reports : Destination
     data class Account(val id: app.canopy.core.model.AccountId) : Destination
     /** Opens the editor; a null id starts a new transaction. */
     data class Transaction(val id: app.canopy.core.model.TransactionId?, val account: app.canopy.core.model.AccountId? = null) : Destination

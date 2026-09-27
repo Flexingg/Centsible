@@ -183,3 +183,9 @@ class BridgeClient(
         }
     }
 }
+
+/** Adds a JSON body inside a request builder. */
+inline fun <reified B : Any> HttpRequestBuilder.jsonBody(body: B) {
+    contentType(ContentType.Application.Json)
+    setBody(body)
+}

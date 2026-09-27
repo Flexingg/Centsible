@@ -22,6 +22,11 @@ class NotifyingBudgetEngine @Inject constructor(
 
     private suspend fun <T> write(block: suspend () -> T): T = block().also { events.emit(Unit) }
 
+    /** For the other gateways' writes (planning, import, reconcile). */
+    fun notifyChanged() {
+        events.tryEmit(Unit)
+    }
+
     override suspend fun createTransaction(budget: app.canopy.core.model.BudgetId, transaction: app.canopy.core.model.NewTransaction) =
         write { inner.createTransaction(budget, transaction) }
     override suspend fun updateTransaction(budget: app.canopy.core.model.BudgetId, id: app.canopy.core.model.TransactionId, patch: app.canopy.core.model.TransactionPatch) =

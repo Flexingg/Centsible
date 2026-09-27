@@ -10,6 +10,13 @@ import app.canopy.core.engine.bridge.BridgeBudgetEngine
 import app.canopy.core.engine.bridge.BridgeHouseholdGateway
 import app.canopy.core.engine.bridge.BridgePairingGateway
 import app.canopy.core.network.BridgeApi
+import app.canopy.core.network.PlanningApi
+import app.canopy.core.domain.AccountServices
+import app.canopy.core.domain.PlanningGateway
+import app.canopy.core.domain.ReportsGateway
+import app.canopy.core.engine.bridge.BridgeAccountServices
+import app.canopy.core.engine.bridge.BridgePlanningGateway
+import app.canopy.core.engine.bridge.BridgeReports
 import app.canopy.core.network.BridgeClient
 import dagger.Binds
 import dagger.Module
@@ -59,5 +66,21 @@ abstract class DataModule {
         @Provides
         @Singleton
         fun bridgeEngine(api: BridgeApi) = BridgeBudgetEngine(api)
+
+        @Provides
+        @Singleton
+        fun planningApi(client: BridgeClient) = PlanningApi(client)
+
+        @Provides
+        @Singleton
+        fun planning(api: PlanningApi, changes: NotifyingBudgetEngine): PlanningGateway = BridgePlanningGateway(api, changes::notifyChanged)
+
+        @Provides
+        @Singleton
+        fun accountServices(api: PlanningApi, changes: NotifyingBudgetEngine): AccountServices = BridgeAccountServices(api, changes::notifyChanged)
+
+        @Provides
+        @Singleton
+        fun reports(api: PlanningApi): ReportsGateway = BridgeReports(api)
     }
 }

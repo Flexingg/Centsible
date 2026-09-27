@@ -53,11 +53,12 @@ data class TransactionsUiState(
 
 @HiltViewModel
 class TransactionsViewModel @Inject constructor(
+    savedState: androidx.lifecycle.SavedStateHandle,
     private val engine: BudgetEngine,
     private val selectedBudget: SelectedBudget,
     changes: BudgetChanges,
 ) : ViewModel() {
-    private val state = MutableStateFlow(TransactionsUiState())
+    private val state = MutableStateFlow(TransactionsUiState(filters = TransactionFilters(search = savedState.get<String>(ARG_QUERY).orEmpty())))
     val uiState: StateFlow<TransactionsUiState> = state.asStateFlow()
     private var loadJob: Job? = null
 
@@ -107,7 +108,9 @@ class TransactionsViewModel @Inject constructor(
         }
     }
 
-    private companion object {
-        const val PAGE = 50
+    companion object {
+        private const val PAGE = 50
+        /** Optional starting search, e.g. "#vacation" from the Tags screen. */
+        const val ARG_QUERY = "q"
     }
 }

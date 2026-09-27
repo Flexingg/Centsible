@@ -100,7 +100,7 @@ fun SettingsScreen(state: SettingsUiState, actions: SettingsActions, renderQr: B
                     contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 96.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    item { Text("Settings", style = MaterialTheme.typography.headlineMedium, modifier = Modifier.padding(start = 4.dp, top = 16.dp, bottom = 4.dp)) }
+                    item { Text("Household & settings", style = MaterialTheme.typography.headlineMedium, modifier = Modifier.padding(start = 4.dp, top = 16.dp, bottom = 4.dp)) }
                     item {
                         CanopyCard {
                             Row(verticalAlignment = Alignment.CenterVertically) {
