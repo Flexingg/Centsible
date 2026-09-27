@@ -12,7 +12,7 @@ import org.junit.Test
  * (`npm run fixtures`). If the contract drifts from these DTOs, this fails first.
  */
 class FixtureDecodingTest {
-    private val json = Json { ignoreUnknownKeys = true; coerceInputValues = true; explicitNulls = false }
+    private val json = BridgeJson
     private val dir = File(System.getProperty("contract.fixtures") ?: "../../../contract/fixtures")
 
     private val decoders: Map<String, KSerializer<*>> = mapOf(

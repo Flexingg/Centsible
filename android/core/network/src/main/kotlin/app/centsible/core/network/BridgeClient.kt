@@ -28,6 +28,20 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.Json
 
 /**
+ * Wire format for the bridge. Shared with tests so they check exactly what the app sends.
+ * - encodeDefaults: a field left at its Kotlin default is still sent. Without it, a
+ *   required field like `platform = "android"` silently disappeared from requests.
+ * - explicitNulls = false: null fields are left out, which is what patch requests want.
+ *   A field that must be sent as JSON null uses JsonNull instead.
+ */
+val BridgeJson = Json {
+    encodeDefaults = true
+    ignoreUnknownKeys = true // newer bridges may add fields
+    coerceInputValues = true // unknown enum-ish values fall back to defaults
+    explicitNulls = false
+}
+
+/**
  * HTTP transport to the bridge: base URL and tokens from the stored session, Cloudflare
  * Access headers, single-flight token refresh, and problem+json → [BridgeException].
  */
@@ -41,11 +55,7 @@ class BridgeClient(
     /** True while reads are being served from the offline cache. */
     val offline: StateFlow<Boolean> = offlineState.asStateFlow()
 
-    val json = Json {
-        ignoreUnknownKeys = true // newer bridges may add fields
-        coerceInputValues = true // unknown enum-ish values fall back to defaults
-        explicitNulls = false
-    }
+    val json = BridgeJson
 
     @PublishedApi
     internal val http = HttpClient(engine) {

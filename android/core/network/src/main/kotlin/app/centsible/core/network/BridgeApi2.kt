@@ -35,7 +35,7 @@ class PlanningApi(private val client: BridgeClient) {
 
     suspend fun categoryNote(budgetId: String, categoryId: String): CategoryNoteDto = client.get("${b(budgetId)}/categories/$categoryId/note")
     suspend fun setCategoryNote(budgetId: String, categoryId: String, note: String?): CategoryNoteDto =
-        client.send(HttpMethod.Put, "${b(budgetId)}/categories/$categoryId/note", NoteInputDto(note))
+        client.send(HttpMethod.Put, "${b(budgetId)}/categories/$categoryId/note", NoteInputDto(kotlinx.serialization.json.JsonPrimitive(note)))
     suspend fun applyTemplates(budgetId: String, month: String, overwrite: Boolean): TemplatesResultDto =
         client.send(HttpMethod.Post, "${b(budgetId)}/months/$month/apply-templates", ApplyTemplatesDto(overwrite))
 

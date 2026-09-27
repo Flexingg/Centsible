@@ -78,7 +78,8 @@ import kotlinx.serialization.json.JsonObject
 @Serializable data class TagDto(val id: String, val tag: String, val color: String? = null, val description: String? = null)
 @Serializable data class TagInputDto(val tag: String? = null, val color: String? = null)
 @Serializable data class CategoryNoteDto(val categoryId: String, val note: String? = null)
-@Serializable data class NoteInputDto(val note: String?)
+/** `note` is required and may be null (clears it), so it's a JsonElement: JsonNull is always sent. */
+@Serializable data class NoteInputDto(val note: JsonElement)
 @Serializable data class ApplyTemplatesDto(val overwrite: Boolean)
 @Serializable data class TemplatesResultDto(val month: BudgetMonthDto, val message: String)
 
