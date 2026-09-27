@@ -233,6 +233,7 @@ paths:
                     items: { $ref: '#/components/schemas/Account' }
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
+        '423': { $ref: '#/components/responses/Problem' }
     post:
       tags: [budgets]
       operationId: createAccount
@@ -257,6 +258,7 @@ paths:
               schema: { $ref: '#/components/schemas/Account' }
         '400': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
+        '423': { $ref: '#/components/responses/Problem' }
 
   /v1/budgets/{budgetId}/category-groups:
     get:
@@ -276,6 +278,7 @@ paths:
                   items:
                     type: array
                     items: { $ref: '#/components/schemas/CategoryGroup' }
+        '423': { $ref: '#/components/responses/Problem' }
     post:
       tags: [budgets]
       operationId: createCategoryGroup
@@ -296,6 +299,7 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/CategoryGroup' }
+        '423': { $ref: '#/components/responses/Problem' }
 
   /v1/budgets/{budgetId}/payees:
     get:
@@ -315,6 +319,7 @@ paths:
                   items:
                     type: array
                     items: { $ref: '#/components/schemas/Payee' }
+        '423': { $ref: '#/components/responses/Problem' }
 
   /v1/budgets/{budgetId}/transactions:
     get:
@@ -336,6 +341,7 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/TransactionPage' }
+        '423': { $ref: '#/components/responses/Problem' }
     post:
       tags: [budgets]
       operationId: createTransaction
@@ -359,6 +365,7 @@ paths:
               schema: { $ref: '#/components/schemas/Transaction' }
         '400': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
+        '423': { $ref: '#/components/responses/Problem' }
 
   /v1/budgets/{budgetId}/transactions/{transactionId}:
     parameters:
@@ -374,6 +381,7 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Transaction' }
         '404': { $ref: '#/components/responses/Problem' }
+        '423': { $ref: '#/components/responses/Problem' }
     patch:
       tags: [budgets]
       operationId: updateTransaction
@@ -396,6 +404,7 @@ paths:
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
         '501': { $ref: '#/components/responses/Problem' }
+        '423': { $ref: '#/components/responses/Problem' }
     delete:
       tags: [budgets]
       operationId: deleteTransaction
@@ -404,6 +413,7 @@ paths:
         '204': { description: Deleted }
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
+        '423': { $ref: '#/components/responses/Problem' }
 
   /v1/budgets/{budgetId}/preferences:
     get:
@@ -417,6 +427,7 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Preferences' }
+        '423': { $ref: '#/components/responses/Problem' }
 
   /v1/budgets/{budgetId}/accounts/{id}:
     patch:
@@ -441,6 +452,7 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Account' }
         '404': { $ref: '#/components/responses/Problem' }
+        '423': { $ref: '#/components/responses/Problem' }
 
   /v1/budgets/{budgetId}/accounts/{id}/close:
     post:
@@ -466,6 +478,7 @@ paths:
         '204': { description: Actual deleted the account because it had no transactions }
         '400': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
+        '423': { $ref: '#/components/responses/Problem' }
 
   /v1/budgets/{budgetId}/accounts/{id}/reopen:
     post:
@@ -481,6 +494,7 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Account' }
         '404': { $ref: '#/components/responses/Problem' }
+        '423': { $ref: '#/components/responses/Problem' }
 
   /v1/budgets/{budgetId}/categories:
     post:
@@ -505,6 +519,7 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Category' }
         '400': { $ref: '#/components/responses/Problem' }
+        '423': { $ref: '#/components/responses/Problem' }
 
   /v1/budgets/{budgetId}/categories/{id}:
     parameters:
@@ -531,6 +546,7 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Category' }
         '404': { $ref: '#/components/responses/Problem' }
+        '423': { $ref: '#/components/responses/Problem' }
     delete:
       tags: [budgets]
       operationId: deleteCategory
@@ -540,6 +556,7 @@ paths:
         '204': { description: Deleted }
         '400': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
+        '423': { $ref: '#/components/responses/Problem' }
 
   /v1/budgets/{budgetId}/category-groups/{id}:
     parameters:
@@ -565,6 +582,7 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/CategoryGroup' }
         '404': { $ref: '#/components/responses/Problem' }
+        '423': { $ref: '#/components/responses/Problem' }
     delete:
       tags: [budgets]
       operationId: deleteCategoryGroup
@@ -574,6 +592,7 @@ paths:
         '204': { description: Deleted }
         '400': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
+        '423': { $ref: '#/components/responses/Problem' }
 
   /v1/budgets/{budgetId}/months:
     get:
@@ -593,6 +612,7 @@ paths:
                   months:
                     type: array
                     items: { $ref: '#/components/schemas/Month' }
+        '423': { $ref: '#/components/responses/Problem' }
 
   /v1/budgets/{budgetId}/months/{month}:
     get:
@@ -608,6 +628,7 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/BudgetMonth' }
         '404': { $ref: '#/components/responses/Problem' }
+        '423': { $ref: '#/components/responses/Problem' }
 
   /v1/budgets/{budgetId}/months/{month}/categories/{categoryId}:
     patch:
@@ -630,6 +651,7 @@ paths:
               schema: { $ref: '#/components/schemas/BudgetMonth' }
         '400': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
+        '423': { $ref: '#/components/responses/Problem' }
 
   /v1/budgets/{budgetId}/months/{month}/transfers:
     post:
@@ -654,6 +676,7 @@ paths:
         '400': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
         '501': { $ref: '#/components/responses/Problem' }
+        '423': { $ref: '#/components/responses/Problem' }
 
   /v1/budgets/{budgetId}/months/{month}/hold:
     put:
@@ -677,6 +700,7 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/BudgetMonth' }
+        '423': { $ref: '#/components/responses/Problem' }
     delete:
       tags: [budgets]
       operationId: resetHold
@@ -689,6 +713,7 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/BudgetMonth' }
+        '423': { $ref: '#/components/responses/Problem' }
 
   /v1/budgets/{budgetId}/schedules:
     get:
@@ -704,6 +729,7 @@ paths:
           content:
             application/json:
               schema: { type: object, required: [items], properties: { items: { type: array, items: { $ref: '#/components/schemas/Schedule' } } } }
+        '423': { $ref: '#/components/responses/Problem' }
     post:
       tags: [budgets]
       operationId: createSchedule
@@ -722,6 +748,7 @@ paths:
               schema: { $ref: '#/components/schemas/Schedule' }
         '400': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
+        '423': { $ref: '#/components/responses/Problem' }
 
   /v1/budgets/{budgetId}/schedules/{id}:
     patch:
@@ -743,6 +770,7 @@ paths:
               schema: { $ref: '#/components/schemas/Schedule' }
         '400': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
+        '423': { $ref: '#/components/responses/Problem' }
     delete:
       tags: [budgets]
       operationId: deleteSchedule
@@ -752,6 +780,7 @@ paths:
       responses:
         '204': { description: Deleted }
         '404': { $ref: '#/components/responses/Problem' }
+        '423': { $ref: '#/components/responses/Problem' }
 
   /v1/budgets/{budgetId}/schedules/{id}/skip:
     post:
@@ -769,6 +798,7 @@ paths:
               schema: { $ref: '#/components/schemas/Schedule' }
         '404': { $ref: '#/components/responses/Problem' }
         '501': { $ref: '#/components/responses/Problem' }
+        '423': { $ref: '#/components/responses/Problem' }
 
   /v1/budgets/{budgetId}/schedules/{id}/post:
     post:
@@ -786,6 +816,7 @@ paths:
               schema: { $ref: '#/components/schemas/Schedule' }
         '404': { $ref: '#/components/responses/Problem' }
         '501': { $ref: '#/components/responses/Problem' }
+        '423': { $ref: '#/components/responses/Problem' }
 
   /v1/budgets/{budgetId}/rules:
     get:
@@ -800,6 +831,7 @@ paths:
           content:
             application/json:
               schema: { type: object, required: [items], properties: { items: { type: array, items: { $ref: '#/components/schemas/Rule' } } } }
+        '423': { $ref: '#/components/responses/Problem' }
     post:
       tags: [budgets]
       operationId: createRule
@@ -817,6 +849,7 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Rule' }
         '400': { $ref: '#/components/responses/Problem' }
+        '423': { $ref: '#/components/responses/Problem' }
 
   /v1/budgets/{budgetId}/rules/{id}:
     put:
@@ -838,6 +871,7 @@ paths:
               schema: { $ref: '#/components/schemas/Rule' }
         '400': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
+        '423': { $ref: '#/components/responses/Problem' }
     delete:
       tags: [budgets]
       operationId: deleteRule
@@ -848,6 +882,7 @@ paths:
         '204': { description: Deleted }
         '400': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
+        '423': { $ref: '#/components/responses/Problem' }
 
   /v1/budgets/{budgetId}/payees/stats:
     get:
@@ -862,6 +897,7 @@ paths:
           content:
             application/json:
               schema: { type: object, required: [items], properties: { items: { type: array, items: { $ref: '#/components/schemas/PayeeStat' } } } }
+        '423': { $ref: '#/components/responses/Problem' }
 
   /v1/budgets/{budgetId}/payees/{id}:
     patch:
@@ -883,6 +919,7 @@ paths:
               schema: { $ref: '#/components/schemas/Payee' }
         '400': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
+        '423': { $ref: '#/components/responses/Problem' }
     delete:
       tags: [budgets]
       operationId: deletePayee
@@ -893,6 +930,7 @@ paths:
         '204': { description: Deleted }
         '400': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
+        '423': { $ref: '#/components/responses/Problem' }
 
   /v1/budgets/{budgetId}/payees/{id}/merge:
     post:
@@ -911,6 +949,7 @@ paths:
         '204': { description: Merged }
         '400': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
+        '423': { $ref: '#/components/responses/Problem' }
 
   /v1/budgets/{budgetId}/tags:
     get:
@@ -924,6 +963,7 @@ paths:
           content:
             application/json:
               schema: { type: object, required: [items], properties: { items: { type: array, items: { $ref: '#/components/schemas/Tag' } } } }
+        '423': { $ref: '#/components/responses/Problem' }
     post:
       tags: [budgets]
       operationId: createTag
@@ -941,6 +981,7 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Tag' }
         '409': { $ref: '#/components/responses/Problem' }
+        '423': { $ref: '#/components/responses/Problem' }
 
   /v1/budgets/{budgetId}/tags/{id}:
     patch:
@@ -961,6 +1002,7 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Tag' }
         '404': { $ref: '#/components/responses/Problem' }
+        '423': { $ref: '#/components/responses/Problem' }
     delete:
       tags: [budgets]
       operationId: deleteTag
@@ -970,6 +1012,7 @@ paths:
       responses:
         '204': { description: Deleted }
         '404': { $ref: '#/components/responses/Problem' }
+        '423': { $ref: '#/components/responses/Problem' }
 
   /v1/budgets/{budgetId}/categories/{id}/note:
     get:
@@ -986,6 +1029,7 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/CategoryNote' }
         '404': { $ref: '#/components/responses/Problem' }
+        '423': { $ref: '#/components/responses/Problem' }
     put:
       tags: [budgets]
       operationId: setCategoryNote
@@ -1004,6 +1048,7 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/CategoryNote' }
         '404': { $ref: '#/components/responses/Problem' }
+        '423': { $ref: '#/components/responses/Problem' }
 
   /v1/budgets/{budgetId}/accounts/{id}/bank-sync:
     post:
@@ -1019,6 +1064,7 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Job' }
+        '423': { $ref: '#/components/responses/Problem' }
 
   /v1/budgets/{budgetId}/bank-sync:
     post:
@@ -1033,6 +1079,7 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Job' }
+        '423': { $ref: '#/components/responses/Problem' }
 
   /v1/jobs/{jobId}:
     get:
@@ -1069,6 +1116,7 @@ paths:
               schema: { $ref: '#/components/schemas/ImportPreview' }
         '400': { $ref: '#/components/responses/Problem' }
         '501': { $ref: '#/components/responses/Problem' }
+        '423': { $ref: '#/components/responses/Problem' }
 
   /v1/budgets/{budgetId}/accounts/{id}/import:
     post:
@@ -1091,6 +1139,7 @@ paths:
               schema: { $ref: '#/components/schemas/ImportResult' }
         '400': { $ref: '#/components/responses/Problem' }
         '501': { $ref: '#/components/responses/Problem' }
+        '423': { $ref: '#/components/responses/Problem' }
 
   /v1/budgets/{budgetId}/accounts/{id}/reconcile:
     get:
@@ -1106,6 +1155,7 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/ReconcileStatus' }
         '404': { $ref: '#/components/responses/Problem' }
+        '423': { $ref: '#/components/responses/Problem' }
     post:
       tags: [budgets]
       operationId: reconcileAccount
@@ -1126,6 +1176,7 @@ paths:
               schema: { $ref: '#/components/schemas/ReconcileResult' }
         '400': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
+        '423': { $ref: '#/components/responses/Problem' }
 
   /v1/budgets/{budgetId}/reports/cash-flow:
     get:
@@ -1143,6 +1194,7 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/CashFlowReport' }
         '400': { $ref: '#/components/responses/Problem' }
+        '423': { $ref: '#/components/responses/Problem' }
 
   /v1/budgets/{budgetId}/reports/spending:
     get:
@@ -1160,6 +1212,7 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/SpendingReport' }
         '400': { $ref: '#/components/responses/Problem' }
+        '423': { $ref: '#/components/responses/Problem' }
 
   /v1/budgets/{budgetId}/reports/net-worth:
     get:
@@ -1175,6 +1228,7 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/NetWorthReport' }
+        '423': { $ref: '#/components/responses/Problem' }
 
   /v1/budgets/{budgetId}/months/{month}/apply-templates:
     post:
@@ -1196,6 +1250,7 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/TemplatesResult' }
         '501': { $ref: '#/components/responses/Problem' }
+        '423': { $ref: '#/components/responses/Problem' }
 
   /v1/budgets/{budgetId}/templates/check:
     get:
@@ -1210,6 +1265,7 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/TemplatesCheck' }
         '501': { $ref: '#/components/responses/Problem' }
+        '423': { $ref: '#/components/responses/Problem' }
 
 components:
   securitySchemes:
@@ -1276,7 +1332,7 @@ components:
         status: { type: integer }
         code:
           type: string
-          description: Stable machine-readable code, e.g. `unauthorized`, `forbidden`, `not_found`, `validation`, `feature_unavailable`, `actual_unavailable`, `conflict`, `rate_limited`
+          description: Stable machine-readable code, e.g. `unauthorized`, `forbidden`, `not_found`, `validation`, `feature_unavailable`, `actual_unavailable`, `budget_encrypted`, `conflict`, `rate_limited`
         detail: { type: string }
 
     Health:

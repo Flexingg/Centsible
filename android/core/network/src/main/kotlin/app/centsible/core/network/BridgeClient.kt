@@ -173,6 +173,7 @@ class BridgeClient(
             "rate_limited" -> BridgeException.RateLimited(message)
             "feature_unavailable" -> BridgeException.FeatureUnavailable(message)
             "actual_unavailable" -> BridgeException.ActualUnavailable(message)
+            "budget_encrypted" -> BridgeException.BudgetEncrypted(message)
             else -> when (res.status.value) {
                 401 -> BridgeException.Unauthorized(message)
                 403 -> BridgeException.Forbidden(message)

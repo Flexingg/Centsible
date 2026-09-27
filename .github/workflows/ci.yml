@@ -31,11 +31,17 @@ jobs:
       - run: npm test
       - run: npm run build
 
-  bridge-latest-actual:
-    # Early warning: same suite against the newest Actual release. Allowed to fail.
-    if: github.event_name == 'schedule'
+  bridge-newer-actual:
+    # Early warning: same suite against Actual's newest release and tonight's nightly
+    # build (the next release), so breakage shows up before you upgrade. Allowed to fail.
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     continue-on-error: true
+    strategy:
+      fail-fast: false
+      matrix:
+        actual: [latest, nightly]
+    name: bridge vs Actual ${{ matrix.actual }}
     defaults:
       run:
         working-directory: bridge
@@ -45,7 +51,7 @@ jobs:
         with:
           node-version: 22
       - run: npm ci
-      - run: npm install --no-save @actual-app/api@latest @actual-app/sync-server@latest
+      - run: npm install --no-save @actual-app/api@${{ matrix.actual }} @actual-app/sync-server@${{ matrix.actual }}
       - run: npm test
 
   android:

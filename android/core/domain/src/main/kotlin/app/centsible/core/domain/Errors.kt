@@ -10,6 +10,8 @@ sealed class BridgeException(message: String) : Exception(message) {
     class FeatureUnavailable(message: String) : BridgeException(message)
     class ActualUnavailable(message: String) : BridgeException(message)
     class RateLimited(message: String) : BridgeException(message)
+    /** End-to-end encrypted budget the bridge has no (or the wrong) password for. */
+    class BudgetEncrypted(message: String) : BridgeException(message)
     class Network(message: String, cause: Throwable? = null) : BridgeException(message) {
         init { cause?.let(::initCause) }
     }

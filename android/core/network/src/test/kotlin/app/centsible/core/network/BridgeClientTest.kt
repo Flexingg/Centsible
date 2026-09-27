@@ -1,6 +1,7 @@
 package app.centsible.core.network
 
 import app.centsible.core.domain.BridgeException
+import app.centsible.core.domain.userMessage
 import app.centsible.core.domain.Session
 import app.centsible.core.model.DeviceId
 import app.centsible.core.model.Member
@@ -87,6 +88,16 @@ class BridgeClientTest {
         val error = runCatching { client.get<HealthDto>("/v1/health") }.exceptionOrNull()
         assertTrue(error is BridgeException.FeatureUnavailable)
         assertEquals("nope", error!!.message)
+    }
+
+    @Test
+    fun `explains encrypted budgets with the bridge's instructions`() = runTest {
+        // Recorded from a real end-to-end encrypted budget with no password configured.
+        val fixture = java.io.File(System.getProperty("contract.fixtures") ?: "../../../contract/fixtures", "problem-budget-encrypted.json")
+        val client = BridgeClient(InMemorySessionStore(session), MockEngine { respond(fixture.readText(), HttpStatusCode.Locked, problemHeaders) })
+        val error = runCatching { client.get<HealthDto>("/v1/health") }.exceptionOrNull()
+        assertTrue(error is BridgeException.BudgetEncrypted)
+        assertTrue(error!!.userMessage().contains("ACTUAL_BUDGET_PASSWORDS"))
     }
 
     @Test

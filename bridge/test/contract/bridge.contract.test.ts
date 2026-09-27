@@ -31,6 +31,8 @@ let app: FastifyInstance;
 let config: BridgeConfig;
 let owner: { accessToken: string; refreshToken: string };
 let budgetId: string;
+let encryptedBudgetId: string;
+const ENCRYPTION_PASSWORD = 'correct horse battery';
 
 type Call = { method: string; url: string; path: string; token?: string; body?: unknown; headers?: Record<string, string> };
 
@@ -62,6 +64,17 @@ beforeAll(async () => {
   const port = 5100 + Math.floor(Math.random() * 800);
   actual = await startSeededActual(join(root, 'actual'), port);
   budgetId = actual.budgetId;
+
+  // A second budget with end-to-end encryption, created the way Actual's settings do.
+  const encData = join(root, 'encrypted-seed');
+  rmSync(encData, { recursive: true, force: true });
+  mkdirSync(encData, { recursive: true });
+  const { stdout } = await promisify(execFile)(
+    process.execPath,
+    [join(here, '..', 'support', 'seed-encrypted.mjs'), actual.url, actual.password, encData, ENCRYPTION_PASSWORD],
+    { maxBuffer: 64 * 1024 * 1024 },
+  );
+  encryptedBudgetId = JSON.parse(stdout.trim().split('\n').pop()!).budgetId;
 
   const bridgeData = join(root, 'bridge');
   rmSync(bridgeData, { recursive: true, force: true });
@@ -223,7 +236,9 @@ describe('budget data', () => {
 
   it('lists budgets', async () => {
     const res = await call({ method: 'GET', url: '/v1/budgets', path: '/v1/budgets', token: owner.accessToken });
-    expect(res.body).toEqual({ items: [{ id: budgetId, name: 'Household', encrypted: false }] });
+    const items = (res.body as { items: unknown[] }).items;
+    expect(items).toContainEqual({ id: budgetId, name: 'Household', encrypted: false });
+    expect(items).toContainEqual({ id: encryptedBudgetId, name: 'Private', encrypted: true });
     recordFixture('budgets', res.body);
   });
 
@@ -895,5 +910,44 @@ describe('tokens', () => {
   it('records an audit trail of household activity', () => {
     const actions = store.recentAudit(200).map((r) => r.action);
     expect(actions).toEqual(expect.arrayContaining(['auth.paired', 'transaction.created', 'budget.money_moved', 'household.member_created']));
+  });
+});
+
+describe('end-to-end encrypted budgets', () => {
+  // Earlier tests rotate and revoke the owner's tokens, so pair a fresh device.
+  let token: string;
+  beforeAll(async () => {
+    const kim = store.createMember({ displayName: 'Kim', role: 'owner' });
+    token = (await pair(kim.id, 'Pixel 8')).accessToken;
+  });
+
+  // Runs last: switching the open budget is expensive, and the household budget
+  // reopens on the next request anyway.
+  it('explains a missing encryption password instead of failing opaquely', async () => {
+    const res = await call({ method: 'GET', url: `/v1/budgets/${encryptedBudgetId}/accounts`, path: '/v1/budgets/{budgetId}/accounts', token });
+    expect(res.status).toBe(423);
+    expect(res.body).toMatchObject({ code: 'budget_encrypted' });
+    recordFixture('problem-budget-encrypted', res.body);
+  });
+
+  it('says so when the configured password is wrong', async () => {
+    config.actual.budgetPasswords[encryptedBudgetId] = 'not it';
+    const res = await call({ method: 'GET', url: `/v1/budgets/${encryptedBudgetId}/accounts`, path: '/v1/budgets/{budgetId}/accounts', token });
+    expect(res.status).toBe(423);
+    expect((res.body as { detail: string }).detail).toMatch(/wrong/);
+  });
+
+  it('opens the budget once the password is configured', async () => {
+    config.actual.budgetPasswords[encryptedBudgetId] = ENCRYPTION_PASSWORD;
+    const res = await call({ method: 'GET', url: `/v1/budgets/${encryptedBudgetId}/accounts`, path: '/v1/budgets/{budgetId}/accounts', token });
+    expect(res.status).toBe(200);
+    const accounts = (res.body as { items: { name: string; balance: number }[] }).items;
+    expect(accounts.map((a) => a.name)).toEqual(['Savings']);
+    expect(accounts[0]!.balance).toBe(90000);
+  });
+
+  it('still serves the unencrypted household budget afterwards', async () => {
+    const res = await call({ method: 'GET', url: `/v1/budgets/${budgetId}/accounts`, path: '/v1/budgets/{budgetId}/accounts', token });
+    expect(res.status).toBe(200);
   });
 });

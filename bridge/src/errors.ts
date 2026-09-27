@@ -7,6 +7,7 @@ export type ErrorCode =
   | 'rate_limited'
   | 'feature_unavailable'
   | 'actual_unavailable'
+  | 'budget_encrypted'
   | 'internal';
 
 export class ApiError extends Error {
@@ -33,6 +34,10 @@ export class ApiError extends Error {
   }
   static featureUnavailable(feature: string) {
     return new ApiError(501, 'feature_unavailable', 'Feature unavailable', `"${feature}" is not supported by this Actual version`);
+  }
+  /** 423: the budget is end-to-end encrypted and the bridge has no (or the wrong) password. */
+  static budgetEncrypted(detail: string) {
+    return new ApiError(423, 'budget_encrypted', 'Budget is encrypted', detail);
   }
   static actualUnavailable(detail?: string) {
     return new ApiError(503, 'actual_unavailable', 'Actual server unavailable', detail);

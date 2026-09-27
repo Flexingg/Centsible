@@ -74,6 +74,7 @@ fun BudgetRoute(onManageCategories: () -> Unit, viewModel: BudgetViewModel = hil
         onMessageShown = viewModel::messageShown,
         onApplyGoals = viewModel::applyGoals,
         onSaveNote = viewModel::saveNote,
+        onHold = viewModel::hold,
     )
 }
 
@@ -91,8 +92,10 @@ fun BudgetScreen(
     onManageCategories: () -> Unit = {},
     onApplyGoals: (Boolean) -> Unit = {},
     onSaveNote: (CategoryId, String) -> Unit = { _, _ -> },
+    onHold: (Money?) -> Unit = {},
 ) {
     var goalsMenu by remember { mutableStateOf(false) }
+    var holding by remember { mutableStateOf(false) }
     val snackbar = remember { SnackbarHostState() }
     LaunchedEffect(state.message) {
         state.message?.let { snackbar.showSnackbar(it); onMessageShown() }
@@ -144,11 +147,12 @@ fun BudgetScreen(
                 onAction = onRetry,
                 modifier = Modifier.padding(padding),
             )
-            is Loadable.Ready -> BudgetContent(data.value, state, onOpenCategory, onManageCategories, Modifier.padding(padding))
+            is Loadable.Ready -> BudgetContent(data.value, state, onOpenCategory, onManageCategories, onHold = { holding = true }, onRelease = { onHold(null) }, modifier = Modifier.padding(padding))
         }
     }
 
     val month = state.data.valueOrNull
+    if (holding && month != null) HoldDialog(month.toBudget, onDismiss = { holding = false }, onHold = { holding = false; onHold(it) })
     val selected = month?.groups?.flatMap { it.categories }?.firstOrNull { it.id == state.selectedCategory }
     if (month != null && selected != null) {
         CategorySheet(
@@ -165,14 +169,22 @@ fun BudgetScreen(
 }
 
 @Composable
-private fun BudgetContent(month: BudgetMonth, state: BudgetUiState, onOpenCategory: (CategoryId) -> Unit, onManageCategories: () -> Unit, modifier: Modifier) {
+private fun BudgetContent(
+    month: BudgetMonth,
+    state: BudgetUiState,
+    onOpenCategory: (CategoryId) -> Unit,
+    onManageCategories: () -> Unit,
+    onHold: () -> Unit,
+    onRelease: () -> Unit,
+    modifier: Modifier,
+) {
     val collapsed = remember { mutableStateMapOf<CategoryGroupId, Boolean>() }
     LazyColumn(
         modifier.fillMaxSize(),
         contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 96.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        item(key = "summary") { SummaryCard(month) }
+        item(key = "summary") { SummaryCard(month, state.canHold && !state.saving, onHold, onRelease) }
         items(month.expenseGroups.filter { !it.hidden }, key = { it.id.raw }) { group ->
             GroupCard(
                 group = group,
@@ -201,7 +213,7 @@ private fun BudgetContent(month: BudgetMonth, state: BudgetUiState, onOpenCatego
 }
 
 @Composable
-private fun SummaryCard(month: BudgetMonth) {
+private fun SummaryCard(month: BudgetMonth, canHold: Boolean = false, onHold: () -> Unit = {}, onRelease: () -> Unit = {}) {
     val colors = CentsibleTheme.colors
     val over = month.toBudget.isNegative
     CentsibleCard(contentPadding = PaddingValues(20.dp)) {
@@ -228,10 +240,29 @@ private fun SummaryCard(month: BudgetMonth) {
             SummaryStat("Budgeted", month.totalBudgeted)
             SummaryStat("Spent", month.totalSpent.abs())
         }
-        if (!month.forNextMonth.isZero || month.lastMonthOverspent.isNegative) {
+        val offerHold = canHold && month.forNextMonth.isZero && month.toBudget.minor > 0
+        if (!month.forNextMonth.isZero || month.lastMonthOverspent.isNegative || offerHold) {
             HorizontalDivider(Modifier.padding(vertical = 12.dp), color = colors.border)
             if (!month.forNextMonth.isZero) {
-                Text("Holding ${MoneyFormat.format(month.forNextMonth)} for next month", style = MaterialTheme.typography.bodySmall, color = colors.textSecondary)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        "Holding ${MoneyFormat.format(month.forNextMonth)} for next month",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = colors.textSecondary,
+                        modifier = Modifier.weight(1f),
+                    )
+                    if (canHold) androidx.compose.material3.TextButton(onClick = onRelease) { Text("Release") }
+                }
+            } else if (offerHold) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        "Already covered this month? Save the rest for next month.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = colors.textSecondary,
+                        modifier = Modifier.weight(1f),
+                    )
+                    androidx.compose.material3.TextButton(onClick = onHold) { Text("Hold") }
+                }
             }
             if (month.lastMonthOverspent.isNegative) {
                 Text("Overspent last month: ${MoneyFormat.format(month.lastMonthOverspent.abs())}", style = MaterialTheme.typography.bodySmall, color = colors.negative)
@@ -347,4 +378,34 @@ private fun IncomeCard(group: BudgetGroup) {
             }
         }
     }
+}
+
+@Composable
+private fun HoldDialog(available: Money, onDismiss: () -> Unit, onHold: (Money) -> Unit) {
+    var input by remember { mutableStateOf(app.centsible.core.designsystem.component.MoneyInput.toInput(available)) }
+    val parsed = app.centsible.core.designsystem.component.MoneyInput.parse(input)?.takeIf { it.minor > 0 && it.minor <= available.minor }
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Hold for next month") },
+        text = {
+            Column {
+                Text(
+                    "Held money leaves this month's To Budget and shows up in next month's.",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                Spacer(Modifier.height(12.dp))
+                androidx.compose.material3.OutlinedTextField(
+                    input, { input = it },
+                    label = { Text("Amount") },
+                    prefix = { Text("$") },
+                    supportingText = { Text("Up to ${MoneyFormat.format(available)}") },
+                    isError = parsed == null,
+                    singleLine = true,
+                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Decimal),
+                )
+            }
+        },
+        confirmButton = { androidx.compose.material3.TextButton(onClick = { parsed?.let(onHold) }, enabled = parsed != null) { Text("Hold") } },
+        dismissButton = { androidx.compose.material3.TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
 }

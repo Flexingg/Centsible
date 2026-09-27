@@ -1,9 +1,14 @@
 {
   "items": [
     {
-      "id": "e0edd95f-a9a6-4712-8098-b2e3596f8686",
+      "id": "6bc8a000-f85e-44e0-9267-2190e1015d0a",
       "name": "Household",
       "encrypted": false
+    },
+    {
+      "id": "fc512c4a-4192-4e72-b93a-b627d4d60250",
+      "name": "Private",
+      "encrypted": true
     }
   ]
 }

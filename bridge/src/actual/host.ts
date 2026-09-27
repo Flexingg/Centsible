@@ -131,16 +131,32 @@ export class ActualHost {
     const remote = files.find((f) => f.groupId === budgetId && f.state === 'remote');
     if (!local && !remote) throw ApiError.notFound(`Budget ${budgetId} not found on the Actual server`);
 
+    // Loading replaces whatever was open, so forget it until this one succeeds.
+    this.openBudgetId = null;
     try {
-      if (local?.id) {
-        await api.loadBudget(local.id);
-        await api.sync();
-      } else {
+      try {
+        if (local?.id) {
+          await api.loadBudget(local.id);
+          await api.sync();
+        } else {
+          await api.downloadBudget(budgetId, password ? { password } : undefined);
+        }
+      } catch (err) {
+        if (encryptionProblem(err)) throw err;
+        this.log.warn({ err, budgetId }, 'loading cached budget failed; downloading a fresh copy');
         await api.downloadBudget(budgetId, password ? { password } : undefined);
       }
     } catch (err) {
-      this.log.warn({ err, budgetId }, 'loading cached budget failed; downloading a fresh copy');
-      await api.downloadBudget(budgetId, password ? { password } : undefined);
+      const problem = encryptionProblem(err);
+      if (problem === 'missing') {
+        throw ApiError.budgetEncrypted(
+          `This budget uses end-to-end encryption. Add "${budgetId}=<password>" to ACTUAL_BUDGET_PASSWORDS on the bridge and restart it.`,
+        );
+      }
+      if (problem === 'wrong') {
+        throw ApiError.budgetEncrypted('The encryption password set for this budget in ACTUAL_BUDGET_PASSWORDS is wrong.');
+      }
+      throw err;
     }
     this.openBudgetId = budgetId;
     this.lastSyncAt = Date.now();
@@ -176,4 +192,16 @@ function routeConsoleToDebug(log: Logger) {
   console.log = toDebug;
   console.info = toDebug;
   console.debug = toDebug;
+}
+
+/**
+ * Actual tags encryption failures with error codes (verified on 26.9.0); the message
+ * check is a fallback in case a release drops the code.
+ */
+function encryptionProblem(err: unknown): 'missing' | 'wrong' | null {
+  if (!(err instanceof Error)) return null;
+  const code = (err as Error & { code?: string }).code;
+  if (code === 'missing-key' || /is encrypted\. Please provide a password/i.test(err.message)) return 'missing';
+  if (code === 'decrypt-failure' || code === 'invalid-key' || /unable to decrypt/i.test(err.message)) return 'wrong';
+  return null;
 }

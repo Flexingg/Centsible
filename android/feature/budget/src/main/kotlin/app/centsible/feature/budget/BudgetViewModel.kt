@@ -38,6 +38,7 @@ data class BudgetUiState(
     val saving: Boolean = false,
     val message: String? = null,
     val canApplyGoals: Boolean = false,
+    val canHold: Boolean = false,
     val canEditNotes: Boolean = false,
     /** Note for the open category; goal templates live here as `#template` lines. */
     val note: String? = null,
@@ -75,6 +76,7 @@ class BudgetViewModel @Inject constructor(
                     canToggleRollover = role?.canWrite == true && caps.has(Feature.BudgetCarryover),
                     canManageCategories = role?.canWrite == true && caps.has(Feature.CategoriesWrite),
                     canApplyGoals = role?.canWrite == true && caps.has(Feature.BudgetTemplates),
+                    canHold = role?.canWrite == true && caps.has(Feature.BudgetHold),
                     canEditNotes = caps.has(Feature.CategoryNotes),
                     availableMonths = runCatching { engine.budgetMonths(budget) }.getOrDefault(emptyList()),
                 )
@@ -101,6 +103,11 @@ class BudgetViewModel @Inject constructor(
         runCatching { planning.setCategoryNote(budget, category, text) }
             .onSuccess { state.update { it.copy(note = text, message = "Note saved") } }
             .onFailure { e -> state.update { it.copy(message = e.userMessage()) } }
+    }
+
+    /** Sets aside To Budget money for next month; null releases the hold. */
+    fun hold(amount: Money?) = mutate(if (amount == null) "Hold released" else "Holding ${app.centsible.core.designsystem.component.MoneyFormat.format(amount)} for next month") {
+        engine.holdForNextMonth(budget, state.value.month, amount)
     }
 
     /** Runs Actual's goal templates for the month; Actual reports what it did. */

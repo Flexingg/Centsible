@@ -70,4 +70,10 @@ class BudgetScreenshotTest {
         compose.waitForIdle()
         captureScreenRoboImage("screenshots/budget_category_goals.png")
     }
+
+    @Test fun budget_holding() {
+        val m = SampleHousehold.budgetMonth
+        render(ready.copy(canHold = true, data = Loadable.Ready(m.copy(toBudget = app.centsible.core.model.Money(0), forNextMonth = m.toBudget))))
+        compose.onRoot().captureRoboImage("screenshots/budget_holding.png")
+    }
 }
