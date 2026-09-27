@@ -1,0 +1,16 @@
+{
+  "id": "c589ef65-f1c1-4b75-b368-6f9c16981750",
+  "accountId": "cd877299-65da-4b46-b467-67fa65e0df3b",
+  "date": "2026-09-15",
+  "amount": -1750,
+  "payeeId": "1f233297-496a-4f48-97cc-167f554f1734",
+  "payeeName": "Corner Market",
+  "categoryId": "af375fd4-d759-46b3-bffe-74a856151d57",
+  "notes": "milk + bread",
+  "cleared": false,
+  "reconciled": false,
+  "transferId": null,
+  "isParent": false,
+  "parentId": null,
+  "subtransactions": []
+}

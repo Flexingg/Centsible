@@ -141,3 +141,16 @@ export function toTransaction(raw: Raw): TransactionDto {
     subtransactions: subs.map(toTransaction),
   };
 }
+
+/** Synced budget preferences with Actual's defaults filled in. */
+export function toPreferences(prefs: Raw) {
+  const first = Number(prefs.firstDayOfWeekIdx ?? 0);
+  return {
+    budgetType: budgetTypeFromPrefs(prefs),
+    currencyCode: typeof prefs.defaultCurrencyCode === 'string' && prefs.defaultCurrencyCode ? prefs.defaultCurrencyCode : 'USD',
+    numberFormat: typeof prefs.numberFormat === 'string' ? prefs.numberFormat : 'comma-dot',
+    dateFormat: typeof prefs.dateFormat === 'string' ? prefs.dateFormat : 'MM/dd/yyyy',
+    firstDayOfWeek: Number.isInteger(first) && first >= 0 && first <= 6 ? first : 0,
+    hideFraction: prefs.hideFraction === true || prefs.hideFraction === 'true',
+  };
+}

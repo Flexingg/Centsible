@@ -233,6 +233,30 @@ paths:
                     items: { $ref: '#/components/schemas/Account' }
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
+    post:
+      tags: [budgets]
+      operationId: createAccount
+      parameters:
+        - $ref: '#/components/parameters/BudgetId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string, minLength: 1, maxLength: 100 }
+                offBudget: { type: boolean, default: false }
+                initialBalance: { $ref: '#/components/schemas/Money' }
+      responses:
+        '201':
+          description: Created account
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Account' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
 
   /v1/budgets/{budgetId}/category-groups:
     get:
@@ -252,6 +276,26 @@ paths:
                   items:
                     type: array
                     items: { $ref: '#/components/schemas/CategoryGroup' }
+    post:
+      tags: [budgets]
+      operationId: createCategoryGroup
+      parameters:
+        - $ref: '#/components/parameters/BudgetId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string, minLength: 1, maxLength: 100 }
+      responses:
+        '201':
+          description: Created group
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CategoryGroup' }
 
   /v1/budgets/{budgetId}/payees:
     get:
@@ -282,6 +326,8 @@ paths:
         - { name: categoryId, in: query, schema: { type: string } }
         - { name: since, in: query, schema: { type: string, format: date } }
         - { name: until, in: query, schema: { type: string, format: date } }
+        - { name: q, in: query, description: Search payee, notes and category name, schema: { type: string, maxLength: 100 } }
+        - { name: uncategorized, in: query, description: Only on-budget transactions that still need a category, schema: { type: boolean } }
         - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 500, default: 100 } }
         - { name: cursor, in: query, schema: { type: string } }
       responses:
@@ -313,6 +359,221 @@ paths:
               schema: { $ref: '#/components/schemas/Transaction' }
         '400': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
+
+  /v1/budgets/{budgetId}/transactions/{transactionId}:
+    parameters:
+      - $ref: '#/components/parameters/BudgetId'
+      - { name: transactionId, in: path, required: true, schema: { type: string } }
+    get:
+      tags: [budgets]
+      operationId: getTransaction
+      responses:
+        '200':
+          description: The transaction, with splits grouped
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Transaction' }
+        '404': { $ref: '#/components/responses/Problem' }
+    patch:
+      tags: [budgets]
+      operationId: updateTransaction
+      description: |
+        Partial update. Changing the payee to a transfer payee turns it into a transfer.
+        `subtransactions` replaces all splits (capability `transactions.splits`); send an
+        existing split's `id` to keep it, omit ids for new splits, `[]` to unsplit.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TransactionPatch' }
+      responses:
+        '200':
+          description: The updated transaction
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Transaction' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '501': { $ref: '#/components/responses/Problem' }
+    delete:
+      tags: [budgets]
+      operationId: deleteTransaction
+      description: Also removes a transfer's other side and a split's children.
+      responses:
+        '204': { description: Deleted }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+
+  /v1/budgets/{budgetId}/preferences:
+    get:
+      tags: [budgets]
+      operationId: getPreferences
+      parameters:
+        - $ref: '#/components/parameters/BudgetId'
+      responses:
+        '200':
+          description: Budget-wide display preferences
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Preferences' }
+
+  /v1/budgets/{budgetId}/accounts/{id}:
+    patch:
+      tags: [budgets]
+      operationId: updateAccount
+      parameters:
+        - $ref: '#/components/parameters/BudgetId'
+        - $ref: '#/components/parameters/Id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              minProperties: 1
+              properties:
+                name: { type: string, minLength: 1, maxLength: 100 }
+      responses:
+        '200':
+          description: Updated account
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Account' }
+        '404': { $ref: '#/components/responses/Problem' }
+
+  /v1/budgets/{budgetId}/accounts/{id}/close:
+    post:
+      tags: [budgets]
+      operationId: closeAccount
+      parameters:
+        - $ref: '#/components/parameters/BudgetId'
+        - $ref: '#/components/parameters/Id'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                transferAccountId: { type: string, description: Required when the balance isn't zero }
+                transferCategoryId: { type: string, description: Category for the balance when moving it off budget }
+      responses:
+        '200':
+          description: The closed account
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Account' }
+        '204': { description: Actual deleted the account because it had no transactions }
+        '400': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+
+  /v1/budgets/{budgetId}/accounts/{id}/reopen:
+    post:
+      tags: [budgets]
+      operationId: reopenAccount
+      parameters:
+        - $ref: '#/components/parameters/BudgetId'
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '200':
+          description: The reopened account
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Account' }
+        '404': { $ref: '#/components/responses/Problem' }
+
+  /v1/budgets/{budgetId}/categories:
+    post:
+      tags: [budgets]
+      operationId: createCategory
+      parameters:
+        - $ref: '#/components/parameters/BudgetId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, groupId]
+              properties:
+                name: { type: string, minLength: 1, maxLength: 100 }
+                groupId: { type: string }
+      responses:
+        '201':
+          description: Created category
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Category' }
+        '400': { $ref: '#/components/responses/Problem' }
+
+  /v1/budgets/{budgetId}/categories/{id}:
+    parameters:
+      - $ref: '#/components/parameters/BudgetId'
+      - $ref: '#/components/parameters/Id'
+    patch:
+      tags: [budgets]
+      operationId: updateCategory
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              minProperties: 1
+              properties:
+                name: { type: string, minLength: 1, maxLength: 100 }
+                hidden: { type: boolean }
+                groupId: { type: string }
+      responses:
+        '200':
+          description: Updated category
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Category' }
+        '404': { $ref: '#/components/responses/Problem' }
+    delete:
+      tags: [budgets]
+      operationId: deleteCategory
+      parameters:
+        - { name: transferCategoryId, in: query, description: Where existing transactions and budget amounts move, schema: { type: string } }
+      responses:
+        '204': { description: Deleted }
+        '400': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+
+  /v1/budgets/{budgetId}/category-groups/{id}:
+    parameters:
+      - $ref: '#/components/parameters/BudgetId'
+      - $ref: '#/components/parameters/Id'
+    patch:
+      tags: [budgets]
+      operationId: updateCategoryGroup
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              minProperties: 1
+              properties:
+                name: { type: string, minLength: 1, maxLength: 100 }
+                hidden: { type: boolean }
+      responses:
+        '200':
+          description: Updated group
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CategoryGroup' }
+        '404': { $ref: '#/components/responses/Problem' }
+    delete:
+      tags: [budgets]
+      operationId: deleteCategoryGroup
+      parameters:
+        - { name: transferCategoryId, in: query, schema: { type: string } }
+      responses:
+        '204': { description: Deleted }
+        '400': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
 
   /v1/budgets/{budgetId}/months:
     get:
@@ -441,6 +702,11 @@ components:
       in: path
       required: true
       description: Actual sync id (the budget's `groupId`), stable across devices
+      schema: { type: string }
+    Id:
+      name: id
+      in: path
+      required: true
       schema: { type: string }
     MemberId:
       name: memberId
@@ -704,13 +970,43 @@ components:
         cleared: { type: boolean }
         subtransactions:
           type: array
-          items:
-            type: object
-            required: [amount]
-            properties:
-              amount: { $ref: '#/components/schemas/Money' }
-              categoryId: { type: string }
-              notes: { type: string }
+          items: { $ref: '#/components/schemas/SplitInput' }
+
+    SplitInput:
+      type: object
+      required: [amount]
+      properties:
+        id: { type: string, description: An existing split's id (PATCH only) }
+        amount: { $ref: '#/components/schemas/Money' }
+        categoryId: { type: [string, 'null'] }
+        notes: { type: [string, 'null'] }
+
+    TransactionPatch:
+      type: object
+      minProperties: 1
+      properties:
+        accountId: { type: string }
+        date: { $ref: '#/components/schemas/Date' }
+        amount: { $ref: '#/components/schemas/Money' }
+        payeeId: { type: [string, 'null'] }
+        payeeName: { type: string, description: Used when payeeId is absent; creates the payee if needed }
+        categoryId: { type: [string, 'null'] }
+        notes: { type: [string, 'null'] }
+        cleared: { type: boolean }
+        subtransactions:
+          type: array
+          items: { $ref: '#/components/schemas/SplitInput' }
+
+    Preferences:
+      type: object
+      required: [budgetType, currencyCode, numberFormat, dateFormat, firstDayOfWeek, hideFraction]
+      properties:
+        budgetType: { type: string, enum: [envelope, tracking, unknown] }
+        currencyCode: { type: string, description: ISO 4217, default USD }
+        numberFormat: { type: string, description: "Actual's number format id, e.g. comma-dot" }
+        dateFormat: { type: string }
+        firstDayOfWeek: { type: integer, minimum: 0, maximum: 6, description: 0 = Sunday }
+        hideFraction: { type: boolean }
 
     BudgetMonth:
       type: object

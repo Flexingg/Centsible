@@ -1,0 +1,8 @@
+{
+  "budgetType": "envelope",
+  "currencyCode": "USD",
+  "numberFormat": "comma-dot",
+  "dateFormat": "MM/dd/yyyy",
+  "firstDayOfWeek": 0,
+  "hideFraction": false
+}

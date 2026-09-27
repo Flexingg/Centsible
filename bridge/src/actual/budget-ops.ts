@@ -2,12 +2,11 @@ import * as api from '@actual-app/api';
 import { ApiError } from '../errors.js';
 import {
   budgetTypeFromPrefs,
+  toPreferences,
   toAccount,
   toBudgetMonth,
   toCategoryGroup,
   toPayee,
-  toTransaction,
-  type TransactionDto,
 } from '../mappers/index.js';
 import type { ActualHost } from './host.js';
 
@@ -31,6 +30,10 @@ export class BudgetOps {
 
   payees(budgetId: string) {
     return this.host.withBudget(budgetId, 'read', async () => (await api.getPayees()).map(toPayee));
+  }
+
+  preferences(budgetId: string) {
+    return this.host.withBudget(budgetId, 'read', async () => toPreferences((await api.getPreferences()) as Record<string, unknown>));
   }
 
   months(budgetId: string) {
@@ -74,76 +77,6 @@ export class BudgetOps {
     });
   }
 
-  transactions(
-    budgetId: string,
-    f: { accountId?: string; categoryId?: string; since?: string; until?: string; limit: number; offset: number },
-  ) {
-    return this.host.withBudget(budgetId, 'read', async () => {
-      const filter: Record<string, unknown> = {};
-      if (f.accountId) filter.account = f.accountId;
-      if (f.categoryId) filter.category = f.categoryId;
-      const date: Record<string, string> = {};
-      if (f.since) date.$gte = f.since;
-      if (f.until) date.$lte = f.until;
-      if (Object.keys(date).length) filter.date = date;
-
-      // tier 2: AQL. Fetch one extra row to know whether another page exists.
-      const { data } = (await api.aqlQuery(
-        api
-          .q('transactions')
-          .filter(filter)
-          .options({ splits: 'grouped' })
-          .orderBy([{ date: 'desc' }, { sort_order: 'desc' }, { id: 'desc' }])
-          .limit(f.limit + 1)
-          .offset(f.offset)
-          .select(TX_FIELDS),
-      )) as { data: Record<string, unknown>[] };
-
-      const items = data.slice(0, f.limit).map(toTransaction);
-      return { items, hasMore: data.length > f.limit };
-    });
-  }
-
-  /**
-   * Idempotent create: the client supplies the UUID, so an outbox replay of the same
-   * transaction finds the existing row instead of creating a duplicate.
-   */
-  createTransaction(budgetId: string, tx: NewTransaction): Promise<{ created: boolean; transaction: TransactionDto }> {
-    return this.host.withBudget(budgetId, 'write', async () => {
-      const existing = await findTransaction(tx.id);
-      if (existing) return { created: false, transaction: existing };
-
-      const accounts = await api.getAccounts();
-      if (!accounts.some((a) => a.id === tx.accountId)) throw ApiError.validation(`Unknown account ${tx.accountId}`);
-      if (tx.subtransactions?.length) {
-        const sum = tx.subtransactions.reduce((s, x) => s + x.amount, 0);
-        if (sum !== tx.amount) throw ApiError.validation(`Split amounts (${sum}) must add up to the total (${tx.amount})`);
-      }
-
-      await api.addTransactions(
-        tx.accountId,
-        [
-          {
-            id: tx.id,
-            date: tx.date,
-            amount: tx.amount,
-            payee: tx.payeeId,
-            payee_name: tx.payeeId ? undefined : tx.payeeName,
-            category: tx.categoryId,
-            notes: tx.notes,
-            cleared: tx.cleared,
-            subtransactions: tx.subtransactions?.map((s) => ({ amount: s.amount, category: s.categoryId, notes: s.notes })),
-          } as Parameters<typeof api.addTransactions>[1][number],
-        ],
-        { learnCategories: true, runTransfers: true },
-      );
-
-      const created = await findTransaction(tx.id);
-      if (!created) throw new Error(`Transaction ${tx.id} was not found after creation`);
-      return { created: true, transaction: created };
-    });
-  }
-
   private async readMonth(month: string) {
     const months = await api.getBudgetMonths();
     if (!months.includes(month)) throw ApiError.notFound(`No budget data for ${month}`);
@@ -156,41 +89,4 @@ export class BudgetOps {
     if (!cat) throw ApiError.validation(`Unknown category ${categoryId}`);
     if (cat.is_income) throw ApiError.validation('Income categories are not budgeted in envelope mode');
   }
-}
-
-export type NewTransaction = {
-  id: string;
-  accountId: string;
-  date: string;
-  amount: number;
-  payeeId?: string;
-  payeeName?: string;
-  categoryId?: string;
-  notes?: string;
-  cleared?: boolean;
-  subtransactions?: { amount: number; categoryId?: string; notes?: string }[];
-};
-
-const TX_FIELDS = [
-  'id',
-  'account',
-  'date',
-  'amount',
-  'payee',
-  'payee.name',
-  'imported_payee',
-  'category',
-  'notes',
-  'cleared',
-  'reconciled',
-  'transfer_id',
-  'is_parent',
-  'parent_id',
-];
-
-async function findTransaction(id: string): Promise<TransactionDto | null> {
-  const { data } = (await api.aqlQuery(
-    api.q('transactions').filter({ id }).options({ splits: 'grouped' }).select(TX_FIELDS),
-  )) as { data: Record<string, unknown>[] };
-  return data[0] ? toTransaction(data[0]) : null;
 }

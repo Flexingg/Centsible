@@ -7,6 +7,8 @@ import { promisify } from 'node:util';
 import type { FastifyInstance } from 'fastify';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { BudgetOps } from '../../src/actual/budget-ops.js';
+import { StructureOps } from '../../src/actual/structure-ops.js';
+import { TransactionOps } from '../../src/actual/transaction-ops.js';
 import { ActualHost } from '../../src/actual/host.js';
 import { HouseholdStore } from '../../src/auth/store.js';
 import type { BridgeConfig } from '../../src/config.js';
@@ -76,7 +78,7 @@ beforeAll(async () => {
   store = new HouseholdStore(join(bridgeData, 'bridge.sqlite'));
   host = new ActualHost(config, silent);
   await host.start();
-  app = await buildServer({ config, store, host, ops: new BudgetOps(host) }, { logger: false });
+  app = await buildServer({ config, store, host, ops: new BudgetOps(host), transactions: new TransactionOps(host), structure: new StructureOps(host) }, { logger: false });
 
   const jo = store.createMember({ displayName: 'Jo', role: 'owner' });
   owner = await pair(jo.id, 'Pixel 9');
@@ -109,6 +111,7 @@ describe('system', () => {
     expect(caps.actual.compatibility).toBe('ok');
     expect(caps.features['budget.envelope']).toBe(true);
     expect(caps.features['budget.moveMoney']).toBe(true);
+    expect(caps.features['transactions.splits']).toBe(true);
     expect(res.headers['cache-control']).toBe('no-store');
     recordFixture('capabilities', caps);
   });
@@ -431,6 +434,187 @@ describe('budget data', () => {
       token: owner.accessToken,
     });
     expect((res.body as { items: { id: string }[] }).items.map((t) => t.id)).toContain(id);
+  });
+});
+
+describe('phase 1: transactions', () => {
+  const tx = () => `/v1/budgets/${budgetId}/transactions`;
+  const one = (id: string) => `${tx()}/${id}`;
+  const LIST = '/v1/budgets/{budgetId}/transactions';
+  const ONE = '/v1/budgets/{budgetId}/transactions/{transactionId}';
+  type Tx = { id: string; accountId: string; amount: number; payeeName: string | null; categoryId: string | null; notes: string | null; cleared: boolean; transferId: string | null; isParent: boolean; subtransactions: { id: string; amount: number; categoryId: string | null }[] };
+
+  async function create(body: Record<string, unknown>) {
+    const res = await call({ method: 'POST', url: tx(), path: LIST, token: owner.accessToken, body: { id: randomUUID(), date: `${actual.month}-15`, ...body } });
+    expect(res.status).toBe(201);
+    return res.body as Tx;
+  }
+  const list = async (query: string) =>
+    ((await call({ method: 'GET', url: `${tx()}?${query}`, path: LIST, token: owner.accessToken })).body as { items: Tx[] }).items;
+
+  it('searches payee, notes and category names', async () => {
+    expect((await list('q=trader')).map((t) => t.payeeName)).toContain("Trader Joe's");
+    expect((await list('q=groceries')).map((t) => t.payeeName)).toContain("Trader Joe's"); // notes "#groceries"
+    const byCategory = await list('q=Bills');
+    expect(byCategory.length).toBeGreaterThan(0);
+    expect(await list('q=zzzz-no-match')).toHaveLength(0);
+  });
+
+  it('filters transactions that still need a category', async () => {
+    const t = await create({ accountId: actual.accounts.checking, amount: -999, payeeName: 'Mystery Shop' });
+    const ids = (await list('uncategorized=true')).map((x) => x.id);
+    expect(ids).toContain(t.id);
+    expect(ids.every((id) => id !== undefined)).toBe(true);
+    const categorized = (await list('uncategorized=true')).filter((x) => x.categoryId !== null);
+    expect(categorized).toHaveLength(0);
+  });
+
+  it('gets one transaction and 404s on unknown ids', async () => {
+    const t = await create({ accountId: actual.accounts.checking, amount: -100, payeeName: 'Getter' });
+    const got = await call({ method: 'GET', url: one(t.id), path: ONE, token: owner.accessToken });
+    expect((got.body as Tx).id).toBe(t.id);
+    const missing = await call({ method: 'GET', url: one(randomUUID()), path: ONE, token: owner.accessToken });
+    expect(missing.status).toBe(404);
+  });
+
+  it('edits fields and creates new payees by name', async () => {
+    const t = await create({ accountId: actual.accounts.checking, amount: -1500, payeeName: 'Corner Store', categoryId: actual.categories['Food'] });
+    const res = await call({
+      method: 'PATCH',
+      url: one(t.id),
+      path: ONE,
+      token: owner.accessToken,
+      body: { amount: -1750, notes: 'milk + bread', categoryId: actual.categories['General'], cleared: false, payeeName: 'Corner Market' },
+    });
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({ amount: -1750, notes: 'milk + bread', categoryId: actual.categories['General'], cleared: false, payeeName: 'Corner Market' });
+    recordFixture('transaction-updated', res.body);
+  });
+
+  it('creates and deletes transfers with both sides', async () => {
+    const payees = (await call({ method: 'GET', url: `/v1/budgets/${budgetId}/payees`, path: '/v1/budgets/{budgetId}/payees', token: owner.accessToken })).body as {
+      items: { id: string; transferAccountId: string | null }[];
+    };
+    const toCard = payees.items.find((p) => p.transferAccountId === actual.accounts.card)!;
+    const t = await create({ accountId: actual.accounts.checking, amount: -30000, payeeId: toCard.id });
+    expect(t.transferId).not.toBeNull();
+    const other = (await list(`accountId=${actual.accounts.card}`)).find((x) => x.id === t.transferId)!;
+    expect(other.amount).toBe(30000);
+
+    const del = await call({ method: 'DELETE', url: one(t.id), path: ONE, token: owner.accessToken });
+    expect(del.status).toBe(204);
+    expect((await call({ method: 'GET', url: one(t.id), path: ONE, token: owner.accessToken })).status).toBe(404);
+    expect((await call({ method: 'GET', url: one(t.transferId!), path: ONE, token: owner.accessToken })).status).toBe(404);
+  });
+
+  it('splits, re-splits and unsplits a transaction', async () => {
+    const t = await create({ accountId: actual.accounts.card, amount: -10000, payeeName: 'Walmart', categoryId: actual.categories['Food'] });
+    const split = await call({
+      method: 'PATCH',
+      url: one(t.id),
+      path: ONE,
+      token: owner.accessToken,
+      body: { subtransactions: [{ amount: -6000, categoryId: actual.categories['Food'] }, { amount: -4000, categoryId: actual.categories['General'] }] },
+    });
+    const s1 = split.body as Tx;
+    expect(s1.isParent).toBe(true);
+    expect(s1.categoryId).toBeNull();
+    expect(s1.subtransactions.map((x) => x.amount).sort((a, b) => a - b)).toEqual([-6000, -4000]);
+
+    const keep = s1.subtransactions.find((x) => x.amount === -6000)!;
+    const resplit = await call({
+      method: 'PATCH',
+      url: one(t.id),
+      path: ONE,
+      token: owner.accessToken,
+      body: { subtransactions: [{ id: keep.id, amount: -7000, categoryId: actual.categories['Food'] }, { amount: -3000, categoryId: actual.categories['Bills'] }] },
+    });
+    const s2 = resplit.body as Tx;
+    expect(s2.subtransactions).toHaveLength(2);
+    expect(s2.subtransactions.find((x) => x.id === keep.id)?.amount).toBe(-7000);
+    expect(s2.subtransactions.some((x) => x.categoryId === actual.categories['Bills'])).toBe(true);
+
+    const bad = await call({ method: 'PATCH', url: one(t.id), path: ONE, token: owner.accessToken, body: { subtransactions: [{ amount: -1 }] } });
+    expect(bad.status).toBe(400);
+
+    const unsplit = await call({ method: 'PATCH', url: one(t.id), path: ONE, token: owner.accessToken, body: { subtransactions: [], categoryId: actual.categories['Food'] } });
+    const s3 = unsplit.body as Tx;
+    expect(s3.isParent).toBe(false);
+    expect(s3.subtransactions).toHaveLength(0);
+    expect(s3.categoryId).toBe(actual.categories['Food']);
+  });
+
+  it('reports budget preferences with defaults', async () => {
+    const res = await call({ method: 'GET', url: `/v1/budgets/${budgetId}/preferences`, path: '/v1/budgets/{budgetId}/preferences', token: owner.accessToken });
+    expect(res.body).toMatchObject({ budgetType: 'envelope', currencyCode: 'USD', firstDayOfWeek: 0 });
+    recordFixture('preferences', res.body);
+  });
+});
+
+describe('phase 1: accounts and categories', () => {
+  const base = () => `/v1/budgets/${budgetId}`;
+  type Account = { id: string; name: string; balance: number; closed: boolean };
+
+  it('creates, renames, closes and reopens accounts', async () => {
+    const created = await call({
+      method: 'POST',
+      url: `${base()}/accounts`,
+      path: '/v1/budgets/{budgetId}/accounts',
+      token: owner.accessToken,
+      body: { name: 'Kids Savings', initialBalance: 5000 },
+    });
+    expect(created.status).toBe(201);
+    const acct = created.body as Account;
+    expect(acct).toMatchObject({ name: 'Kids Savings', balance: 5000, closed: false });
+
+    const renamed = await call({ method: 'PATCH', url: `${base()}/accounts/${acct.id}`, path: '/v1/budgets/{budgetId}/accounts/{id}', token: owner.accessToken, body: { name: 'Kid Savings' } });
+    expect((renamed.body as Account).name).toBe('Kid Savings');
+
+    const close = (body: object) =>
+      call({ method: 'POST', url: `${base()}/accounts/${acct.id}/close`, path: '/v1/budgets/{budgetId}/accounts/{id}/close', token: owner.accessToken, body });
+    expect((await close({})).status).toBe(400); // has a balance
+    const closed = await close({ transferAccountId: actual.accounts.checking });
+    expect(closed.status).toBe(200);
+    expect((closed.body as Account).closed).toBe(true);
+
+    const reopened = await call({ method: 'POST', url: `${base()}/accounts/${acct.id}/reopen`, path: '/v1/budgets/{budgetId}/accounts/{id}/reopen', token: owner.accessToken });
+    expect((reopened.body as Account).closed).toBe(false);
+  });
+
+  it('manages category groups and categories', async () => {
+    const group = await call({ method: 'POST', url: `${base()}/category-groups`, path: '/v1/budgets/{budgetId}/category-groups', token: owner.accessToken, body: { name: 'Kids' } });
+    expect(group.status).toBe(201);
+    const groupId = (group.body as { id: string }).id;
+
+    const cat = await call({ method: 'POST', url: `${base()}/categories`, path: '/v1/budgets/{budgetId}/categories', token: owner.accessToken, body: { name: 'Soccer', groupId } });
+    expect(cat.status).toBe(201);
+    const catId = (cat.body as { id: string }).id;
+    expect(cat.body).toMatchObject({ name: 'Soccer', groupId, isIncome: false, hidden: false });
+
+    const hidden = await call({
+      method: 'PATCH',
+      url: `${base()}/categories/${catId}`,
+      path: '/v1/budgets/{budgetId}/categories/{id}',
+      token: owner.accessToken,
+      body: { name: 'Sports', hidden: true },
+    });
+    expect(hidden.body).toMatchObject({ name: 'Sports', hidden: true });
+
+    const renamedGroup = await call({ method: 'PATCH', url: `${base()}/category-groups/${groupId}`, path: '/v1/budgets/{budgetId}/category-groups/{id}', token: owner.accessToken, body: { name: 'Children' } });
+    expect((renamedGroup.body as { name: string }).name).toBe('Children');
+
+    const delCat = await call({
+      method: 'DELETE',
+      url: `${base()}/categories/${catId}?transferCategoryId=${actual.categories['General']}`,
+      path: '/v1/budgets/{budgetId}/categories/{id}',
+      token: owner.accessToken,
+    });
+    expect(delCat.status).toBe(204);
+    const delGroup = await call({ method: 'DELETE', url: `${base()}/category-groups/${groupId}`, path: '/v1/budgets/{budgetId}/category-groups/{id}', token: owner.accessToken });
+    expect(delGroup.status).toBe(204);
+
+    const groups = (await call({ method: 'GET', url: `${base()}/category-groups`, path: '/v1/budgets/{budgetId}/category-groups', token: owner.accessToken })).body as { items: { id: string }[] };
+    expect(groups.items.map((g) => g.id)).not.toContain(groupId);
   });
 });
 

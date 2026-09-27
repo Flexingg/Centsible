@@ -1,12 +1,16 @@
 import Fastify, { type FastifyError, type FastifyInstance, type FastifyRequest } from 'fastify';
 import type { ActualHost } from '../actual/host.js';
 import type { BudgetOps } from '../actual/budget-ops.js';
+import type { StructureOps } from '../actual/structure-ops.js';
+import type { TransactionOps } from '../actual/transaction-ops.js';
 import type { HouseholdStore, Member, Device, Role } from '../auth/store.js';
 import type { BridgeConfig } from '../config.js';
 import { ApiError } from '../errors.js';
 import { authRoutes } from './routes/auth.js';
 import { budgetRoutes } from './routes/budgets.js';
 import { householdRoutes } from './routes/household.js';
+import { structureRoutes } from './routes/structure.js';
+import { transactionRoutes } from './routes/transactions.js';
 import { systemRoutes } from './routes/system.js';
 
 export type Deps = {
@@ -14,6 +18,8 @@ export type Deps = {
   store: HouseholdStore;
   host: ActualHost;
   ops: BudgetOps;
+  transactions: TransactionOps;
+  structure: StructureOps;
 };
 
 declare module 'fastify' {
@@ -77,6 +83,8 @@ export async function buildServer(deps: Deps, opts: { logger?: boolean | object 
   await app.register(authRoutes(deps));
   await app.register(householdRoutes(deps));
   await app.register(budgetRoutes(deps));
+  await app.register(transactionRoutes(deps));
+  await app.register(structureRoutes(deps));
   return app;
 }
 
@@ -95,4 +103,10 @@ export function requireBudget(deps: Deps, req: FastifyRequest, budgetId: string,
   const auth = requireRole(req, role);
   if (!deps.store.canAccessBudget(auth.member, budgetId)) throw ApiError.forbidden('No access to this budget');
   return auth;
+}
+
+/** Records who did what from which device (Actual itself doesn't track this). */
+export function audit(deps: Deps, req: FastifyRequest, budgetId: string, action: string, target?: string, detail?: unknown) {
+  const { member, device } = req.auth!;
+  deps.store.audit({ memberId: member.id, deviceId: device.id, budgetId, action, target, detail });
 }

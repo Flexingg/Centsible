@@ -1,6 +1,8 @@
 import { join } from 'node:path';
 import type { FastifyBaseLogger } from 'fastify';
 import { BudgetOps } from './actual/budget-ops.js';
+import { StructureOps } from './actual/structure-ops.js';
+import { TransactionOps } from './actual/transaction-ops.js';
 import { ActualHost } from './actual/host.js';
 import { HouseholdStore } from './auth/store.js';
 import { loadConfig } from './config.js';
@@ -19,7 +21,7 @@ const host = new ActualHost(config, {
   info: (o, m) => log?.info(o, m),
   warn: (o, m) => log?.warn(o, m),
 });
-const app = await buildServer({ config, store, host, ops: new BudgetOps(host) });
+const app = await buildServer({ config, store, host, ops: new BudgetOps(host), transactions: new TransactionOps(host), structure: new StructureOps(host) });
 log = app.log;
 
 try {

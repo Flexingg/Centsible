@@ -1,26 +1,13 @@
 import type { FastifyPluginAsync, FastifyRequest } from 'fastify';
-import type { NewTransaction } from '../../actual/budget-ops.js';
 import { ApiError } from '../../errors.js';
 import { requireBudget, requireRole, type Deps } from '../server.js';
 
-const MONTH = { type: 'string', pattern: '^\\d{4}-\\d{2}$' };
-const DATE = { type: 'string', pattern: '^\\d{4}-\\d{2}-\\d{2}$' };
-const MONEY = { type: 'integer' };
+export const MONTH = { type: 'string', pattern: '^\\d{4}-\\d{2}$' };
+export const DATE = { type: 'string', pattern: '^\\d{4}-\\d{2}-\\d{2}$' };
+export const MONEY = { type: 'integer' };
 
-type BudgetParams = { budgetId: string };
+export type BudgetParams = { budgetId: string };
 type MonthParams = BudgetParams & { month: string };
-
-const encodeCursor = (offset: number) => Buffer.from(JSON.stringify({ o: offset })).toString('base64url');
-function decodeCursor(cursor: string | undefined): number {
-  if (!cursor) return 0;
-  try {
-    const o = JSON.parse(Buffer.from(cursor, 'base64url').toString('utf8')).o;
-    if (Number.isInteger(o) && o >= 0) return o;
-  } catch {
-    /* fall through */
-  }
-  throw ApiError.validation('Invalid cursor');
-}
 
 export const budgetRoutes =
   (deps: Deps): FastifyPluginAsync =>
@@ -68,71 +55,10 @@ export const budgetRoutes =
       return { items: await ops.payees(req.params.budgetId) };
     });
 
-    app.get<{
-      Params: BudgetParams;
-      Querystring: { accountId?: string; categoryId?: string; since?: string; until?: string; limit?: number; cursor?: string };
-    }>(
-      '/v1/budgets/:budgetId/transactions',
-      {
-        schema: {
-          querystring: {
-            type: 'object',
-            properties: {
-              accountId: { type: 'string' },
-              categoryId: { type: 'string' },
-              since: DATE,
-              until: DATE,
-              limit: { type: 'integer', minimum: 1, maximum: 500, default: 100 },
-              cursor: { type: 'string' },
-            },
-          },
-        },
-      },
-      async (req) => {
-        requireBudget(deps, req, req.params.budgetId);
-        const { cursor, limit = 100, ...filters } = req.query;
-        const offset = decodeCursor(cursor);
-        const page = await ops.transactions(req.params.budgetId, { ...filters, limit, offset });
-        return { items: page.items, nextCursor: page.hasMore ? encodeCursor(offset + limit) : null };
-      },
-    );
-
-    app.post<{ Params: BudgetParams; Body: NewTransaction }>(
-      '/v1/budgets/:budgetId/transactions',
-      {
-        schema: {
-          body: {
-            type: 'object',
-            required: ['id', 'accountId', 'date', 'amount'],
-            properties: {
-              id: { type: 'string', pattern: '^[0-9a-fA-F-]{36}$' },
-              accountId: { type: 'string' },
-              date: DATE,
-              amount: MONEY,
-              payeeId: { type: 'string' },
-              payeeName: { type: 'string', maxLength: 200 },
-              categoryId: { type: 'string' },
-              notes: { type: 'string', maxLength: 2000 },
-              cleared: { type: 'boolean' },
-              subtransactions: {
-                type: 'array',
-                items: {
-                  type: 'object',
-                  required: ['amount'],
-                  properties: { amount: MONEY, categoryId: { type: 'string' }, notes: { type: 'string' } },
-                },
-              },
-            },
-          },
-        },
-      },
-      async (req, reply) => {
-        requireBudget(deps, req, req.params.budgetId, 'member');
-        const { created, transaction } = await ops.createTransaction(req.params.budgetId, req.body);
-        if (created) audit(req, req.params.budgetId, 'transaction.created', transaction.id, { amount: transaction.amount });
-        return reply.status(created ? 201 : 200).send(transaction);
-      },
-    );
+    app.get<{ Params: BudgetParams }>('/v1/budgets/:budgetId/preferences', async (req) => {
+      requireBudget(deps, req, req.params.budgetId);
+      return ops.preferences(req.params.budgetId);
+    });
 
     app.get<{ Params: BudgetParams }>('/v1/budgets/:budgetId/months', async (req) => {
       requireBudget(deps, req, req.params.budgetId);
