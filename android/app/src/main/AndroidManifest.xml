@@ -4,13 +4,13 @@
     <uses-permission android:name="android.permission.INTERNET" />
 
     <application
-        android:name=".CanopyApplication"
+        android:name=".CentsibleApplication"
         android:allowBackup="false"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:label="@string/app_name"
         android:networkSecurityConfig="@xml/network_security_config"
         android:supportsRtl="true"
-        android:theme="@style/Theme.Canopy">
+        android:theme="@style/Theme.Centsible">
 
         <activity
             android:name=".MainActivity"

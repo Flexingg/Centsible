@@ -1,0 +1,58 @@
+package app.centsible.feature.planning
+
+import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onRoot
+import app.centsible.core.designsystem.component.Loadable
+import app.centsible.core.designsystem.theme.CentsibleTheme
+import app.centsible.core.model.Category
+import app.centsible.core.model.CategoryGroup
+import app.centsible.core.model.Payee
+import app.centsible.core.model.PayeeId
+import app.centsible.core.testing.SampleHousehold
+import app.centsible.core.testing.SamplePlanning
+import com.github.takahirom.roborazzi.captureRoboImage
+import com.github.takahirom.roborazzi.captureScreenRoboImage
+import java.time.LocalDate
+import org.junit.Rule
+import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
+
+@RunWith(RobolectricTestRunner::class)
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
+@Config(sdk = [35], qualifiers = "w411dp-h891dp-xxhdpi")
+class PlanningScreenshotTest {
+    @get:Rule val compose = createComposeRule()
+    private val today = LocalDate.of(2026, 9, 27)
+    private val recurring = RecurringData(SamplePlanning.schedules, SamplePlanning.payeeNames, SampleHousehold.accounts)
+
+    @Test fun recurring_light() {
+        compose.setContent { CentsibleTheme(darkTheme = false) { RecurringScreen(RecurringUiState(Loadable.Ready(recurring), canEdit = true), onBack = {}, today = today) } }
+        compose.onRoot().captureRoboImage("screenshots/recurring_light.png")
+    }
+
+    @Test fun recurring_sheet() {
+        compose.setContent {
+            CentsibleTheme(darkTheme = false) {
+                RecurringScreen(RecurringUiState(Loadable.Ready(recurring), canEdit = true, canSkip = true, canPost = true, editing = SamplePlanning.schedules[2]), onBack = {}, today = today)
+            }
+        }
+        compose.waitForIdle()
+        captureScreenRoboImage("screenshots/recurring_sheet.png")
+    }
+
+    @Test fun merchants_light() {
+        compose.setContent { CentsibleTheme(darkTheme = false) { MerchantsScreen(MerchantsUiState(Loadable.Ready(SamplePlanning.payees.filter { it.transferAccountId == null }), canEdit = true), onBack = {}) } }
+        compose.onRoot().captureRoboImage("screenshots/merchants_light.png")
+    }
+
+    @Test fun rules_light() {
+        val groups = SampleHousehold.budgetMonth.groups.map { g -> CategoryGroup(g.id, g.name, g.isIncome, g.hidden, g.categories.map { Category(it.id, it.name, g.id, g.isIncome, it.hidden) }) }
+        val names = Describe.Names(SamplePlanning.payeeNames + ("p-amazon" to "Amazon"), groups.flatMap { it.categories }.associate { it.id.raw to it.name }, emptyMap())
+        val data = RulesData(SamplePlanning.rules, names, SamplePlanning.payeeNames.map { (id, n) -> Payee(PayeeId(id), n, null) }, groups)
+        compose.setContent { CentsibleTheme(darkTheme = false) { RulesScreen(RulesUiState(Loadable.Ready(data), canEdit = true), onBack = {}) } }
+        compose.onRoot().captureRoboImage("screenshots/rules_light.png")
+    }
+}

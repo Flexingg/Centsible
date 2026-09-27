@@ -1,3 +1,3 @@
 plugins {
-    id("canopy.jvm.library")
+    id("centsible.jvm.library")
 }

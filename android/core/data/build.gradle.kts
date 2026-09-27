@@ -1,11 +1,11 @@
 plugins {
-    id("canopy.android.library")
-    id("canopy.hilt")
-    id("canopy.kotlin.serialization")
+    id("centsible.android.library")
+    id("centsible.hilt")
+    id("centsible.kotlin.serialization")
 }
 
 android {
-    namespace = "app.canopy.core.data"
+    namespace = "app.centsible.core.data"
 }
 
 dependencies {

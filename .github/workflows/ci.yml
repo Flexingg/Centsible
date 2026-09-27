@@ -3,7 +3,9 @@ name: CI
 on:
   push:
     branches: [main]
+    tags: ["v*"]
   pull_request:
+  workflow_dispatch:
   schedule:
     # Nightly: run the contract suite against Actual's newest release so breakage
     # shows up before you upgrade your server.
@@ -66,3 +68,63 @@ jobs:
         with:
           name: screenshots
           path: android/feature/*/build/outputs/roborazzi
+
+  release:
+    # Every green push to main becomes a release with the APK attached, so a phone
+    # (or an updater like Obtainium) can always grab the newest build. Pushing a
+    # tag like v0.3.0 publishes that version number instead.
+    needs: android
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    concurrency: release
+    defaults:
+      run:
+        working-directory: android
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Version
+        id: version
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            echo "name=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+            echo "tag=$GITHUB_REF_NAME" >> "$GITHUB_OUTPUT"
+          else
+            echo "name=0.2.${{ github.run_number }}" >> "$GITHUB_OUTPUT"
+            echo "tag=v0.2.${{ github.run_number }}" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Signing key
+        env:
+          KEYSTORE_BASE64: ${{ secrets.CENTSIBLE_KEYSTORE_BASE64 }}
+        run: |
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.jks"
+            echo "CENTSIBLE_KEYSTORE=$RUNNER_TEMP/release.jks" >> "$GITHUB_ENV"
+          else
+            echo "::warning::CENTSIBLE_KEYSTORE_BASE64 isn't set, so this APK uses a throwaway debug key and can't update a previous install."
+          fi
+      - name: Build release APK
+        env:
+          CENTSIBLE_KEYSTORE_PASSWORD: ${{ secrets.CENTSIBLE_KEYSTORE_PASSWORD }}
+          CENTSIBLE_KEY_ALIAS: ${{ secrets.CENTSIBLE_KEY_ALIAS }}
+          CENTSIBLE_KEY_PASSWORD: ${{ secrets.CENTSIBLE_KEY_PASSWORD }}
+        run: |
+          # versionCode is the run number, so each build installs over the last one.
+          ./gradlew :app:assembleRelease \
+            -Pcentsible.versionCode=${{ github.run_number }} \
+            -Pcentsible.versionName=${{ steps.version.outputs.name }}
+          mv app/build/outputs/apk/release/app-release.apk "centsible-${{ steps.version.outputs.name }}.apk"
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: Centsible ${{ steps.version.outputs.name }}
+          target_commitish: ${{ github.sha }}
+          generate_release_notes: true
+          make_latest: true
+          files: android/centsible-${{ steps.version.outputs.name }}.apk

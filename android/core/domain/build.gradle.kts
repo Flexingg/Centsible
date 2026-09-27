@@ -1,6 +1,6 @@
 plugins {
-    id("canopy.jvm.library")
-    id("canopy.jvm.inject")
+    id("centsible.jvm.library")
+    id("centsible.jvm.inject")
 }
 
 dependencies {

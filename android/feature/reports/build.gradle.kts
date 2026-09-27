@@ -1,7 +1,7 @@
 plugins {
-    id("canopy.android.feature")
+    id("centsible.android.feature")
 }
 
 android {
-    namespace = "app.canopy.feature.reports"
+    namespace = "app.centsible.feature.reports"
 }

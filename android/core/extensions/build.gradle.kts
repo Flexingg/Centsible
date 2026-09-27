@@ -1,10 +1,10 @@
 plugins {
-    id("canopy.android.compose")
-    id("canopy.hilt")
+    id("centsible.android.compose")
+    id("centsible.hilt")
 }
 
 android {
-    namespace = "app.canopy.core.extensions"
+    namespace = "app.centsible.core.extensions"
 }
 
 dependencies {

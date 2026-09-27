@@ -1,0 +1,60 @@
+package app.centsible.core.network
+
+import io.ktor.client.call.body
+import io.ktor.client.request.parameter
+import io.ktor.http.HttpMethod
+
+/** Phase 2 endpoints. */
+class PlanningApi(private val client: BridgeClient) {
+    private fun b(budgetId: String) = "/v1/budgets/$budgetId"
+
+    suspend fun schedules(budgetId: String, upcoming: Int): List<ScheduleDto> =
+        client.get<ItemsDto<ScheduleDto>>("${b(budgetId)}/schedules") { parameter("upcoming", upcoming) }.items
+    suspend fun createSchedule(budgetId: String, body: ScheduleInputDto): ScheduleDto = client.send(HttpMethod.Post, "${b(budgetId)}/schedules", body)
+    suspend fun updateSchedule(budgetId: String, id: String, body: ScheduleInputDto): ScheduleDto = client.send(HttpMethod.Patch, "${b(budgetId)}/schedules/$id", body)
+    suspend fun deleteSchedule(budgetId: String, id: String) { client.execute(HttpMethod.Delete, "${b(budgetId)}/schedules/$id") }
+    suspend fun skipSchedule(budgetId: String, id: String): ScheduleDto = client.execute(HttpMethod.Post, "${b(budgetId)}/schedules/$id/skip").body()
+    suspend fun postSchedule(budgetId: String, id: String): ScheduleDto = client.execute(HttpMethod.Post, "${b(budgetId)}/schedules/$id/post").body()
+
+    suspend fun rules(budgetId: String): List<RuleDto> = client.get<ItemsDto<RuleDto>>("${b(budgetId)}/rules").items
+    suspend fun createRule(budgetId: String, body: RuleInputDto): RuleDto = client.send(HttpMethod.Post, "${b(budgetId)}/rules", body)
+    suspend fun updateRule(budgetId: String, id: String, body: RuleInputDto): RuleDto = client.send(HttpMethod.Put, "${b(budgetId)}/rules/$id", body)
+    suspend fun deleteRule(budgetId: String, id: String) { client.execute(HttpMethod.Delete, "${b(budgetId)}/rules/$id") }
+
+    suspend fun payeeStats(budgetId: String): List<PayeeStatDto> = client.get<ItemsDto<PayeeStatDto>>("${b(budgetId)}/payees/stats").items
+    suspend fun renamePayee(budgetId: String, id: String, name: String) { client.send<RenameDto, PayeeDto>(HttpMethod.Patch, "${b(budgetId)}/payees/$id", RenameDto(name)) }
+    suspend fun mergePayees(budgetId: String, id: String, mergeIds: List<String>) {
+        client.execute(HttpMethod.Post, "${b(budgetId)}/payees/$id/merge") { jsonBody(MergeDto(mergeIds)) }
+    }
+    suspend fun deletePayee(budgetId: String, id: String) { client.execute(HttpMethod.Delete, "${b(budgetId)}/payees/$id") }
+
+    suspend fun tags(budgetId: String): List<TagDto> = client.get<ItemsDto<TagDto>>("${b(budgetId)}/tags").items
+    suspend fun createTag(budgetId: String, body: TagInputDto): TagDto = client.send(HttpMethod.Post, "${b(budgetId)}/tags", body)
+    suspend fun updateTag(budgetId: String, id: String, body: TagInputDto): TagDto = client.send(HttpMethod.Patch, "${b(budgetId)}/tags/$id", body)
+    suspend fun deleteTag(budgetId: String, id: String) { client.execute(HttpMethod.Delete, "${b(budgetId)}/tags/$id") }
+
+    suspend fun categoryNote(budgetId: String, categoryId: String): CategoryNoteDto = client.get("${b(budgetId)}/categories/$categoryId/note")
+    suspend fun setCategoryNote(budgetId: String, categoryId: String, note: String?): CategoryNoteDto =
+        client.send(HttpMethod.Put, "${b(budgetId)}/categories/$categoryId/note", NoteInputDto(note))
+    suspend fun applyTemplates(budgetId: String, month: String, overwrite: Boolean): TemplatesResultDto =
+        client.send(HttpMethod.Post, "${b(budgetId)}/months/$month/apply-templates", ApplyTemplatesDto(overwrite))
+
+    // Account services
+    suspend fun bankSync(budgetId: String, accountId: String?): JobDto =
+        client.execute(HttpMethod.Post, if (accountId != null) "${b(budgetId)}/accounts/$accountId/bank-sync" else "${b(budgetId)}/bank-sync").body()
+    suspend fun job(id: String): JobDto = client.get("/v1/jobs/$id")
+    suspend fun previewImport(budgetId: String, accountId: String, body: ImportRequestDto): ImportPreviewDto =
+        client.send(HttpMethod.Post, "${b(budgetId)}/accounts/$accountId/import/preview", body)
+    suspend fun importFile(budgetId: String, accountId: String, body: ImportRequestDto): ImportResultDto =
+        client.send(HttpMethod.Post, "${b(budgetId)}/accounts/$accountId/import", body)
+    suspend fun reconcileStatus(budgetId: String, accountId: String): ReconcileStatusDto = client.get("${b(budgetId)}/accounts/$accountId/reconcile")
+    suspend fun reconcile(budgetId: String, accountId: String, body: ReconcileRequestDto): ReconcileResultDto =
+        client.send(HttpMethod.Post, "${b(budgetId)}/accounts/$accountId/reconcile", body)
+
+    // Reports
+    suspend fun cashFlow(budgetId: String, start: String, end: String): CashFlowDto =
+        client.get("${b(budgetId)}/reports/cash-flow") { parameter("start", start); parameter("end", end) }
+    suspend fun spending(budgetId: String, start: String, end: String): SpendingDto =
+        client.get("${b(budgetId)}/reports/spending") { parameter("start", start); parameter("end", end) }
+    suspend fun netWorth(budgetId: String, months: Int): NetWorthDto = client.get("${b(budgetId)}/reports/net-worth") { parameter("months", months) }
+}

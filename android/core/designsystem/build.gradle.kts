@@ -1,9 +1,9 @@
 plugins {
-    id("canopy.android.compose")
+    id("centsible.android.compose")
 }
 
 android {
-    namespace = "app.canopy.core.designsystem"
+    namespace = "app.centsible.core.designsystem"
 }
 
 dependencies {

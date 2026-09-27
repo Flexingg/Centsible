@@ -1,18 +1,33 @@
 plugins {
-    id("canopy.android.application")
+    id("centsible.android.application")
 }
 
 android {
-    namespace = "app.canopy"
+    namespace = "app.centsible"
     defaultConfig {
-        applicationId = "app.canopy.budget"
-        versionCode = 1
-        versionName = "0.1.0"
+        applicationId = "app.centsible.budget"
+        // CI passes the run number and tag; local builds stay at 1 / 0.2.0-dev.
+        versionCode = providers.gradleProperty("centsible.versionCode").orNull?.toInt() ?: 1
+        versionName = providers.gradleProperty("centsible.versionName").orNull ?: "0.2.0-dev"
+    }
+    signingConfigs {
+        // Release key comes from the environment (CI secrets). Every build must use the
+        // same key, or Android refuses to install an update over the previous one.
+        val keystore = System.getenv("CENTSIBLE_KEYSTORE")
+        if (keystore != null) create("release") {
+            storeFile = file(keystore)
+            storePassword = System.getenv("CENTSIBLE_KEYSTORE_PASSWORD")
+            keyAlias = System.getenv("CENTSIBLE_KEY_ALIAS")
+            keyPassword = System.getenv("CENTSIBLE_KEY_PASSWORD")
+        }
     }
     buildTypes {
         release {
-            isMinifyEnabled = true
+            // R8 stays off until a release build has been exercised on a device;
+            // a stripped class would only show up as a crash at runtime.
+            isMinifyEnabled = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            signingConfig = signingConfigs.findByName("release") ?: signingConfigs.getByName("debug")
         }
     }
 }

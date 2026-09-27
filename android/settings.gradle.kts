@@ -19,7 +19,7 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "canopy"
+rootProject.name = "centsible"
 
 include(":app")
 include(":core:model", ":core:domain", ":core:network", ":core:engine-bridge")

@@ -1,9 +1,9 @@
 plugins {
-    id("canopy.android.feature")
+    id("centsible.android.feature")
 }
 
 android {
-    namespace = "app.canopy.feature.onboarding"
+    namespace = "app.centsible.feature.onboarding"
 }
 
 dependencies {

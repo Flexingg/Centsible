@@ -1,7 +1,7 @@
 plugins {
-    id("canopy.android.feature")
+    id("centsible.android.feature")
 }
 
 android {
-    namespace = "app.canopy.feature.planning"
+    namespace = "app.centsible.feature.planning"
 }

@@ -1,8 +1,6 @@
-# Actual × Monarch for Android
+# Centsible
 
 A native Android app for a self-hosted [Actual Budget](https://actualbudget.org) server, with a Monarch-style UI. It's built for households and envelope budgeting, and designed so that Actual upgrades don't break it.
-
-"Canopy" is a placeholder app name.
 
 - **Design and roadmap:** [`docs/FRAMEWORK.md`](docs/FRAMEWORK.md)
 - **Status:** Phases 0–2 are built: accounts, transactions, envelope budget, recurring, rules, merchants, tags, bank sync, file import, reconcile, reports, goals, and offline edits. None of it has been tried on a real device yet. See the Progress table in FRAMEWORK.md for known gaps.
@@ -33,7 +31,13 @@ The **bridge** is a small Node service. It wraps Actual's official API behind a 
    ```sh
    docker compose exec bridge node dist/admin/cli.js add-member --name "Jo" --role owner --pair
    ```
-5. Install the app and scan the QR code. Invite the rest of the household from **More → Household → Add person**.
+5. Install the app from the [latest release](https://github.com/Flexingg/Centsible/releases/latest) (download the `.apk` on your phone and allow installing from your browser), then scan the QR code. Invite the rest of the household from **More → Household → Add person**.
+
+## Releases
+
+CI builds a signed APK for every push to `main` that passes the tests, and publishes it as a GitHub release (`v0.2.<build>`). Push a tag like `v0.3.0` to publish a specific version. The version code is the CI run number, so each build installs over the previous one. To get updates automatically, point [Obtainium](https://github.com/ImranR98/Obtainium) at this repo.
+
+Signing uses four repository secrets: `CENTSIBLE_KEYSTORE_BASE64`, `CENTSIBLE_KEYSTORE_PASSWORD`, `CENTSIBLE_KEY_ALIAS` and `CENTSIBLE_KEY_PASSWORD`. Without them, CI falls back to a throwaway debug key, and that APK can't update an existing install. Keep a backup of the keystore: losing it means uninstalling to update.
 
 ## Develop
 

@@ -110,7 +110,7 @@ Actual ships roughly monthly (`YY.M.x`). Defense in depth:
 
 ### Module layout (monorepo)
 
-"Canopy" is a placeholder app name; package `app.canopy`.
+"Centsible" is a placeholder app name; package `app.centsible`.
 
 ```
 actual-monarch-android/
@@ -123,7 +123,7 @@ actual-monarch-android/
 │  └─ test/                  unit + contract suite against a real actual-server
 ├─ deploy/                   docker-compose (Actual + bridge + cloudflared), .env.example
 └─ android/                  Gradle project
-   ├─ build-logic/           convention plugins (canopy.android.feature, canopy.jvm.library, …)
+   ├─ build-logic/           convention plugins (centsible.android.feature, centsible.jvm.library, …)
    ├─ app/                   shell: navigation, session routing, deep links
    ├─ core/model/            pure Kotlin: Money, ids, entities, Capabilities
    ├─ core/domain/           BudgetEngine port, gateways, use cases, PairingLinks

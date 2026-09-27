@@ -1,5 +1,5 @@
 <resources>
-    <style name="Theme.Canopy" parent="android:Theme.Material.Light.NoActionBar">
+    <style name="Theme.Centsible" parent="android:Theme.Material.Light.NoActionBar">
         <item name="android:windowBackground">#F6F5F2</item>
     </style>
 </resources>

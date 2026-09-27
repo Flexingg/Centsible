@@ -1,6 +1,6 @@
-import app.canopy.core.designsystem.component.CategoryEmoji
-import app.canopy.core.designsystem.component.MoneyFormat
-import app.canopy.core.model.Money
+import app.centsible.core.designsystem.component.CategoryEmoji
+import app.centsible.core.designsystem.component.MoneyFormat
+import app.centsible.core.model.Money
 import java.util.Locale
 import org.junit.Assert.assertEquals
 import org.junit.Test
@@ -26,10 +26,10 @@ class MoneyFormatTest {
 class MoneyInputTest {
     @Test
     fun `parses typed amounts`() {
-        assertEquals(Money(123_450), app.canopy.core.designsystem.component.MoneyInput.parse("1,234.5"))
-        assertEquals(Money(500), app.canopy.core.designsystem.component.MoneyInput.parse("$5"))
-        assertEquals(null, app.canopy.core.designsystem.component.MoneyInput.parse("5.123"))
-        assertEquals(null, app.canopy.core.designsystem.component.MoneyInput.parse("abc"))
-        assertEquals("1234.50", app.canopy.core.designsystem.component.MoneyInput.toInput(Money(123_450)))
+        assertEquals(Money(123_450), app.centsible.core.designsystem.component.MoneyInput.parse("1,234.5"))
+        assertEquals(Money(500), app.centsible.core.designsystem.component.MoneyInput.parse("$5"))
+        assertEquals(null, app.centsible.core.designsystem.component.MoneyInput.parse("5.123"))
+        assertEquals(null, app.centsible.core.designsystem.component.MoneyInput.parse("abc"))
+        assertEquals("1234.50", app.centsible.core.designsystem.component.MoneyInput.toInput(Money(123_450)))
     }
 }

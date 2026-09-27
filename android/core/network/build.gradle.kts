@@ -1,6 +1,6 @@
 plugins {
-    id("canopy.jvm.library")
-    id("canopy.kotlin.serialization")
+    id("centsible.jvm.library")
+    id("centsible.kotlin.serialization")
 }
 
 dependencies {
