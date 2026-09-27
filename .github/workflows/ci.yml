@@ -118,18 +118,34 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-    concurrency: release
+    # A newer push supersedes an older release still in flight.
+    concurrency:
+      group: release
+      cancel-in-progress: true
     defaults:
       run:
         working-directory: android
     steps:
       - uses: actions/checkout@v7
+      - name: Skip if main has moved on
+        id: current
+        run: |
+          # Only the newest commit on main gets a release. Tagging an older commit whose
+          # workflow files differ from main's is also refused for the CI token
+          # ("Resource not accessible by integration").
+          if [[ "$GITHUB_REF" == refs/heads/main ]] && [ "$(git ls-remote origin refs/heads/main | cut -f1)" != "$GITHUB_SHA" ]; then
+            echo "::notice::main has moved past this commit; its own run will publish the release."
+            echo "stale=true" >> "$GITHUB_OUTPUT"
+          fi
       - uses: actions/setup-java@v6
+        if: steps.current.outputs.stale != 'true'
         with:
           distribution: temurin
           java-version: 21
       - uses: gradle/actions/setup-gradle@v6
+        if: steps.current.outputs.stale != 'true'
       - name: Version
+        if: steps.current.outputs.stale != 'true'
         id: version
         run: |
           if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
@@ -140,6 +156,7 @@ jobs:
             echo "tag=v0.2.${{ github.run_number }}" >> "$GITHUB_OUTPUT"
           fi
       - name: Signing key
+        if: steps.current.outputs.stale != 'true'
         env:
           KEYSTORE_BASE64: ${{ secrets.CENTSIBLE_KEYSTORE_BASE64 }}
         run: |
@@ -150,6 +167,7 @@ jobs:
             echo "::warning::CENTSIBLE_KEYSTORE_BASE64 isn't set, so this APK uses a throwaway debug key and can't update a previous install."
           fi
       - name: Build release APK
+        if: steps.current.outputs.stale != 'true'
         env:
           CENTSIBLE_KEYSTORE_PASSWORD: ${{ secrets.CENTSIBLE_KEYSTORE_PASSWORD }}
           CENTSIBLE_KEY_ALIAS: ${{ secrets.CENTSIBLE_KEY_ALIAS }}
@@ -161,6 +179,7 @@ jobs:
             -Pcentsible.versionName=${{ steps.version.outputs.name }}
           mv app/build/outputs/apk/release/app-release.apk "centsible-${{ steps.version.outputs.name }}.apk"
       - uses: softprops/action-gh-release@v3
+        if: steps.current.outputs.stale != 'true'
         with:
           tag_name: ${{ steps.version.outputs.tag }}
           name: Centsible ${{ steps.version.outputs.name }}
