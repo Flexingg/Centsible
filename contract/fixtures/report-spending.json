@@ -1,0 +1,35 @@
+{
+  "start": "2026-09",
+  "end": "2026-09",
+  "total": -232898,
+  "categories": [
+    {
+      "categoryId": "d4b0f075-3343-4408-91ed-fae94f74e5bf",
+      "name": "Bills",
+      "groupId": "fc3825fd-b982-4b72-b768-5b30844cf832",
+      "groupName": "Usual Expenses",
+      "amount": -187599
+    },
+    {
+      "categoryId": "541836f1-e756-4473-a5d0-6c1d3f06c7fa",
+      "name": "Food",
+      "groupId": "fc3825fd-b982-4b72-b768-5b30844cf832",
+      "groupName": "Usual Expenses",
+      "amount": -27357
+    },
+    {
+      "categoryId": null,
+      "name": "Uncategorized",
+      "groupId": null,
+      "groupName": null,
+      "amount": -9542
+    },
+    {
+      "categoryId": "af375fd4-d759-46b3-bffe-74a856151d57",
+      "name": "General",
+      "groupId": "fc3825fd-b982-4b72-b768-5b30844cf832",
+      "groupName": "Usual Expenses",
+      "amount": -8400
+    }
+  ]
+}

@@ -1,0 +1,22 @@
+{
+  "points": [
+    {
+      "month": "2026-07",
+      "assets": 0,
+      "liabilities": 0,
+      "netWorth": 0
+    },
+    {
+      "month": "2026-08",
+      "assets": 0,
+      "liabilities": 0,
+      "netWorth": 0
+    },
+    {
+      "month": "2026-09",
+      "assets": 2173173,
+      "liabilities": -19872,
+      "netWorth": 2153301
+    }
+  ]
+}

@@ -1,28 +1,34 @@
 {
   "items": [
     {
-      "id": "9637d00a-8ff6-4fee-a590-5dee37decf13",
+      "id": "aa59e53b-f897-4287-8f43-fbcfa9d355d3",
       "name": "Brokerage",
       "offBudget": true,
       "closed": false,
       "balance": 1250000,
-      "accountGroupId": null
+      "accountGroupId": null,
+      "syncSource": null,
+      "lastSync": null
     },
     {
-      "id": "cd877299-65da-4b46-b467-67fa65e0df3b",
+      "id": "8ebc9fcd-ed0c-4aa9-83ff-aa253aad3a71",
       "name": "Joint Checking",
       "offBudget": false,
       "closed": false,
       "balance": 932166,
-      "accountGroupId": null
+      "accountGroupId": null,
+      "syncSource": null,
+      "lastSync": null
     },
     {
-      "id": "8bdb1617-aaf3-44a3-8295-6eca0880cdef",
+      "id": "c6590251-90aa-404b-9a86-d45003a52518",
       "name": "Visa",
       "offBudget": false,
       "closed": false,
       "balance": -6173,
-      "accountGroupId": null
+      "accountGroupId": null,
+      "syncSource": null,
+      "lastSync": null
     }
   ]
 }

@@ -7,6 +7,10 @@ import { promisify } from 'node:util';
 import type { FastifyInstance } from 'fastify';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { BudgetOps } from '../../src/actual/budget-ops.js';
+import { AccountOps } from '../../src/actual/account-ops.js';
+import { PlanningOps } from '../../src/actual/planning-ops.js';
+import { ReportOps } from '../../src/actual/report-ops.js';
+import { JobStore } from '../../src/jobs.js';
 import { StructureOps } from '../../src/actual/structure-ops.js';
 import { TransactionOps } from '../../src/actual/transaction-ops.js';
 import { ActualHost } from '../../src/actual/host.js';
@@ -78,7 +82,7 @@ beforeAll(async () => {
   store = new HouseholdStore(join(bridgeData, 'bridge.sqlite'));
   host = new ActualHost(config, silent);
   await host.start();
-  app = await buildServer({ config, store, host, ops: new BudgetOps(host), transactions: new TransactionOps(host), structure: new StructureOps(host) }, { logger: false });
+  app = await buildServer({ config, store, host, ops: new BudgetOps(host), transactions: new TransactionOps(host), structure: new StructureOps(host), planning: new PlanningOps(host), accountOps: new AccountOps(host), reports: new ReportOps(host), jobs: new JobStore() }, { logger: false });
 
   const jo = store.createMember({ displayName: 'Jo', role: 'owner' });
   owner = await pair(jo.id, 'Pixel 9');
@@ -112,6 +116,9 @@ describe('system', () => {
     expect(caps.features['budget.envelope']).toBe(true);
     expect(caps.features['budget.moveMoney']).toBe(true);
     expect(caps.features['transactions.splits']).toBe(true);
+    for (const f of ['schedules.write', 'schedules.skip', 'rules.write', 'payees.write', 'tags', 'import.files', 'reconcile', 'reports.cashFlow', 'budget.templates']) {
+      expect(caps.features[f], f).toBe(true);
+    }
     expect(res.headers['cache-control']).toBe('no-store');
     recordFixture('capabilities', caps);
   });
@@ -615,6 +622,257 @@ describe('phase 1: accounts and categories', () => {
 
     const groups = (await call({ method: 'GET', url: `${base()}/category-groups`, path: '/v1/budgets/{budgetId}/category-groups', token: owner.accessToken })).body as { items: { id: string }[] };
     expect(groups.items.map((g) => g.id)).not.toContain(groupId);
+  });
+});
+
+describe('phase 2: schedules, rules, merchants, tags', () => {
+  const base = () => `/v1/budgets/${budgetId}`;
+  type Schedule = { id: string; name: string | null; nextDate: string; amount: number; upcoming: string[]; recurrence: { frequency: string } | null; payeeId: string };
+  const nextMonth = () => {
+    const [y, m] = actual.month.split('-').map(Number) as [number, number];
+    return m === 12 ? `${y + 1}-01` : `${y}-${String(m + 1).padStart(2, '0')}`;
+  };
+
+  it('creates, edits, skips, posts and deletes a recurring schedule', async () => {
+    const created = await call({
+      method: 'POST',
+      url: `${base()}/schedules`,
+      path: '/v1/budgets/{budgetId}/schedules',
+      token: owner.accessToken,
+      body: {
+        name: 'Spotify',
+        payeeName: 'Spotify',
+        accountId: actual.accounts.card,
+        amount: -1099,
+        amountOp: 'isapprox',
+        recurrence: { frequency: 'monthly', interval: 1, start: `${nextMonth()}-05` },
+      },
+    });
+    expect(created.status).toBe(201);
+    const s = created.body as Schedule;
+    expect(s.recurrence?.frequency).toBe('monthly');
+    expect(s.upcoming).toHaveLength(3);
+    expect(s.upcoming[0]).toBe(`${nextMonth()}-05`);
+    recordFixture('schedule', s);
+
+    const path = '/v1/budgets/{budgetId}/schedules/{id}';
+    const edited = await call({ method: 'PATCH', url: `${base()}/schedules/${s.id}`, path, token: owner.accessToken, body: { amount: -1199 } });
+    expect((edited.body as Schedule).amount).toBe(-1199);
+
+    const skipped = await call({ method: 'POST', url: `${base()}/schedules/${s.id}/skip`, path: `${path}/skip`, token: owner.accessToken });
+    expect((skipped.body as Schedule).nextDate).toBe(s.upcoming[1]);
+
+    await call({ method: 'POST', url: `${base()}/schedules/${s.id}/post`, path: `${path}/post`, token: owner.accessToken });
+    const txs = (await call({ method: 'GET', url: `${base()}/transactions?q=Spotify`, path: '/v1/budgets/{budgetId}/transactions', token: owner.accessToken })).body as { items: { amount: number }[] };
+    expect(txs.items.map((t) => t.amount)).toContain(-1199);
+
+    const list = await call({ method: 'GET', url: `${base()}/schedules`, path: '/v1/budgets/{budgetId}/schedules', token: owner.accessToken });
+    expect((list.body as { items: Schedule[] }).items.map((x) => x.id)).toContain(s.id);
+
+    const rules = (await call({ method: 'GET', url: `${base()}/rules`, path: '/v1/budgets/{budgetId}/rules', token: owner.accessToken })).body as { items: { scheduleId: string | null }[] };
+    expect(rules.items.some((r) => r.scheduleId === s.id)).toBe(true);
+
+    expect((await call({ method: 'DELETE', url: `${base()}/schedules/${s.id}`, path, token: owner.accessToken })).status).toBe(204);
+  });
+
+  it('creates, updates and deletes rules, and refuses schedule links', async () => {
+    const payees = (await call({ method: 'GET', url: `${base()}/payees`, path: '/v1/budgets/{budgetId}/payees', token: owner.accessToken })).body as { items: { id: string; name: string }[] };
+    const costco = payees.items.find((p) => p.name === 'Costco')!;
+    const rule = {
+      conditionsOp: 'and',
+      conditions: [{ field: 'payee', op: 'is', value: costco.id }],
+      actions: [{ field: 'category', op: 'set', value: actual.categories['Food'] }],
+    };
+    const created = await call({ method: 'POST', url: `${base()}/rules`, path: '/v1/budgets/{budgetId}/rules', token: owner.accessToken, body: rule });
+    expect(created.status).toBe(201);
+    const id = (created.body as { id: string }).id;
+    recordFixture('rule', created.body);
+
+    const updated = await call({
+      method: 'PUT',
+      url: `${base()}/rules/${id}`,
+      path: '/v1/budgets/{budgetId}/rules/{id}',
+      token: owner.accessToken,
+      body: { ...rule, actions: [{ field: 'category', op: 'set', value: actual.categories['General'] }] },
+    });
+    expect((updated.body as { actions: { value: string }[] }).actions[0]!.value).toBe(actual.categories['General']);
+
+    const bad = await call({
+      method: 'POST',
+      url: `${base()}/rules`,
+      path: '/v1/budgets/{budgetId}/rules',
+      token: owner.accessToken,
+      body: { conditions: [], actions: [{ op: 'link-schedule', value: 'x' }] },
+    });
+    expect(bad.status).toBe(400);
+    expect((await call({ method: 'DELETE', url: `${base()}/rules/${id}`, path: '/v1/budgets/{budgetId}/rules/{id}', token: owner.accessToken })).status).toBe(204);
+  });
+
+  it('lists merchants with usage, renames, merges and deletes them', async () => {
+    const mk = (payeeName: string) =>
+      call({ method: 'POST', url: `${base()}/transactions`, path: '/v1/budgets/{budgetId}/transactions', token: owner.accessToken, body: { id: randomUUID(), accountId: actual.accounts.card, date: `${actual.month}-16`, amount: -500, payeeName } });
+    await mk('Coffee Place');
+    await mk('Coffee Place #2');
+    const stats = await call({ method: 'GET', url: `${base()}/payees/stats`, path: '/v1/budgets/{budgetId}/payees/stats', token: owner.accessToken });
+    const items = (stats.body as { items: { id: string; name: string; transactionCount: number }[] }).items;
+    expect(items.find((p) => p.name === 'Costco')!.transactionCount).toBeGreaterThanOrEqual(1);
+    const a = items.find((p) => p.name === 'Coffee Place')!;
+    const b = items.find((p) => p.name === 'Coffee Place #2')!;
+    recordFixture('payee-stats', stats.body);
+
+    const renamed = await call({ method: 'PATCH', url: `${base()}/payees/${a.id}`, path: '/v1/budgets/{budgetId}/payees/{id}', token: owner.accessToken, body: { name: 'Coffee Co' } });
+    expect((renamed.body as { name: string }).name).toBe('Coffee Co');
+
+    const merged = await call({ method: 'POST', url: `${base()}/payees/${a.id}/merge`, path: '/v1/budgets/{budgetId}/payees/{id}/merge', token: owner.accessToken, body: { mergeIds: [b.id] } });
+    expect(merged.status).toBe(204);
+    const after = ((await call({ method: 'GET', url: `${base()}/payees/stats`, path: '/v1/budgets/{budgetId}/payees/stats', token: owner.accessToken })).body as { items: { id: string; transactionCount: number }[] }).items;
+    expect(after.find((p) => p.id === b.id)).toBeUndefined();
+    expect(after.find((p) => p.id === a.id)!.transactionCount).toBe(2);
+
+    const spare = await mk('Delete Me Inc');
+    const spareTx = spare.body as { id: string; payeeId: string };
+    await call({ method: 'DELETE', url: `${base()}/transactions/${spareTx.id}`, path: '/v1/budgets/{budgetId}/transactions/{transactionId}', token: owner.accessToken });
+    expect((await call({ method: 'DELETE', url: `${base()}/payees/${spareTx.payeeId}`, path: '/v1/budgets/{budgetId}/payees/{id}', token: owner.accessToken })).status).toBe(204);
+  });
+
+  it('manages tags', async () => {
+    const created = await call({ method: 'POST', url: `${base()}/tags`, path: '/v1/budgets/{budgetId}/tags', token: owner.accessToken, body: { tag: '#vacation', color: '#1e90ff' } });
+    expect(created.status).toBe(201);
+    const tag = created.body as { id: string; tag: string };
+    expect(tag.tag).toBe('vacation');
+    const dup = await call({ method: 'POST', url: `${base()}/tags`, path: '/v1/budgets/{budgetId}/tags', token: owner.accessToken, body: { tag: 'Vacation' } });
+    expect(dup.status).toBe(409);
+    const updated = await call({ method: 'PATCH', url: `${base()}/tags/${tag.id}`, path: '/v1/budgets/{budgetId}/tags/{id}', token: owner.accessToken, body: { description: 'Trips' } });
+    expect((updated.body as { description: string }).description).toBe('Trips');
+    const list = await call({ method: 'GET', url: `${base()}/tags`, path: '/v1/budgets/{budgetId}/tags', token: owner.accessToken });
+    expect((list.body as { items: { tag: string }[] }).items.map((t) => t.tag)).toContain('vacation');
+    expect((await call({ method: 'DELETE', url: `${base()}/tags/${tag.id}`, path: '/v1/budgets/{budgetId}/tags/{id}', token: owner.accessToken })).status).toBe(204);
+  });
+
+  it('applies #template goals from category notes', async () => {
+    const notePath = '/v1/budgets/{budgetId}/categories/{id}/note';
+    const food = actual.categories['Food'];
+    await call({ method: 'PUT', url: `${base()}/categories/${food}/note`, path: notePath, token: owner.accessToken, body: { note: 'Weekly shop\n#template 500' } });
+    const note = await call({ method: 'GET', url: `${base()}/categories/${food}/note`, path: notePath, token: owner.accessToken });
+    expect((note.body as { note: string }).note).toContain('#template 500');
+
+    const check = await call({ method: 'GET', url: `${base()}/templates/check`, path: '/v1/budgets/{budgetId}/templates/check', token: owner.accessToken });
+    expect((check.body as { ok: boolean }).ok).toBe(true);
+
+    const applied = await call({
+      method: 'POST',
+      url: `${base()}/months/${actual.month}/apply-templates`,
+      path: '/v1/budgets/{budgetId}/months/{month}/apply-templates',
+      token: owner.accessToken,
+      body: { overwrite: true },
+    });
+    const month = (applied.body as { month: { groups: { categories: { id: string; budgeted: number }[] }[] } }).month;
+    expect(month.groups.flatMap((g) => g.categories).find((c) => c.id === food)!.budgeted).toBe(50000);
+  });
+});
+
+describe('phase 2: bank sync, import, reconcile, reports', () => {
+  const base = () => `/v1/budgets/${budgetId}`;
+  const qif = () => ['!Type:Bank', `D${actual.month.slice(5)}/20/${actual.month.slice(0, 4)}`, 'T-45.67', 'PFarmers Market', 'MSaturday', '^', `D${actual.month.slice(5)}/21/${actual.month.slice(0, 4)}`, 'T-8.00', 'PParking', '^', ''].join('\n');
+  const csv = () => ['Posted Date,Description,Debit,Credit,Memo', `${actual.month}-22,Bookstore,12.50,,novel`, `${actual.month}-23,Refund Co,,5.00,`, ''].join('\n');
+  const b64 = (t: string) => Buffer.from(t).toString('base64');
+
+  it('reports bank sync on an unlinked account as a failed job', async () => {
+    const started = await call({ method: 'POST', url: `${base()}/accounts/${actual.accounts.checking}/bank-sync`, path: '/v1/budgets/{budgetId}/accounts/{id}/bank-sync', token: owner.accessToken });
+    expect(started.status).toBe(202);
+    let job = started.body as { id: string; status: string; error: string | null };
+    for (let i = 0; i < 100 && job.status === 'running'; i++) {
+      await new Promise((r) => setTimeout(r, 100));
+      job = (await call({ method: 'GET', url: `/v1/jobs/${job.id}`, path: '/v1/jobs/{jobId}', token: owner.accessToken })).body as typeof job;
+    }
+    expect(job.status).toBe('failed');
+    expect(job.error).toMatch(/linked/);
+    recordFixture('job', job);
+  });
+
+  it('previews and imports QIF without duplicating on re-import', async () => {
+    const body = { fileName: 'statement.qif', contentBase64: b64(qif()) };
+    const preview = await call({ method: 'POST', url: `${base()}/accounts/${actual.accounts.checking}/import/preview`, path: '/v1/budgets/{budgetId}/accounts/{id}/import/preview', token: owner.accessToken, body });
+    const p = preview.body as { rows: { amount: number; payeeName: string; date: string }[]; newCount: number };
+    expect(p.rows).toHaveLength(2);
+    expect(p.rows[0]).toMatchObject({ amount: -4567, payeeName: 'Farmers Market', date: `${actual.month}-20` });
+    expect(p.newCount).toBe(2);
+    recordFixture('import-preview', preview.body);
+
+    const path = '/v1/budgets/{budgetId}/accounts/{id}/import';
+    const first = await call({ method: 'POST', url: `${base()}/accounts/${actual.accounts.checking}/import`, path, token: owner.accessToken, body });
+    expect((first.body as { added: number }).added).toBe(2);
+    const again = await call({ method: 'POST', url: `${base()}/accounts/${actual.accounts.checking}/import`, path, token: owner.accessToken, body });
+    expect((again.body as { added: number }).added).toBe(0);
+  });
+
+  it('detects CSV columns with separate debit and credit', async () => {
+    const res = await call({
+      method: 'POST',
+      url: `${base()}/accounts/${actual.accounts.card}/import/preview`,
+      path: '/v1/budgets/{budgetId}/accounts/{id}/import/preview',
+      token: owner.accessToken,
+      body: { fileName: 'export.csv', contentBase64: b64(csv()) },
+    });
+    const p = res.body as { rows: { amount: number; payeeName: string; notes: string | null }[]; mapping: Record<string, string>; columns: string[] };
+    expect(p.mapping).toMatchObject({ date: 'Posted Date', payee: 'Description', outflow: 'Debit', inflow: 'Credit', notes: 'Memo' });
+    expect(p.rows.map((r) => r.amount)).toEqual([-1250, 500]);
+    expect(p.rows[0]!.notes).toBe('novel');
+  });
+
+  it('rejects unsupported files', async () => {
+    const res = await call({
+      method: 'POST',
+      url: `${base()}/accounts/${actual.accounts.card}/import/preview`,
+      path: '/v1/budgets/{budgetId}/accounts/{id}/import/preview',
+      token: owner.accessToken,
+      body: { fileName: 'photo.jpg', contentBase64: b64('nope') },
+    });
+    expect(res.status).toBe(400);
+  });
+
+  it('reconciles against a statement, with and without an adjustment', async () => {
+    const path = '/v1/budgets/{budgetId}/accounts/{id}/reconcile';
+    const url = `${base()}/accounts/${actual.accounts.card}/reconcile`;
+    const status = (await call({ method: 'GET', url, path, token: owner.accessToken })).body as { clearedBalance: number };
+    recordFixture('reconcile-status', status);
+
+    const off = await call({ method: 'POST', url, path, token: owner.accessToken, body: { statementBalance: status.clearedBalance - 100 } });
+    expect(off.body).toMatchObject({ reconciled: false, difference: -100, lockedCount: 0 });
+
+    const fixed = await call({ method: 'POST', url, path, token: owner.accessToken, body: { statementBalance: status.clearedBalance - 100, createAdjustment: true } });
+    const r = fixed.body as { reconciled: boolean; adjustmentTransactionId: string; lockedCount: number };
+    expect(r.reconciled).toBe(true);
+    expect(r.lockedCount).toBeGreaterThan(0);
+    const adj = await call({ method: 'GET', url: `${base()}/transactions/${r.adjustmentTransactionId}`, path: '/v1/budgets/{budgetId}/transactions/{transactionId}', token: owner.accessToken });
+    expect(adj.body).toMatchObject({ amount: -100, reconciled: true });
+
+    const after = (await call({ method: 'GET', url, path, token: owner.accessToken })).body as { clearedBalance: number };
+    expect(after.clearedBalance).toBe(status.clearedBalance - 100);
+  });
+
+  it('builds cash flow, spending and net worth reports', async () => {
+    const q = `start=${actual.month}&end=${actual.month}`;
+    const cash = await call({ method: 'GET', url: `${base()}/reports/cash-flow?${q}`, path: '/v1/budgets/{budgetId}/reports/cash-flow', token: owner.accessToken });
+    const m = (cash.body as { months: { income: number; expenses: number; net: number }[] }).months[0]!;
+    expect(m.income).toBe(610000); // payroll only: starting balances excluded
+    expect(m.expenses).toBeLessThan(0);
+    expect(m.net).toBe(m.income + m.expenses);
+    recordFixture('report-cash-flow', cash.body);
+
+    const spending = await call({ method: 'GET', url: `${base()}/reports/spending?${q}`, path: '/v1/budgets/{budgetId}/reports/spending', token: owner.accessToken });
+    const sp = spending.body as { total: number; categories: { name: string; amount: number }[] };
+    expect(sp.categories.find((c) => c.name === 'Bills')!.amount).toBeLessThan(0);
+    expect(sp.categories.some((c) => c.name === 'Income')).toBe(false);
+    expect(sp.total).toBe(sp.categories.reduce((s, c) => s + c.amount, 0));
+    recordFixture('report-spending', spending.body);
+
+    const nw = await call({ method: 'GET', url: `${base()}/reports/net-worth?months=3`, path: '/v1/budgets/{budgetId}/reports/net-worth', token: owner.accessToken });
+    const points = (nw.body as { points: { netWorth: number }[] }).points;
+    expect(points).toHaveLength(3);
+    const accounts = (await call({ method: 'GET', url: `${base()}/accounts`, path: '/v1/budgets/{budgetId}/accounts', token: owner.accessToken })).body as { items: { balance: number }[] };
+    expect(points.at(-1)!.netWorth).toBe(accounts.items.reduce((s, a) => s + a.balance, 0));
+    recordFixture('report-net-worth', nw.body);
   });
 });
 

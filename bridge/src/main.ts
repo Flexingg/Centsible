@@ -1,6 +1,10 @@
 import { join } from 'node:path';
 import type { FastifyBaseLogger } from 'fastify';
 import { BudgetOps } from './actual/budget-ops.js';
+import { AccountOps } from './actual/account-ops.js';
+import { PlanningOps } from './actual/planning-ops.js';
+import { ReportOps } from './actual/report-ops.js';
+import { JobStore } from './jobs.js';
 import { StructureOps } from './actual/structure-ops.js';
 import { TransactionOps } from './actual/transaction-ops.js';
 import { ActualHost } from './actual/host.js';
@@ -21,7 +25,7 @@ const host = new ActualHost(config, {
   info: (o, m) => log?.info(o, m),
   warn: (o, m) => log?.warn(o, m),
 });
-const app = await buildServer({ config, store, host, ops: new BudgetOps(host), transactions: new TransactionOps(host), structure: new StructureOps(host) });
+const app = await buildServer({ config, store, host, ops: new BudgetOps(host), transactions: new TransactionOps(host), structure: new StructureOps(host), planning: new PlanningOps(host), accountOps: new AccountOps(host), reports: new ReportOps(host), jobs: new JobStore() });
 log = app.log;
 
 try {

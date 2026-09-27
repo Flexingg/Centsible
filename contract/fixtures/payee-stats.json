@@ -1,0 +1,151 @@
+{
+  "items": [
+    {
+      "id": "d23b550f-8197-4680-8569-e4073710c1f2",
+      "name": "Starting Balance",
+      "transferAccountId": null,
+      "transactionCount": 3,
+      "ruleCount": 0
+    },
+    {
+      "id": "a55303bb-4244-41a9-a613-412c200be899",
+      "name": "Costco",
+      "transferAccountId": null,
+      "transactionCount": 2,
+      "ruleCount": 0
+    },
+    {
+      "id": "19c79384-153c-4442-9360-556dec8a6c7a",
+      "name": "Target",
+      "transferAccountId": null,
+      "transactionCount": 2,
+      "ruleCount": 0
+    },
+    {
+      "id": "5cb6a986-4743-4e72-a66d-5653806d9a0d",
+      "name": "Blue Bottle",
+      "transferAccountId": null,
+      "transactionCount": 1,
+      "ruleCount": 0
+    },
+    {
+      "id": "0f5cb71c-1d5b-45f2-9925-a35ec24e6992",
+      "name": "Coffee Place",
+      "transferAccountId": null,
+      "transactionCount": 1,
+      "ruleCount": 0
+    },
+    {
+      "id": "bddf9b3e-579f-4a9e-9070-1749d37e9ca1",
+      "name": "Coffee Place #2",
+      "transferAccountId": null,
+      "transactionCount": 1,
+      "ruleCount": 0
+    },
+    {
+      "id": "13a8c5b9-f470-415b-94cb-9620433b1901",
+      "name": "Corner Market",
+      "transferAccountId": null,
+      "transactionCount": 1,
+      "ruleCount": 0
+    },
+    {
+      "id": "e7eeddc3-abfd-462e-8dfe-decf42fd80ff",
+      "name": "Employer Payroll",
+      "transferAccountId": null,
+      "transactionCount": 1,
+      "ruleCount": 0
+    },
+    {
+      "id": "c6e1e4f7-6e34-4562-b2cc-5d50ea020af2",
+      "name": "Getter",
+      "transferAccountId": null,
+      "transactionCount": 1,
+      "ruleCount": 0
+    },
+    {
+      "id": "71550bc4-6d67-405e-8235-94b391ed2f06",
+      "name": "Joint Checking",
+      "transferAccountId": "8ebc9fcd-ed0c-4aa9-83ff-aa253aad3a71",
+      "transactionCount": 1,
+      "ruleCount": 0
+    },
+    {
+      "id": "855b31c1-8f35-4d0a-885a-44206ef268e1",
+      "name": "Kid Savings",
+      "transferAccountId": "64096e53-29ee-4804-98a1-cb2e287dc3ea",
+      "transactionCount": 1,
+      "ruleCount": 0
+    },
+    {
+      "id": "e104c5b4-643f-407b-be98-b551c992fca3",
+      "name": "Made on the web",
+      "transferAccountId": null,
+      "transactionCount": 1,
+      "ruleCount": 0
+    },
+    {
+      "id": "84ec9a3e-9261-424d-b2f9-7fec3862436f",
+      "name": "Mystery Shop",
+      "transferAccountId": null,
+      "transactionCount": 1,
+      "ruleCount": 0
+    },
+    {
+      "id": "5c7003b8-c0b0-47c7-bb7c-e5ea1816d913",
+      "name": "Netflix",
+      "transferAccountId": null,
+      "transactionCount": 1,
+      "ruleCount": 0
+    },
+    {
+      "id": "1907f31b-954f-47be-9b46-ff51182cbc7e",
+      "name": "Oak Street Apartments",
+      "transferAccountId": null,
+      "transactionCount": 1,
+      "ruleCount": 0
+    },
+    {
+      "id": "5a70a538-b66d-41a8-852b-b5b889275a36",
+      "name": "Spotify",
+      "transferAccountId": null,
+      "transactionCount": 1,
+      "ruleCount": 0
+    },
+    {
+      "id": "71a52a3e-0511-4f43-828c-787e0d996fb9",
+      "name": "Trader Joe's",
+      "transferAccountId": null,
+      "transactionCount": 1,
+      "ruleCount": 0
+    },
+    {
+      "id": "687876b2-25cf-4c94-a22a-76eda5ff3e1f",
+      "name": "Walmart",
+      "transferAccountId": null,
+      "transactionCount": 1,
+      "ruleCount": 0
+    },
+    {
+      "id": "3417293b-3096-4cce-9a26-7a1d2f42657e",
+      "name": "Brokerage",
+      "transferAccountId": "aa59e53b-f897-4287-8f43-fbcfa9d355d3",
+      "transactionCount": 0,
+      "ruleCount": 0
+    },
+    {
+      "id": "1c64bf2c-89cd-46b6-98ff-ba04b2999f4c",
+      "name": "Corner Store",
+      "transferAccountId": null,
+      "transactionCount": 0,
+      "ruleCount": 0
+    },
+    {
+      "id": "e0cbfaea-5f33-4bda-b50a-1ac0d75435dd",
+      "name": "Visa",
+      "transferAccountId": "c6590251-90aa-404b-9a86-d45003a52518",
+      "transactionCount": 0,
+      "ruleCount": 0
+    }
+  ]
+}

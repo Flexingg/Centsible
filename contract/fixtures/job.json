@@ -1,0 +1,10 @@
+{
+  "id": "6de823b1-4468-44f1-8143-46982aa91c42",
+  "kind": "bank-sync",
+  "budgetId": "e0edd95f-a9a6-4712-8098-b2e3596f8686",
+  "status": "failed",
+  "startedAt": "2026-09-27T16:32:26.445Z",
+  "finishedAt": "2026-09-27T16:32:26.446Z",
+  "result": null,
+  "error": "This account isn't linked to a bank. Link it in Actual (GoCardless, SimpleFIN or Pluggy.ai) first."
+}

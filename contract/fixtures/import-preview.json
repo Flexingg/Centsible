@@ -1,0 +1,23 @@
+{
+  "rows": [
+    {
+      "date": "2026-09-20",
+      "amount": -4567,
+      "payeeName": "Farmers Market",
+      "notes": "Saturday",
+      "importedId": null
+    },
+    {
+      "date": "2026-09-21",
+      "amount": -800,
+      "payeeName": "Parking",
+      "notes": null,
+      "importedId": null
+    }
+  ],
+  "errors": [],
+  "columns": [],
+  "mapping": null,
+  "newCount": 2,
+  "matchedCount": 0
+}

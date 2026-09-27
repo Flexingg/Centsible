@@ -3,6 +3,10 @@ import type { ActualHost } from '../actual/host.js';
 import type { BudgetOps } from '../actual/budget-ops.js';
 import type { StructureOps } from '../actual/structure-ops.js';
 import type { TransactionOps } from '../actual/transaction-ops.js';
+import type { AccountOps } from '../actual/account-ops.js';
+import type { PlanningOps } from '../actual/planning-ops.js';
+import type { ReportOps } from '../actual/report-ops.js';
+import type { JobStore } from '../jobs.js';
 import type { HouseholdStore, Member, Device, Role } from '../auth/store.js';
 import type { BridgeConfig } from '../config.js';
 import { ApiError } from '../errors.js';
@@ -11,6 +15,8 @@ import { budgetRoutes } from './routes/budgets.js';
 import { householdRoutes } from './routes/household.js';
 import { structureRoutes } from './routes/structure.js';
 import { transactionRoutes } from './routes/transactions.js';
+import { planningRoutes } from './routes/planning.js';
+import { operationRoutes } from './routes/operations.js';
 import { systemRoutes } from './routes/system.js';
 
 export type Deps = {
@@ -20,6 +26,10 @@ export type Deps = {
   ops: BudgetOps;
   transactions: TransactionOps;
   structure: StructureOps;
+  planning: PlanningOps;
+  accountOps: AccountOps;
+  reports: ReportOps;
+  jobs: JobStore;
 };
 
 declare module 'fastify' {
@@ -85,6 +95,8 @@ export async function buildServer(deps: Deps, opts: { logger?: boolean | object 
   await app.register(budgetRoutes(deps));
   await app.register(transactionRoutes(deps));
   await app.register(structureRoutes(deps));
+  await app.register(planningRoutes(deps));
+  await app.register(operationRoutes(deps));
   return app;
 }
 

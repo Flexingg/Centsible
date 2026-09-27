@@ -8,6 +8,7 @@ import {
   toCategoryGroup,
   toPayee,
 } from '../mappers/index.js';
+import { AccountOps } from './account-ops.js';
 import type { ActualHost } from './host.js';
 
 /**
@@ -20,7 +21,8 @@ export class BudgetOps {
   accounts(budgetId: string) {
     return this.host.withBudget(budgetId, 'read', async () => {
       const accounts = await api.getAccounts(); // tier 1
-      return Promise.all(accounts.map(async (a) => toAccount(a, await api.getAccountBalance(a.id))));
+      const sync = await AccountOps.syncInfo(); // tier 2: bank link status
+      return Promise.all(accounts.map(async (a) => toAccount(a, await api.getAccountBalance(a.id), sync.get(a.id))));
     });
   }
 
@@ -77,6 +79,31 @@ export class BudgetOps {
     });
   }
 
+  /**
+   * Fills budgets from `#template` lines in category notes (tier 3). `overwrite` replaces
+   * amounts already budgeted; otherwise only empty categories are filled.
+   */
+  applyTemplates(budgetId: string, month: string, overwrite: boolean) {
+    return this.host.withBudget(budgetId, 'write', async (lib) => {
+      const result = await this.host.internal<{ type?: string; message?: string; pre?: string }>(
+        'budget.templates',
+        lib,
+        overwrite ? 'budget/overwrite-goal-template' : 'budget/apply-goal-template',
+        { month },
+      );
+      const monthDto = await this.readMonth(month);
+      return { month: monthDto, message: templateMessage(result) };
+    });
+  }
+
+  /** Validates every #template line and says what's wrong (tier 3). */
+  checkTemplates(budgetId: string) {
+    return this.host.withBudget(budgetId, 'read', async (lib) => {
+      const result = await this.host.internal<{ type?: string; message?: string; pre?: string }>('budget.templates', lib, 'budget/check-templates', {});
+      return { ok: result?.type !== 'error', message: templateMessage(result) };
+    });
+  }
+
   private async readMonth(month: string) {
     const months = await api.getBudgetMonths();
     if (!months.includes(month)) throw ApiError.notFound(`No budget data for ${month}`);
@@ -89,4 +116,14 @@ export class BudgetOps {
     if (!cat) throw ApiError.validation(`Unknown category ${categoryId}`);
     if (cat.is_income) throw ApiError.validation('Income categories are not budgeted in envelope mode');
   }
+}
+
+function templateMessage(r: { type?: string; message?: string; pre?: string } | null | undefined): string {
+  const known: Record<string, string> = {
+    'templates-applied': 'Goals applied',
+    'templates-check-passed': 'All goal templates look good',
+    'no-templates': 'No categories have #template notes yet',
+  };
+  const base = r?.message ? (known[r.message] ?? r.message) : 'Done';
+  return r?.pre ? `${base}: ${r.pre}` : base;
 }

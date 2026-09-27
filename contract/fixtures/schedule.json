@@ -1,0 +1,24 @@
+{
+  "id": "4cb2681b-3150-46b9-ab2a-1e2af44960a0",
+  "name": "Spotify",
+  "nextDate": "2026-10-05",
+  "completed": false,
+  "postsTransaction": false,
+  "payeeId": "5a70a538-b66d-41a8-852b-b5b889275a36",
+  "accountId": "c6590251-90aa-404b-9a86-d45003a52518",
+  "amount": -1099,
+  "amountMax": null,
+  "amountOp": "isapprox",
+  "recurrence": {
+    "endMode": "never",
+    "interval": 1,
+    "frequency": "monthly",
+    "start": "2026-10-05"
+  },
+  "date": null,
+  "upcoming": [
+    "2026-10-05",
+    "2026-11-05",
+    "2026-12-05"
+  ]
+}

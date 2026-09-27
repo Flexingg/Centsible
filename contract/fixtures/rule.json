@@ -1,0 +1,24 @@
+{
+  "id": "737cb268-0bbf-4452-b16d-710be7a6d77e",
+  "stage": null,
+  "conditionsOp": "and",
+  "conditions": [
+    {
+      "field": "payee",
+      "op": "is",
+      "value": "a55303bb-4244-41a9-a613-412c200be899",
+      "type": null,
+      "options": null
+    }
+  ],
+  "actions": [
+    {
+      "field": "category",
+      "op": "set",
+      "value": "541836f1-e756-4473-a5d0-6c1d3f06c7fa",
+      "type": null,
+      "options": null
+    }
+  ],
+  "scheduleId": null
+}

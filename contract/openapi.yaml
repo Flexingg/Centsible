@@ -690,6 +690,527 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/BudgetMonth' }
 
+  /v1/budgets/{budgetId}/schedules:
+    get:
+      tags: [budgets]
+      operationId: listSchedules
+      description: Scheduled and recurring transactions (Monarch "Recurring").
+      parameters:
+        - $ref: '#/components/parameters/BudgetId'
+        - { name: upcoming, in: query, description: How many upcoming dates to include, schema: { type: integer, minimum: 1, maximum: 24, default: 3 } }
+      responses:
+        '200':
+          description: Schedules
+          content:
+            application/json:
+              schema: { type: object, required: [items], properties: { items: { type: array, items: { $ref: '#/components/schemas/Schedule' } } } }
+    post:
+      tags: [budgets]
+      operationId: createSchedule
+      parameters:
+        - $ref: '#/components/parameters/BudgetId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ScheduleInput' }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Schedule' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+
+  /v1/budgets/{budgetId}/schedules/{id}:
+    patch:
+      tags: [budgets]
+      operationId: updateSchedule
+      parameters:
+        - $ref: '#/components/parameters/BudgetId'
+        - $ref: '#/components/parameters/Id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ScheduleInput' }
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Schedule' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+    delete:
+      tags: [budgets]
+      operationId: deleteSchedule
+      parameters:
+        - $ref: '#/components/parameters/BudgetId'
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '204': { description: Deleted }
+        '404': { $ref: '#/components/responses/Problem' }
+
+  /v1/budgets/{budgetId}/schedules/{id}/skip:
+    post:
+      tags: [budgets]
+      operationId: skipSchedule
+      description: Skip the next occurrence. Capability `schedules.skip`.
+      parameters:
+        - $ref: '#/components/parameters/BudgetId'
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Schedule' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '501': { $ref: '#/components/responses/Problem' }
+
+  /v1/budgets/{budgetId}/schedules/{id}/post:
+    post:
+      tags: [budgets]
+      operationId: postSchedule
+      description: Add the next occurrence as a transaction now. Capability `schedules.post`.
+      parameters:
+        - $ref: '#/components/parameters/BudgetId'
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Schedule' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '501': { $ref: '#/components/responses/Problem' }
+
+  /v1/budgets/{budgetId}/rules:
+    get:
+      tags: [budgets]
+      operationId: listRules
+      description: All rules, including the hidden ones behind schedules (scheduleId set).
+      parameters:
+        - $ref: '#/components/parameters/BudgetId'
+      responses:
+        '200':
+          description: Rules
+          content:
+            application/json:
+              schema: { type: object, required: [items], properties: { items: { type: array, items: { $ref: '#/components/schemas/Rule' } } } }
+    post:
+      tags: [budgets]
+      operationId: createRule
+      parameters:
+        - $ref: '#/components/parameters/BudgetId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RuleInput' }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Rule' }
+        '400': { $ref: '#/components/responses/Problem' }
+
+  /v1/budgets/{budgetId}/rules/{id}:
+    put:
+      tags: [budgets]
+      operationId: updateRule
+      parameters:
+        - $ref: '#/components/parameters/BudgetId'
+        - $ref: '#/components/parameters/Id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RuleInput' }
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Rule' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+    delete:
+      tags: [budgets]
+      operationId: deleteRule
+      parameters:
+        - $ref: '#/components/parameters/BudgetId'
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '204': { description: Deleted }
+        '400': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+
+  /v1/budgets/{budgetId}/payees/stats:
+    get:
+      tags: [budgets]
+      operationId: listPayeeStats
+      description: Payees with usage counts (Monarch "Merchants").
+      parameters:
+        - $ref: '#/components/parameters/BudgetId'
+      responses:
+        '200':
+          description: Payees
+          content:
+            application/json:
+              schema: { type: object, required: [items], properties: { items: { type: array, items: { $ref: '#/components/schemas/PayeeStat' } } } }
+
+  /v1/budgets/{budgetId}/payees/{id}:
+    patch:
+      tags: [budgets]
+      operationId: renamePayee
+      parameters:
+        - $ref: '#/components/parameters/BudgetId'
+        - $ref: '#/components/parameters/Id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [name], properties: { name: { type: string, minLength: 1, maxLength: 200 } } }
+      responses:
+        '200':
+          description: Renamed
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Payee' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+    delete:
+      tags: [budgets]
+      operationId: deletePayee
+      parameters:
+        - $ref: '#/components/parameters/BudgetId'
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '204': { description: Deleted }
+        '400': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+
+  /v1/budgets/{budgetId}/payees/{id}/merge:
+    post:
+      tags: [budgets]
+      operationId: mergePayees
+      description: Moves transactions and rules from mergeIds onto this payee, then removes them.
+      parameters:
+        - $ref: '#/components/parameters/BudgetId'
+        - $ref: '#/components/parameters/Id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [mergeIds], properties: { mergeIds: { type: array, minItems: 1, items: { type: string } } } }
+      responses:
+        '204': { description: Merged }
+        '400': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+
+  /v1/budgets/{budgetId}/tags:
+    get:
+      tags: [budgets]
+      operationId: listTags
+      parameters:
+        - $ref: '#/components/parameters/BudgetId'
+      responses:
+        '200':
+          description: Tags
+          content:
+            application/json:
+              schema: { type: object, required: [items], properties: { items: { type: array, items: { $ref: '#/components/schemas/Tag' } } } }
+    post:
+      tags: [budgets]
+      operationId: createTag
+      parameters:
+        - $ref: '#/components/parameters/BudgetId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TagInput' }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Tag' }
+        '409': { $ref: '#/components/responses/Problem' }
+
+  /v1/budgets/{budgetId}/tags/{id}:
+    patch:
+      tags: [budgets]
+      operationId: updateTag
+      parameters:
+        - $ref: '#/components/parameters/BudgetId'
+        - $ref: '#/components/parameters/Id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TagInput' }
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Tag' }
+        '404': { $ref: '#/components/responses/Problem' }
+    delete:
+      tags: [budgets]
+      operationId: deleteTag
+      parameters:
+        - $ref: '#/components/parameters/BudgetId'
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '204': { description: Deleted }
+        '404': { $ref: '#/components/responses/Problem' }
+
+  /v1/budgets/{budgetId}/categories/{id}/note:
+    get:
+      tags: [budgets]
+      operationId: getCategoryNote
+      description: 'Category notes hold #template goal lines.'
+      parameters:
+        - $ref: '#/components/parameters/BudgetId'
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '200':
+          description: Note
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CategoryNote' }
+        '404': { $ref: '#/components/responses/Problem' }
+    put:
+      tags: [budgets]
+      operationId: setCategoryNote
+      parameters:
+        - $ref: '#/components/parameters/BudgetId'
+        - $ref: '#/components/parameters/Id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [note], properties: { note: { type: [string, 'null'] } } }
+      responses:
+        '200':
+          description: Saved
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CategoryNote' }
+        '404': { $ref: '#/components/responses/Problem' }
+
+  /v1/budgets/{budgetId}/accounts/{id}/bank-sync:
+    post:
+      tags: [budgets]
+      operationId: syncAccount
+      description: Starts a bank sync for a linked account. Poll the job.
+      parameters:
+        - $ref: '#/components/parameters/BudgetId'
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '202':
+          description: Job started (or the one already running)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Job' }
+
+  /v1/budgets/{budgetId}/bank-sync:
+    post:
+      tags: [budgets]
+      operationId: syncAllAccounts
+      description: Starts a bank sync for every linked account.
+      parameters:
+        - $ref: '#/components/parameters/BudgetId'
+      responses:
+        '202':
+          description: Job started
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Job' }
+
+  /v1/jobs/{jobId}:
+    get:
+      tags: [system]
+      operationId: getJob
+      parameters:
+        - { name: jobId, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: Job
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Job' }
+        '404': { $ref: '#/components/responses/Problem' }
+
+  /v1/budgets/{budgetId}/accounts/{id}/import/preview:
+    post:
+      tags: [budgets]
+      operationId: previewImport
+      description: Parses a statement (OFX, QFX, QIF, CSV, CAMT) and reports what importing it would do.
+      parameters:
+        - $ref: '#/components/parameters/BudgetId'
+        - $ref: '#/components/parameters/Id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ImportRequest' }
+      responses:
+        '200':
+          description: Preview
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ImportPreview' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '501': { $ref: '#/components/responses/Problem' }
+
+  /v1/budgets/{budgetId}/accounts/{id}/import:
+    post:
+      tags: [budgets]
+      operationId: importFile
+      description: Imports the statement. Matching transactions are merged, not duplicated.
+      parameters:
+        - $ref: '#/components/parameters/BudgetId'
+        - $ref: '#/components/parameters/Id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ImportRequest' }
+      responses:
+        '200':
+          description: Imported
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ImportResult' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '501': { $ref: '#/components/responses/Problem' }
+
+  /v1/budgets/{budgetId}/accounts/{id}/reconcile:
+    get:
+      tags: [budgets]
+      operationId: getReconcileStatus
+      parameters:
+        - $ref: '#/components/parameters/BudgetId'
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '200':
+          description: Balances
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ReconcileStatus' }
+        '404': { $ref: '#/components/responses/Problem' }
+    post:
+      tags: [budgets]
+      operationId: reconcileAccount
+      description: Compares the cleared balance with a statement; optionally adds an adjustment; then locks cleared transactions.
+      parameters:
+        - $ref: '#/components/parameters/BudgetId'
+        - $ref: '#/components/parameters/Id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [statementBalance], properties: { statementBalance: { $ref: '#/components/schemas/Money' }, createAdjustment: { type: boolean, default: false } } }
+      responses:
+        '200':
+          description: Result
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ReconcileResult' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+
+  /v1/budgets/{budgetId}/reports/cash-flow:
+    get:
+      tags: [budgets]
+      operationId: cashFlowReport
+      description: Income and expenses per month (on budget, excluding transfers and starting balances).
+      parameters:
+        - $ref: '#/components/parameters/BudgetId'
+        - { name: start, in: query, required: true, schema: { $ref: '#/components/schemas/Month' } }
+        - { name: end, in: query, required: true, schema: { $ref: '#/components/schemas/Month' } }
+      responses:
+        '200':
+          description: Cash flow
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CashFlowReport' }
+        '400': { $ref: '#/components/responses/Problem' }
+
+  /v1/budgets/{budgetId}/reports/spending:
+    get:
+      tags: [budgets]
+      operationId: spendingReport
+      description: Spending by category for a month range.
+      parameters:
+        - $ref: '#/components/parameters/BudgetId'
+        - { name: start, in: query, required: true, schema: { $ref: '#/components/schemas/Month' } }
+        - { name: end, in: query, required: true, schema: { $ref: '#/components/schemas/Month' } }
+      responses:
+        '200':
+          description: Spending
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SpendingReport' }
+        '400': { $ref: '#/components/responses/Problem' }
+
+  /v1/budgets/{budgetId}/reports/net-worth:
+    get:
+      tags: [budgets]
+      operationId: netWorthReport
+      description: End-of-month balances across all accounts.
+      parameters:
+        - $ref: '#/components/parameters/BudgetId'
+        - { name: months, in: query, schema: { type: integer, minimum: 1, maximum: 120, default: 12 } }
+      responses:
+        '200':
+          description: Net worth
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/NetWorthReport' }
+
+  /v1/budgets/{budgetId}/months/{month}/apply-templates:
+    post:
+      tags: [budgets]
+      operationId: applyTemplates
+      description: 'Fills budgets from #template notes. Capability `budget.templates`.'
+      parameters:
+        - $ref: '#/components/parameters/BudgetId'
+        - $ref: '#/components/parameters/MonthParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: [object, 'null'], properties: { overwrite: { type: boolean, default: false } } }
+      responses:
+        '200':
+          description: Applied
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TemplatesResult' }
+        '501': { $ref: '#/components/responses/Problem' }
+
+  /v1/budgets/{budgetId}/templates/check:
+    get:
+      tags: [budgets]
+      operationId: checkTemplates
+      parameters:
+        - $ref: '#/components/parameters/BudgetId'
+      responses:
+        '200':
+          description: Result
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TemplatesCheck' }
+        '501': { $ref: '#/components/responses/Problem' }
+
 components:
   securitySchemes:
     bearer:
@@ -889,6 +1410,8 @@ components:
         closed: { type: boolean }
         balance: { $ref: '#/components/schemas/Money' }
         accountGroupId: { type: [string, 'null'] }
+        syncSource: { type: [string, 'null'], description: "Bank sync provider once linked in Actual (goCardless, simpleFin, pluggyai)" }
+        lastSync: { type: [string, 'null'], format: date-time }
 
     Category:
       type: object
@@ -1080,3 +1603,272 @@ components:
           type: integer
           format: int64
           minimum: 1
+
+    Recurrence:
+      type: object
+      description: "Actual's RecurConfig: how a schedule repeats"
+      required: [frequency, start]
+      properties:
+        frequency: { type: string, enum: [daily, weekly, monthly, yearly] }
+        interval: { type: integer, minimum: 1 }
+        start: { $ref: '#/components/schemas/Date' }
+        endMode: { type: string, enum: [never, after_n_occurrences, on_date] }
+        endOccurrences: { type: integer }
+        endDate: { $ref: '#/components/schemas/Date' }
+        skipWeekend: { type: boolean }
+        weekendSolveMode: { type: string, enum: [before, after] }
+        patterns: { type: array, items: {} }
+
+    Schedule:
+      type: object
+      required: [id, name, nextDate, completed, postsTransaction, payeeId, accountId, amount, amountMax, amountOp, recurrence, date, upcoming]
+      properties:
+        id: { type: string }
+        name: { type: [string, 'null'] }
+        nextDate: { type: [string, 'null'] }
+        completed: { type: boolean }
+        postsTransaction: { type: boolean, description: Actual adds the transaction automatically when due }
+        payeeId: { type: [string, 'null'] }
+        accountId: { type: [string, 'null'] }
+        amount: { $ref: '#/components/schemas/Money' }
+        amountMax: { type: [integer, 'null'], description: Upper bound when amountOp is isbetween }
+        amountOp: { type: string, description: "is, isapprox or isbetween" }
+        recurrence:
+          oneOf:
+            - { $ref: '#/components/schemas/Recurrence' }
+            - { type: 'null' }
+        date: { type: [string, 'null'], description: One-time schedules only }
+        upcoming:
+          type: array
+          items: { type: string }
+
+    ScheduleInput:
+      type: object
+      minProperties: 1
+      properties:
+        name: { type: [string, 'null'] }
+        payeeId: { type: [string, 'null'] }
+        payeeName: { type: string }
+        accountId: { type: [string, 'null'] }
+        amount: { $ref: '#/components/schemas/Money' }
+        amountMax: { $ref: '#/components/schemas/Money' }
+        amountOp: { type: string, enum: [is, isapprox, isbetween] }
+        recurrence: { $ref: '#/components/schemas/Recurrence' }
+        date: { $ref: '#/components/schemas/Date' }
+        postsTransaction: { type: boolean }
+
+    RuleItem:
+      type: object
+      description: "A condition or action in Actual's rule format; value's type depends on field and op"
+      required: [op]
+      properties:
+        field: { type: [string, 'null'] }
+        op: { type: string }
+        value: {}
+        type: { type: [string, 'null'] }
+        options: { type: [object, 'null'] }
+
+    Rule:
+      type: object
+      required: [id, stage, conditionsOp, conditions, actions, scheduleId]
+      properties:
+        id: { type: string }
+        stage: { type: [string, 'null'], description: "pre, post or null (default)" }
+        conditionsOp: { type: string, enum: [and, or] }
+        conditions: { type: array, items: { $ref: '#/components/schemas/RuleItem' } }
+        actions: { type: array, items: { $ref: '#/components/schemas/RuleItem' } }
+        scheduleId: { type: [string, 'null'], description: Set for the hidden rule behind a schedule }
+
+    RuleInput:
+      type: object
+      required: [conditions, actions]
+      properties:
+        stage: { type: [string, 'null'], enum: [pre, post, null] }
+        conditionsOp: { type: string, enum: [and, or] }
+        conditions: { type: array, items: { $ref: '#/components/schemas/RuleItem' } }
+        actions: { type: array, items: { $ref: '#/components/schemas/RuleItem' } }
+
+    PayeeStat:
+      type: object
+      required: [id, name, transferAccountId, transactionCount, ruleCount]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        transferAccountId: { type: [string, 'null'] }
+        transactionCount: { type: integer }
+        ruleCount: { type: integer }
+
+    Tag:
+      type: object
+      required: [id, tag, color, description]
+      properties:
+        id: { type: string }
+        tag: { type: string, description: 'Without the leading #' }
+        color: { type: [string, 'null'] }
+        description: { type: [string, 'null'] }
+
+    TagInput:
+      type: object
+      minProperties: 1
+      properties:
+        tag: { type: string }
+        color: { type: [string, 'null'] }
+        description: { type: [string, 'null'] }
+
+    CategoryNote:
+      type: object
+      required: [categoryId, note]
+      properties:
+        categoryId: { type: string }
+        note: { type: [string, 'null'] }
+
+    Job:
+      type: object
+      required: [id, kind, budgetId, status, startedAt, finishedAt, result, error]
+      properties:
+        id: { type: string }
+        kind: { type: string }
+        budgetId: { type: string }
+        status: { type: string, enum: [running, succeeded, failed] }
+        startedAt: { type: string, format: date-time }
+        finishedAt: { type: [string, 'null'] }
+        result: { description: "For bank-sync: { accounts, newTransactions }" }
+        error: { type: [string, 'null'] }
+
+    ImportRequest:
+      type: object
+      required: [fileName, contentBase64]
+      properties:
+        fileName: { type: string, description: The extension picks the parser }
+        contentBase64: { type: string, description: File bytes, base64; 10 MB max }
+        options:
+          type: object
+          properties:
+            dateFormat: { type: string, enum: [yyyy-MM-dd, MM/dd/yyyy, dd/MM/yyyy, MM/dd/yy, dd/MM/yy] }
+            hasHeaderRow: { type: boolean }
+            delimiter: { type: string }
+            invertAmounts: { type: boolean }
+            csvMapping: { $ref: '#/components/schemas/CsvMapping' }
+
+    CsvMapping:
+      type: object
+      description: Column names for each field; detected from the header when omitted
+      properties:
+        date: { type: string }
+        payee: { type: string }
+        amount: { type: string }
+        inflow: { type: string }
+        outflow: { type: string }
+        notes: { type: string }
+
+    ImportRow:
+      type: object
+      required: [date, amount, payeeName, notes, importedId]
+      properties:
+        date: { $ref: '#/components/schemas/Date' }
+        amount: { $ref: '#/components/schemas/Money' }
+        payeeName: { type: [string, 'null'] }
+        notes: { type: [string, 'null'] }
+        importedId: { type: [string, 'null'] }
+
+    ImportPreview:
+      type: object
+      required: [rows, errors, columns, mapping, newCount, matchedCount]
+      properties:
+        rows: { type: array, items: { $ref: '#/components/schemas/ImportRow' } }
+        errors: { type: array, items: { type: string } }
+        columns: { type: array, items: { type: string }, description: CSV header columns (empty for other formats) }
+        mapping:
+          oneOf:
+            - { $ref: '#/components/schemas/CsvMapping' }
+            - { type: 'null' }
+        newCount: { type: integer }
+        matchedCount: { type: integer, description: Rows that match transactions already in Actual }
+
+    ImportResult:
+      type: object
+      required: [added, updated, errors]
+      properties:
+        added: { type: integer }
+        updated: { type: integer }
+        errors: { type: array, items: { type: string } }
+
+    ReconcileStatus:
+      type: object
+      required: [clearedBalance, unclearedBalance, balance]
+      properties:
+        clearedBalance: { $ref: '#/components/schemas/Money' }
+        unclearedBalance: { $ref: '#/components/schemas/Money' }
+        balance: { $ref: '#/components/schemas/Money' }
+
+    ReconcileResult:
+      type: object
+      required: [reconciled, difference, adjustmentTransactionId, lockedCount]
+      properties:
+        reconciled: { type: boolean, description: False when there's a difference and no adjustment was requested }
+        difference: { $ref: '#/components/schemas/Money' }
+        adjustmentTransactionId: { type: [string, 'null'] }
+        lockedCount: { type: integer }
+
+    CashFlowReport:
+      type: object
+      required: [months]
+      properties:
+        months:
+          type: array
+          items:
+            type: object
+            required: [month, income, expenses, net]
+            properties:
+              month: { $ref: '#/components/schemas/Month' }
+              income: { $ref: '#/components/schemas/Money' }
+              expenses: { $ref: '#/components/schemas/Money' }
+              net: { $ref: '#/components/schemas/Money' }
+
+    SpendingReport:
+      type: object
+      required: [start, end, total, categories]
+      properties:
+        start: { $ref: '#/components/schemas/Month' }
+        end: { $ref: '#/components/schemas/Month' }
+        total: { $ref: '#/components/schemas/Money' }
+        categories:
+          type: array
+          items:
+            type: object
+            required: [categoryId, name, groupId, groupName, amount]
+            properties:
+              categoryId: { type: [string, 'null'] }
+              name: { type: string }
+              groupId: { type: [string, 'null'] }
+              groupName: { type: [string, 'null'] }
+              amount: { $ref: '#/components/schemas/Money' }
+
+    NetWorthReport:
+      type: object
+      required: [points]
+      properties:
+        points:
+          type: array
+          items:
+            type: object
+            required: [month, assets, liabilities, netWorth]
+            properties:
+              month: { $ref: '#/components/schemas/Month' }
+              assets: { $ref: '#/components/schemas/Money' }
+              liabilities: { $ref: '#/components/schemas/Money' }
+              netWorth: { $ref: '#/components/schemas/Money' }
+
+    TemplatesResult:
+      type: object
+      required: [month, message]
+      properties:
+        month: { $ref: '#/components/schemas/BudgetMonth' }
+        message: { type: string }
+
+    TemplatesCheck:
+      type: object
+      required: [ok, message]
+      properties:
+        ok: { type: boolean }
+        message: { type: string }
