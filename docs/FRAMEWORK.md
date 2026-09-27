@@ -1,6 +1,6 @@
 # Actual × Monarch for Android: Framework Design
 
-**Status:** Draft v0.2 (decisions locked, API facts verified against Actual 26.9.0) · **Date:** 2026-09-27
+**Status:** v0.3 (Phase 0 built: bridge + Android shell, tested against Actual 26.9.0) · **Date:** 2026-09-27
 **Goal:** A native Android app that sits on a self-hosted **Actual Budget** server. It supports all of Actual's features, uses a **Monarch-style** UI/UX, and survives Actual upgrades without rewrites. Once the core works, it gets an extension layer for new features.
 
 ---
@@ -110,31 +110,30 @@ Actual ships roughly monthly (`YY.M.x`). Defense in depth:
 
 ### Module layout (monorepo)
 
+"Canopy" is a placeholder app name; package `app.canopy`.
+
 ```
 actual-monarch-android/
-├─ contract/                 openapi.yaml: single source of truth; generates Kotlin + TS types
+├─ contract/                 openapi.yaml (source of truth) + fixtures/ recorded from a real Actual
 ├─ bridge/                   Node/TypeScript service + Dockerfile
-│  └─ src/
-│     ├─ http/               routes, auth, validation
-│     ├─ actual/             ← the ONLY place that imports @actual-app/api
-│     │  ├─ tier1/ tier2/ tier3/
-│     │  └─ capabilities.ts
-│     ├─ mappers/            Actual shapes → contract DTOs
-│     └─ ext/                extension routes + extension store
-├─ app/                      Android application shell, nav graph
-├─ core/
-│  ├─ model/                 pure Kotlin: Money, ids, domain entities
-│  ├─ domain/                use cases, repository interfaces, BudgetEngine port
-│  ├─ data/                  repository impls, Room, outbox, sync orchestrator
-│  ├─ engine-bridge/         BudgetEngine over the /v1 contract
-│  ├─ engine-embedded/       (later) BudgetEngine over on-device loot-core
-│  ├─ network/               generated client, auth interceptor
-│  ├─ designsystem/          Monarch-style theme + components
-│  └─ testing/               fakes, fixture budgets
-├─ feature/
-│  ├─ onboarding/ dashboard/ accounts/ transactions/ budget/ cashflow/
-│  ├─ recurring/ reports/ rules/ payees/ categories/ goals/ settings/
-└─ extensions/               add-on features (Phase 4+), each its own module
+│  ├─ src/actual/            ← the ONLY place that imports @actual-app/api
+│  ├─ src/auth/              household store: members, devices, pairing, tokens, audit
+│  ├─ src/http/routes/       v1 endpoints
+│  ├─ src/mappers/           Actual shapes → contract DTOs
+│  └─ test/                  unit + contract suite against a real actual-server
+├─ deploy/                   docker-compose (Actual + bridge + cloudflared), .env.example
+└─ android/                  Gradle project
+   ├─ build-logic/           convention plugins (canopy.android.feature, canopy.jvm.library, …)
+   ├─ app/                   shell: navigation, session routing, deep links
+   ├─ core/model/            pure Kotlin: Money, ids, entities, Capabilities
+   ├─ core/domain/           BudgetEngine port, gateways, use cases, PairingLinks
+   ├─ core/network/          Ktor client, contract DTOs, token refresh, CF Access headers
+   ├─ core/engine-bridge/    BudgetEngine over the /v1 contract
+   ├─ core/data/             encrypted session store, DI bindings (the engine seam)
+   ├─ core/designsystem/     theme + components (MoneyText, progress bars, avatars, cards)
+   ├─ core/extensions/       extension points (DashboardWidget, …)
+   ├─ core/testing/          FakeBudgetEngine + sample household for tests and screenshots
+   └─ feature/               onboarding, dashboard, accounts, transactions, budget, settings
 ```
 
 **Dependency rules** (enforced with a Gradle convention plugin or Konsist tests):

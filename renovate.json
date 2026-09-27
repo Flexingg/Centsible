@@ -1,0 +1,16 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended"],
+  "packageRules": [
+    {
+      "description": "Actual moves as one unit: API, test server and Docker image on the same release line",
+      "groupName": "Actual Budget",
+      "matchPackageNames": ["@actual-app/api", "@actual-app/sync-server", "actualbudget/actual-server"],
+      "rangeStrategy": "pin"
+    },
+    {
+      "groupName": "Android toolchain",
+      "matchPackageNames": ["com.android.tools.build:gradle", "org.jetbrains.kotlin**", "com.google.devtools.ksp**", "com.google.dagger**"]
+    }
+  ]
+}
