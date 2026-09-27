@@ -1,0 +1,28 @@
+{
+  "items": [
+    {
+      "id": "a857dd35-420b-4fc9-b9e2-6ce6b75c35d4",
+      "name": "Brokerage",
+      "offBudget": true,
+      "closed": false,
+      "balance": 1250000,
+      "accountGroupId": null
+    },
+    {
+      "id": "1b75a67d-a103-40eb-8949-ec3caf9f11b6",
+      "name": "Joint Checking",
+      "offBudget": false,
+      "closed": false,
+      "balance": 932166,
+      "accountGroupId": null
+    },
+    {
+      "id": "9d65d93d-38fa-4b3d-b97f-9eaeac72dd4d",
+      "name": "Visa",
+      "offBudget": false,
+      "closed": false,
+      "balance": -6173,
+      "accountGroupId": null
+    }
+  ]
+}

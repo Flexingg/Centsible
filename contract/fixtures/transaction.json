@@ -1,0 +1,16 @@
+{
+  "id": "03a9bdbf-71b8-45a1-a0bd-e1b46ce4eb3b",
+  "accountId": "9d65d93d-38fa-4b3d-b97f-9eaeac72dd4d",
+  "date": "2026-09-12",
+  "amount": -2599,
+  "payeeId": "6dbe5dc7-4928-4bf5-9f69-615bc8b45a1d",
+  "payeeName": "Netflix",
+  "categoryId": "d4b0f075-3343-4408-91ed-fae94f74e5bf",
+  "notes": "subscription",
+  "cleared": true,
+  "reconciled": false,
+  "transferId": null,
+  "isParent": false,
+  "parentId": null,
+  "subtransactions": []
+}

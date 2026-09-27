@@ -1,0 +1,77 @@
+{
+  "items": [
+    {
+      "id": "fc3825fd-b982-4b72-b768-5b30844cf832",
+      "name": "Usual Expenses",
+      "isIncome": false,
+      "hidden": false,
+      "categories": [
+        {
+          "id": "541836f1-e756-4473-a5d0-6c1d3f06c7fa",
+          "name": "Food",
+          "groupId": "fc3825fd-b982-4b72-b768-5b30844cf832",
+          "isIncome": false,
+          "hidden": false
+        },
+        {
+          "id": "af375fd4-d759-46b3-bffe-74a856151d57",
+          "name": "General",
+          "groupId": "fc3825fd-b982-4b72-b768-5b30844cf832",
+          "isIncome": false,
+          "hidden": false
+        },
+        {
+          "id": "d4b0f075-3343-4408-91ed-fae94f74e5bf",
+          "name": "Bills",
+          "groupId": "fc3825fd-b982-4b72-b768-5b30844cf832",
+          "isIncome": false,
+          "hidden": false
+        },
+        {
+          "id": "29ec2c58-8cd3-42fe-9187-7b5dfe0f70a6",
+          "name": "Bills (Flexible)",
+          "groupId": "fc3825fd-b982-4b72-b768-5b30844cf832",
+          "isIncome": false,
+          "hidden": false
+        }
+      ]
+    },
+    {
+      "id": "a137772f-cf2f-4089-9432-822d2ddc1466",
+      "name": "Investments and Savings",
+      "isIncome": false,
+      "hidden": false,
+      "categories": [
+        {
+          "id": "6bbd8472-25d4-4cee-8a11-5bd9f7e83d61",
+          "name": "Savings",
+          "groupId": "a137772f-cf2f-4089-9432-822d2ddc1466",
+          "isIncome": false,
+          "hidden": false
+        }
+      ]
+    },
+    {
+      "id": "2E1F5BDB-209B-43F9-AF2C-3CE28E380C00",
+      "name": "Income",
+      "isIncome": true,
+      "hidden": false,
+      "categories": [
+        {
+          "id": "3c1699a5-522a-435e-86dc-93d900a14f0e",
+          "name": "Income",
+          "groupId": "2E1F5BDB-209B-43F9-AF2C-3CE28E380C00",
+          "isIncome": true,
+          "hidden": false
+        },
+        {
+          "id": "506e8d9d-7ed0-4397-84e4-07a9185dc6b2",
+          "name": "Starting Balances",
+          "groupId": "2E1F5BDB-209B-43F9-AF2C-3CE28E380C00",
+          "isIncome": true,
+          "hidden": false
+        }
+      ]
+    }
+  ]
+}

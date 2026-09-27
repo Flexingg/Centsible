@@ -1,0 +1,25 @@
+{
+  "contract": "1.0.0",
+  "bridge": {
+    "version": "0.1.0"
+  },
+  "actual": {
+    "serverVersion": "26.9.0",
+    "apiVersion": "26.9.0",
+    "compatibility": "ok"
+  },
+  "status": "ok",
+  "features": {
+    "household": true,
+    "accounts.read": true,
+    "categories.read": true,
+    "payees.read": true,
+    "transactions.read": true,
+    "transactions.create": true,
+    "budget.envelope": true,
+    "budget.tracking": false,
+    "budget.carryover": true,
+    "budget.hold": true,
+    "budget.moveMoney": true
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "items": [
+    {
+      "id": "25223c2d-3400-46cc-95ee-23f418e312dd",
+      "accountId": "a857dd35-420b-4fc9-b9e2-6ce6b75c35d4",
+      "date": "2026-09-27",
+      "amount": 1250000,
+      "payeeId": "8d1fa5b9-1c9f-49ba-8183-4f1955d74923",
+      "payeeName": "Starting Balance",
+      "categoryId": null,
+      "notes": null,
+      "cleared": true,
+      "reconciled": false,
+      "transferId": null,
+      "isParent": false,
+      "parentId": null,
+      "subtransactions": []
+    },
+    {
+      "id": "a7626ce4-7ec4-4e61-b279-ecf2411f22c2",
+      "accountId": "1b75a67d-a103-40eb-8949-ec3caf9f11b6",
+      "date": "2026-09-27",
+      "amount": 520000,
+      "payeeId": "8d1fa5b9-1c9f-49ba-8183-4f1955d74923",
+      "payeeName": "Starting Balance",
+      "categoryId": "506e8d9d-7ed0-4397-84e4-07a9185dc6b2",
+      "notes": null,
+      "cleared": true,
+      "reconciled": false,
+      "transferId": null,
+      "isParent": false,
+      "parentId": null,
+      "subtransactions": []
+    }
+  ],
+  "nextCursor": "eyJvIjoyfQ"
+}

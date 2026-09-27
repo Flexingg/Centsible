@@ -1,0 +1,786 @@
+openapi: 3.1.0
+info:
+  title: Actual Bridge API
+  version: 1.0.0
+  description: |
+    Stable contract between the Android app and the Actual bridge.
+
+    Conventions
+    - All money values are integers in minor units (cents). Ledger amounts are signed:
+      outflows negative, inflows positive. Budget amounts (`budgeted`, `totalBudgeted`)
+      are the amount assigned, positive when money is assigned.
+    - Months are `YYYY-MM`, dates are `YYYY-MM-DD`.
+    - Within /v1 changes are additive only. Clients must ignore unknown fields and
+      treat unknown enum values as `unknown`.
+    - Non-idempotent writes require an `Idempotency-Key` header. Creates use a
+      client-generated UUID `id` instead.
+    - Errors are `application/problem+json` with a stable `code`.
+servers:
+  - url: https://budget-api.example.com
+security:
+  - bearer: []
+tags:
+  - name: system
+  - name: auth
+  - name: household
+  - name: budgets
+
+paths:
+  /v1/health:
+    get:
+      tags: [system]
+      operationId: getHealth
+      security: []
+      responses:
+        '200':
+          description: Liveness
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Health' }
+
+  /v1/capabilities:
+    get:
+      tags: [system]
+      operationId: getCapabilities
+      responses:
+        '200':
+          description: What this bridge and the Actual version behind it support
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Capabilities' }
+        '401': { $ref: '#/components/responses/Problem' }
+
+  /v1/auth/pair:
+    post:
+      tags: [auth]
+      operationId: pairDevice
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PairRequest' }
+      responses:
+        '200':
+          description: Device paired
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TokenResponse' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+
+  /v1/auth/refresh:
+    post:
+      tags: [auth]
+      operationId: refreshToken
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RefreshRequest' }
+      responses:
+        '200':
+          description: New token pair (refresh tokens rotate)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TokenResponse' }
+        '401': { $ref: '#/components/responses/Problem' }
+
+  /v1/auth/logout:
+    post:
+      tags: [auth]
+      operationId: logout
+      description: Revokes the calling device.
+      responses:
+        '204': { description: Logged out }
+
+  /v1/me:
+    get:
+      tags: [auth]
+      operationId: getMe
+      responses:
+        '200':
+          description: The calling member and device
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Me' }
+        '401': { $ref: '#/components/responses/Problem' }
+
+  /v1/household/members:
+    get:
+      tags: [household]
+      operationId: listMembers
+      responses:
+        '200':
+          description: Household members (owner only)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/Member' }
+        '403': { $ref: '#/components/responses/Problem' }
+    post:
+      tags: [household]
+      operationId: createMember
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/NewMember' }
+      responses:
+        '201':
+          description: Member created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Member' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+
+  /v1/household/members/{memberId}/pairing-codes:
+    post:
+      tags: [household]
+      operationId: createPairingCode
+      parameters:
+        - $ref: '#/components/parameters/MemberId'
+      responses:
+        '201':
+          description: Single-use pairing code, render `pairingUri` as a QR code
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PairingCode' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+
+  /v1/household/members/{memberId}/budgets:
+    put:
+      tags: [household]
+      operationId: setMemberBudgets
+      parameters:
+        - $ref: '#/components/parameters/MemberId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [budgetIds]
+              properties:
+                budgetIds:
+                  type: array
+                  items: { type: string }
+      responses:
+        '200':
+          description: Updated member
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Member' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+
+  /v1/household/devices/{deviceId}:
+    delete:
+      tags: [household]
+      operationId: revokeDevice
+      parameters:
+        - name: deviceId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '204': { description: Revoked }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+
+  /v1/budgets:
+    get:
+      tags: [budgets]
+      operationId: listBudgets
+      responses:
+        '200':
+          description: Budget files the member can open
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/Budget' }
+
+  /v1/budgets/{budgetId}/accounts:
+    get:
+      tags: [budgets]
+      operationId: listAccounts
+      parameters:
+        - $ref: '#/components/parameters/BudgetId'
+      responses:
+        '200':
+          description: Accounts with current balances
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/Account' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+
+  /v1/budgets/{budgetId}/category-groups:
+    get:
+      tags: [budgets]
+      operationId: listCategoryGroups
+      parameters:
+        - $ref: '#/components/parameters/BudgetId'
+      responses:
+        '200':
+          description: Category groups with their categories
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/CategoryGroup' }
+
+  /v1/budgets/{budgetId}/payees:
+    get:
+      tags: [budgets]
+      operationId: listPayees
+      parameters:
+        - $ref: '#/components/parameters/BudgetId'
+      responses:
+        '200':
+          description: Payees (Monarch "merchants")
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/Payee' }
+
+  /v1/budgets/{budgetId}/transactions:
+    get:
+      tags: [budgets]
+      operationId: listTransactions
+      parameters:
+        - $ref: '#/components/parameters/BudgetId'
+        - { name: accountId, in: query, schema: { type: string } }
+        - { name: categoryId, in: query, schema: { type: string } }
+        - { name: since, in: query, schema: { type: string, format: date } }
+        - { name: until, in: query, schema: { type: string, format: date } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 500, default: 100 } }
+        - { name: cursor, in: query, schema: { type: string } }
+      responses:
+        '200':
+          description: Newest first, splits grouped under their parent
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TransactionPage' }
+    post:
+      tags: [budgets]
+      operationId: createTransaction
+      parameters:
+        - $ref: '#/components/parameters/BudgetId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/NewTransaction' }
+      responses:
+        '201':
+          description: Created. Re-sending the same `id` returns the existing transaction with 200.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Transaction' }
+        '200':
+          description: Already existed (idempotent replay)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Transaction' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+
+  /v1/budgets/{budgetId}/months:
+    get:
+      tags: [budgets]
+      operationId: listMonths
+      parameters:
+        - $ref: '#/components/parameters/BudgetId'
+      responses:
+        '200':
+          description: Months that have budget data
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [months]
+                properties:
+                  months:
+                    type: array
+                    items: { $ref: '#/components/schemas/Month' }
+
+  /v1/budgets/{budgetId}/months/{month}:
+    get:
+      tags: [budgets]
+      operationId: getBudgetMonth
+      parameters:
+        - $ref: '#/components/parameters/BudgetId'
+        - $ref: '#/components/parameters/MonthParam'
+      responses:
+        '200':
+          description: Envelope budget for the month
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BudgetMonth' }
+        '404': { $ref: '#/components/responses/Problem' }
+
+  /v1/budgets/{budgetId}/months/{month}/categories/{categoryId}:
+    patch:
+      tags: [budgets]
+      operationId: updateCategoryBudget
+      parameters:
+        - $ref: '#/components/parameters/BudgetId'
+        - $ref: '#/components/parameters/MonthParam'
+        - { name: categoryId, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CategoryBudgetPatch' }
+      responses:
+        '200':
+          description: The updated month (budget math is always recomputed by Actual)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BudgetMonth' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+
+  /v1/budgets/{budgetId}/months/{month}/transfers:
+    post:
+      tags: [budgets]
+      operationId: moveMoney
+      description: Move money between categories or to/from "To Budget". Capability `budget.moveMoney`.
+      parameters:
+        - $ref: '#/components/parameters/BudgetId'
+        - $ref: '#/components/parameters/MonthParam'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/MoneyTransfer' }
+      responses:
+        '200':
+          description: The updated month
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BudgetMonth' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '501': { $ref: '#/components/responses/Problem' }
+
+  /v1/budgets/{budgetId}/months/{month}/hold:
+    put:
+      tags: [budgets]
+      operationId: holdForNextMonth
+      parameters:
+        - $ref: '#/components/parameters/BudgetId'
+        - $ref: '#/components/parameters/MonthParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [amount]
+              properties:
+                amount: { $ref: '#/components/schemas/Money' }
+      responses:
+        '200':
+          description: The updated month
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BudgetMonth' }
+    delete:
+      tags: [budgets]
+      operationId: resetHold
+      parameters:
+        - $ref: '#/components/parameters/BudgetId'
+        - $ref: '#/components/parameters/MonthParam'
+      responses:
+        '200':
+          description: The updated month
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BudgetMonth' }
+
+components:
+  securitySchemes:
+    bearer:
+      type: http
+      scheme: bearer
+
+  parameters:
+    BudgetId:
+      name: budgetId
+      in: path
+      required: true
+      description: Actual sync id (the budget's `groupId`), stable across devices
+      schema: { type: string }
+    MemberId:
+      name: memberId
+      in: path
+      required: true
+      schema: { type: string }
+    MonthParam:
+      name: month
+      in: path
+      required: true
+      schema: { $ref: '#/components/schemas/Month' }
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema: { type: string, minLength: 8, maxLength: 128 }
+
+  responses:
+    Problem:
+      description: Error
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+
+  schemas:
+    Money:
+      type: integer
+      format: int64
+      description: Minor units (cents)
+    Month:
+      type: string
+      pattern: '^\d{4}-\d{2}$'
+    Date:
+      type: string
+      pattern: '^\d{4}-\d{2}-\d{2}$'
+    Role:
+      type: string
+      enum: [owner, member, viewer]
+
+    Problem:
+      type: object
+      required: [type, title, status, code]
+      properties:
+        type: { type: string }
+        title: { type: string }
+        status: { type: integer }
+        code:
+          type: string
+          description: Stable machine-readable code, e.g. `unauthorized`, `forbidden`, `not_found`, `validation`, `feature_unavailable`, `actual_unavailable`, `conflict`, `rate_limited`
+        detail: { type: string }
+
+    Health:
+      type: object
+      required: [status, version]
+      properties:
+        status: { type: string, enum: [ok] }
+        version: { type: string }
+
+    Capabilities:
+      type: object
+      required: [contract, bridge, actual, status, features]
+      properties:
+        contract: { type: string, description: Contract version implemented by the bridge }
+        bridge:
+          type: object
+          required: [version]
+          properties:
+            version: { type: string }
+        actual:
+          type: object
+          required: [apiVersion, compatibility]
+          properties:
+            serverVersion: { type: [string, 'null'] }
+            apiVersion: { type: string }
+            compatibility:
+              type: string
+              enum: [ok, api_newer, api_older, unknown]
+        status:
+          type: string
+          enum: [ok, degraded, unavailable]
+        features:
+          type: object
+          description: Feature flag map. Absent means false.
+          additionalProperties: { type: boolean }
+
+    PairRequest:
+      type: object
+      required: [code, deviceName, platform]
+      properties:
+        code: { type: string, minLength: 6 }
+        deviceName: { type: string, minLength: 1, maxLength: 80 }
+        platform: { type: string, enum: [android, ios, web, other] }
+
+    RefreshRequest:
+      type: object
+      required: [refreshToken]
+      properties:
+        refreshToken: { type: string }
+
+    TokenResponse:
+      type: object
+      required: [accessToken, refreshToken, expiresIn, member, device]
+      properties:
+        accessToken: { type: string }
+        refreshToken: { type: string }
+        expiresIn: { type: integer, description: Access token lifetime in seconds }
+        member: { $ref: '#/components/schemas/Member' }
+        device: { $ref: '#/components/schemas/Device' }
+
+    Member:
+      type: object
+      required: [id, displayName, role, disabled, budgetIds]
+      properties:
+        id: { type: string }
+        displayName: { type: string }
+        role: { $ref: '#/components/schemas/Role' }
+        disabled: { type: boolean }
+        budgetIds:
+          type: array
+          description: Budgets this member may open. Owners implicitly have all.
+          items: { type: string }
+
+    NewMember:
+      type: object
+      required: [displayName, role]
+      properties:
+        displayName: { type: string, minLength: 1, maxLength: 80 }
+        role: { $ref: '#/components/schemas/Role' }
+        budgetIds:
+          type: array
+          items: { type: string }
+
+    Device:
+      type: object
+      required: [id, name, platform, createdAt]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        platform: { type: string }
+        createdAt: { type: string, format: date-time }
+        lastSeenAt: { type: [string, 'null'], format: date-time }
+
+    Me:
+      type: object
+      required: [member, device, devices]
+      properties:
+        member: { $ref: '#/components/schemas/Member' }
+        device: { $ref: '#/components/schemas/Device' }
+        devices:
+          type: array
+          items: { $ref: '#/components/schemas/Device' }
+
+    PairingCode:
+      type: object
+      required: [code, expiresAt, pairingUri]
+      properties:
+        code: { type: string }
+        expiresAt: { type: string, format: date-time }
+        pairingUri:
+          type: string
+          description: |
+            `actualbridge://pair?u=<bridge url>&c=<code>[&cfid=<CF Access client id>&cfsecret=<secret>]`
+            Encode as a QR code.
+
+    Budget:
+      type: object
+      required: [id, name, encrypted]
+      properties:
+        id: { type: string, description: Actual sync id (groupId) }
+        name: { type: string }
+        encrypted: { type: boolean }
+
+    Account:
+      type: object
+      required: [id, name, offBudget, closed, balance]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        offBudget: { type: boolean }
+        closed: { type: boolean }
+        balance: { $ref: '#/components/schemas/Money' }
+        accountGroupId: { type: [string, 'null'] }
+
+    Category:
+      type: object
+      required: [id, name, groupId, isIncome, hidden]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        groupId: { type: string }
+        isIncome: { type: boolean }
+        hidden: { type: boolean }
+
+    CategoryGroup:
+      type: object
+      required: [id, name, isIncome, hidden, categories]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        isIncome: { type: boolean }
+        hidden: { type: boolean }
+        categories:
+          type: array
+          items: { $ref: '#/components/schemas/Category' }
+
+    Payee:
+      type: object
+      required: [id, name]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        transferAccountId:
+          type: [string, 'null']
+          description: Set when this payee represents a transfer to that account
+
+    Transaction:
+      type: object
+      required: [id, accountId, date, amount, cleared, reconciled, isParent, subtransactions]
+      properties:
+        id: { type: string }
+        accountId: { type: string }
+        date: { $ref: '#/components/schemas/Date' }
+        amount: { $ref: '#/components/schemas/Money' }
+        payeeId: { type: [string, 'null'] }
+        payeeName: { type: [string, 'null'] }
+        categoryId: { type: [string, 'null'] }
+        notes: { type: [string, 'null'] }
+        cleared: { type: boolean }
+        reconciled: { type: boolean }
+        transferId: { type: [string, 'null'] }
+        isParent: { type: boolean }
+        parentId: { type: [string, 'null'] }
+        subtransactions:
+          type: array
+          items: { $ref: '#/components/schemas/Transaction' }
+
+    TransactionPage:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/Transaction' }
+        nextCursor: { type: [string, 'null'] }
+
+    NewTransaction:
+      type: object
+      required: [id, accountId, date, amount]
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Client-generated. Makes the create idempotent for outbox replays.
+        accountId: { type: string }
+        date: { $ref: '#/components/schemas/Date' }
+        amount: { $ref: '#/components/schemas/Money' }
+        payeeId: { type: string }
+        payeeName: { type: string, description: Used when payeeId is absent; creates the payee if needed }
+        categoryId: { type: string }
+        notes: { type: string }
+        cleared: { type: boolean }
+        subtransactions:
+          type: array
+          items:
+            type: object
+            required: [amount]
+            properties:
+              amount: { $ref: '#/components/schemas/Money' }
+              categoryId: { type: string }
+              notes: { type: string }
+
+    BudgetMonth:
+      type: object
+      required: [month, budgetType, toBudget, incomeAvailable, lastMonthOverspent, forNextMonth,
+                 fromLastMonth, totalBudgeted, totalIncome, totalSpent, totalBalance, groups]
+      properties:
+        month: { $ref: '#/components/schemas/Month' }
+        budgetType:
+          type: string
+          enum: [envelope, tracking, unknown]
+        toBudget: { $ref: '#/components/schemas/Money' }
+        incomeAvailable: { $ref: '#/components/schemas/Money' }
+        lastMonthOverspent: { $ref: '#/components/schemas/Money' }
+        forNextMonth: { $ref: '#/components/schemas/Money' }
+        fromLastMonth: { $ref: '#/components/schemas/Money' }
+        totalBudgeted: { $ref: '#/components/schemas/Money' }
+        totalIncome: { $ref: '#/components/schemas/Money' }
+        totalSpent: { $ref: '#/components/schemas/Money' }
+        totalBalance: { $ref: '#/components/schemas/Money' }
+        groups:
+          type: array
+          items: { $ref: '#/components/schemas/BudgetGroup' }
+
+    BudgetGroup:
+      type: object
+      required: [id, name, isIncome, hidden, budgeted, spent, balance, received, categories]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        isIncome: { type: boolean }
+        hidden: { type: boolean }
+        budgeted: { $ref: '#/components/schemas/Money' }
+        spent: { $ref: '#/components/schemas/Money' }
+        balance: { $ref: '#/components/schemas/Money' }
+        received: { $ref: '#/components/schemas/Money' }
+        categories:
+          type: array
+          items: { $ref: '#/components/schemas/BudgetCategory' }
+
+    BudgetCategory:
+      type: object
+      required: [id, name, hidden, budgeted, spent, balance, received, carryover]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        hidden: { type: boolean }
+        budgeted: { $ref: '#/components/schemas/Money' }
+        spent: { $ref: '#/components/schemas/Money' }
+        balance: { $ref: '#/components/schemas/Money' }
+        received:
+          $ref: '#/components/schemas/Money'
+          description: Income categories only; 0 otherwise
+        carryover:
+          type: boolean
+          description: Rollover overspending into next month
+
+    CategoryBudgetPatch:
+      type: object
+      minProperties: 1
+      properties:
+        budgeted: { $ref: '#/components/schemas/Money' }
+        carryover: { type: boolean }
+
+    MoneyTransfer:
+      type: object
+      required: [from, to, amount]
+      properties:
+        from: { type: string, description: Category id or `to-budget` }
+        to: { type: string, description: Category id or `to-budget` }
+        amount:
+          type: integer
+          format: int64
+          minimum: 1

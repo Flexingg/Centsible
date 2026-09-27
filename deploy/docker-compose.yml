@@ -1,0 +1,32 @@
+# Actual + bridge behind a Cloudflare Tunnel.
+#
+# In the Cloudflare Zero Trust dashboard, give the tunnel two public hostnames:
+#   actual.example.com      -> http://actual:5006   (Actual web app, as today)
+#   budget-api.example.com  -> http://bridge:8787   (the Android app talks to this)
+# Then (recommended) protect budget-api.example.com with an Access application that
+# has a "Service Auth" policy, and put that service token in .env as CF_ACCESS_*.
+services:
+  actual:
+    image: actualbudget/actual-server:26.9.0 # keep on the same YY.M as the bridge
+    restart: unless-stopped
+    volumes:
+      - ./actual-data:/data
+
+  bridge:
+    build: ../bridge
+    restart: unless-stopped
+    depends_on: [actual]
+    env_file: .env
+    environment:
+      ACTUAL_SERVER_URL: http://actual:5006
+      BRIDGE_TRUST_PROXY: "true"
+    volumes:
+      - ./bridge-data:/data
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN}
+    depends_on: [actual, bridge]

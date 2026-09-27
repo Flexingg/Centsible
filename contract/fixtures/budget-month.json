@@ -1,0 +1,121 @@
+{
+  "month": "2026-09",
+  "budgetType": "envelope",
+  "toBudget": 865000,
+  "incomeAvailable": 1130000,
+  "lastMonthOverspent": 0,
+  "forNextMonth": 0,
+  "fromLastMonth": 0,
+  "totalBudgeted": 265000,
+  "totalIncome": 1130000,
+  "totalSpent": -211606,
+  "totalBalance": 53394,
+  "groups": [
+    {
+      "id": "fc3825fd-b982-4b72-b768-5b30844cf832",
+      "name": "Usual Expenses",
+      "isIncome": false,
+      "hidden": false,
+      "budgeted": 265000,
+      "spent": -211606,
+      "balance": 53394,
+      "received": 0,
+      "categories": [
+        {
+          "id": "541836f1-e756-4473-a5d0-6c1d3f06c7fa",
+          "name": "Food",
+          "hidden": false,
+          "budgeted": 60000,
+          "spent": -17357,
+          "balance": 42643,
+          "received": 0,
+          "carryover": true
+        },
+        {
+          "id": "af375fd4-d759-46b3-bffe-74a856151d57",
+          "name": "General",
+          "hidden": false,
+          "budgeted": 20000,
+          "spent": -6650,
+          "balance": 13350,
+          "received": 0,
+          "carryover": false
+        },
+        {
+          "id": "d4b0f075-3343-4408-91ed-fae94f74e5bf",
+          "name": "Bills",
+          "hidden": false,
+          "budgeted": 185000,
+          "spent": -187599,
+          "balance": -2599,
+          "received": 0,
+          "carryover": false
+        },
+        {
+          "id": "29ec2c58-8cd3-42fe-9187-7b5dfe0f70a6",
+          "name": "Bills (Flexible)",
+          "hidden": false,
+          "budgeted": 0,
+          "spent": 0,
+          "balance": 0,
+          "received": 0,
+          "carryover": false
+        }
+      ]
+    },
+    {
+      "id": "a137772f-cf2f-4089-9432-822d2ddc1466",
+      "name": "Investments and Savings",
+      "isIncome": false,
+      "hidden": false,
+      "budgeted": 0,
+      "spent": 0,
+      "balance": 0,
+      "received": 0,
+      "categories": [
+        {
+          "id": "6bbd8472-25d4-4cee-8a11-5bd9f7e83d61",
+          "name": "Savings",
+          "hidden": false,
+          "budgeted": 0,
+          "spent": 0,
+          "balance": 0,
+          "received": 0,
+          "carryover": false
+        }
+      ]
+    },
+    {
+      "id": "2E1F5BDB-209B-43F9-AF2C-3CE28E380C00",
+      "name": "Income",
+      "isIncome": true,
+      "hidden": false,
+      "budgeted": 0,
+      "spent": 0,
+      "balance": 0,
+      "received": 1130000,
+      "categories": [
+        {
+          "id": "3c1699a5-522a-435e-86dc-93d900a14f0e",
+          "name": "Income",
+          "hidden": false,
+          "budgeted": 0,
+          "spent": 0,
+          "balance": 0,
+          "received": 610000,
+          "carryover": false
+        },
+        {
+          "id": "506e8d9d-7ed0-4397-84e4-07a9185dc6b2",
+          "name": "Starting Balances",
+          "hidden": false,
+          "budgeted": 0,
+          "spent": 0,
+          "balance": 0,
+          "received": 520000,
+          "carryover": false
+        }
+      ]
+    }
+  ]
+}

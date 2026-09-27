@@ -1,0 +1,39 @@
+{
+  "name": "actual-bridge",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Stable REST contract over @actual-app/api for the Actual x Monarch Android app",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "dev": "tsx watch src/main.ts",
+    "start": "node dist/main.js",
+    "admin": "tsx src/admin/cli.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:unit": "vitest run test/unit",
+    "test:contract": "vitest run test/contract",
+    "fixtures": "RECORD_FIXTURES=1 vitest run test/contract"
+  },
+  "dependencies": {
+    "@actual-app/api": "26.9.0",
+    "better-sqlite3": "13.0.3",
+    "fastify": "5.12.5",
+    "qrcode": "1.5.4"
+  },
+  "devDependencies": {
+    "@actual-app/sync-server": "26.9.0",
+    "@types/better-sqlite3": "9.6.0",
+    "@types/node": "22.20.4",
+    "@types/qrcode": "1.5.6",
+    "ajv": "8.20.0",
+    "ajv-formats": "3.0.1",
+    "tsx": "4.23.15",
+    "typescript": "7.0.2",
+    "vitest": "5.0.2",
+    "yaml": "2.9.1"
+  }
+}

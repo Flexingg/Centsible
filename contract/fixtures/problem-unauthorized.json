@@ -1,0 +1,7 @@
+{
+  "type": "about:blank",
+  "title": "Unauthorized",
+  "status": 401,
+  "code": "unauthorized",
+  "detail": "Missing or expired access token"
+}
