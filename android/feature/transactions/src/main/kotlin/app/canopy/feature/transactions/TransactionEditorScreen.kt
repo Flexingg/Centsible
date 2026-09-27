@@ -81,6 +81,7 @@ fun TransactionEditorRoute(onClose: () -> Unit, viewModel: TransactionEditorView
         actions = EditorActions(
             close = onClose,
             retry = { viewModel.load() },
+            rememberCategory = viewModel::setRememberCategory,
             edit = viewModel::edit,
             addSplit = viewModel::addSplit,
             updateSplit = viewModel::updateSplit,
@@ -95,6 +96,7 @@ data class EditorActions(
     val close: () -> Unit = {},
     val retry: () -> Unit = {},
     val edit: ((TransactionForm) -> TransactionForm) -> Unit = {},
+    val rememberCategory: (Boolean) -> Unit = {},
     val addSplit: () -> Unit = {},
     val updateSplit: (Long, (SplitRow) -> SplitRow) -> Unit = { _, _ -> },
     val removeSplit: (Long) -> Unit = {},
@@ -204,6 +206,20 @@ fun TransactionEditorScreen(state: EditorUiState, actions: EditorActions) {
                         HorizontalDivider(color = colors.border)
                         val name = form.categoryId?.let { categoryNames[it] }
                         FieldRow("Category", name ?: "Needs category", enabled, emoji = name, warn = name == null) { picker = Picker.Category }
+                        if (state.canRememberCategory && name != null) {
+                            Row(
+                                Modifier.fillMaxWidth().clickable { actions.rememberCategory(!state.rememberCategory) }.padding(bottom = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                androidx.compose.material3.Checkbox(checked = state.rememberCategory, onCheckedChange = actions.rememberCategory)
+                                Text(
+                                    "Always use $name for ${form.payee.trim()}",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = colors.textSecondary,
+                                    maxLines = 2,
+                                )
+                            }
+                        }
                     }
                     HorizontalDivider(color = colors.border)
                     FieldRow("Date", form.date.pretty(), enabled) { pickingDate = true }

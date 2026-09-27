@@ -56,4 +56,18 @@ class BudgetScreenshotTest {
         render(ready.copy(data = Loadable.Failed("Can't reach your bridge. Check your connection.")))
         compose.onRoot().captureRoboImage("screenshots/budget_error.png")
     }
+
+    @Test fun category_sheet_goals() {
+        render(
+            ready.copy(
+                selectedCategory = CategoryId("c-dining"),
+                canApplyGoals = true,
+                canEditNotes = true,
+                noteLoaded = true,
+                note = "Date nights and takeout\n#template 350",
+            ),
+        )
+        compose.waitForIdle()
+        captureScreenRoboImage("screenshots/budget_category_goals.png")
+    }
 }

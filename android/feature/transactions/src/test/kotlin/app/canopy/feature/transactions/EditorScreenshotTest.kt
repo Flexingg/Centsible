@@ -71,4 +71,13 @@ class EditorScreenshotTest {
         base.copy(form = TransactionForm(kind = TxKind.Transfer, amount = "500.00", accountId = AccountId("acc-checking"), transferAccountId = AccountId("acc-savings"))),
         "editor_transfer",
     )
+
+    @Test fun editor_remember_category() = render(
+        base.copy(
+            canCreateRules = true,
+            rememberCategory = true,
+            form = TransactionForm(amount = "23.10", payee = "Blue Bottle", accountId = AccountId("acc-visa"), categoryId = CategoryId("c-dining"), date = LocalDate.now()),
+        ),
+        "editor_remember_category",
+    )
 }

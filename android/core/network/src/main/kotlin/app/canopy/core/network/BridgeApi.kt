@@ -11,7 +11,20 @@ import io.ktor.http.contentType
 import kotlinx.serialization.json.JsonObject
 
 /** Typed endpoints of contract/openapi.yaml v1. */
-class BridgeApi(private val client: BridgeClient) {
+class BridgeApi(private val client: BridgeClient, private val outbox: Outbox? = null) {
+
+    /**
+     * Writes that are safe to replay later (idempotent creates, value-setting patches,
+     * deletes) go to the outbox when the bridge is unreachable instead of failing.
+     */
+    private suspend fun <T> queueable(method: HttpMethod, path: String, body: String?, call: suspend () -> T): T = try {
+        call()
+    } catch (e: app.canopy.core.domain.BridgeException.Network) {
+        val box = outbox ?: throw e
+        box.enqueue(PendingRequest(method = method.value, path = path, body = body))
+        throw app.canopy.core.domain.BridgeException.QueuedOffline()
+    }
+
 
     suspend fun pair(bridgeUrl: String, cfId: String?, cfSecret: String?, request: PairRequestDto): TokenResponseDto =
         client.executeAnonymous(bridgeUrl, HttpMethod.Post, "/v1/auth/pair", cfId, cfSecret) {
@@ -58,17 +71,53 @@ class BridgeApi(private val client: BridgeClient) {
         cursor?.let { parameter("cursor", it) }
     }
 
-    suspend fun createTransaction(budgetId: String, body: NewTransactionDto): TransactionDto =
-        client.send(HttpMethod.Post, "/v1/budgets/$budgetId/transactions", body)
+    suspend fun createTransaction(budgetId: String, body: NewTransactionDto): TransactionDto {
+        val path = "/v1/budgets/$budgetId/transactions"
+        return queueable(HttpMethod.Post, path, client.json.encodeToString(NewTransactionDto.serializer(), body)) { client.send(HttpMethod.Post, path, body) }
+    }
 
     suspend fun transaction(budgetId: String, id: String): TransactionDto = client.get("/v1/budgets/$budgetId/transactions/$id")
 
     /** The body is built by hand so "set to null" and "leave alone" stay distinct. */
-    suspend fun updateTransaction(budgetId: String, id: String, patch: JsonObject): TransactionDto =
-        client.send(HttpMethod.Patch, "/v1/budgets/$budgetId/transactions/$id", patch)
+    suspend fun updateTransaction(budgetId: String, id: String, patch: JsonObject): TransactionDto {
+        val path = "/v1/budgets/$budgetId/transactions/$id"
+        return queueable(HttpMethod.Patch, path, patch.toString()) { client.send(HttpMethod.Patch, path, patch) }
+    }
 
     suspend fun deleteTransaction(budgetId: String, id: String) {
-        client.execute(HttpMethod.Delete, "/v1/budgets/$budgetId/transactions/$id")
+        val path = "/v1/budgets/$budgetId/transactions/$id"
+        queueable(HttpMethod.Delete, path, null) { client.execute(HttpMethod.Delete, path) }
+    }
+
+    /**
+     * Sends queued writes in order. Stops at the first network failure (still offline);
+     * a request the bridge rejects is set aside, except a 404 on delete, which means the
+     * work is already done.
+     */
+    suspend fun replayOutbox(): Int {
+        val box = outbox ?: return 0
+        var sent = 0
+        while (true) {
+            val next = box.next() ?: return sent
+            try {
+                client.execute(HttpMethod.parse(next.method), next.path) {
+                    next.body?.let {
+                        contentType(ContentType.Application.Json)
+                        setBody(io.ktor.http.content.TextContent(it, ContentType.Application.Json))
+                    }
+                }
+                box.remove(next.id)
+                sent++
+            } catch (e: app.canopy.core.domain.BridgeException.Network) {
+                return sent
+            } catch (e: app.canopy.core.domain.BridgeException.NotFound) {
+                if (next.method == HttpMethod.Delete.value) box.remove(next.id) else box.markFailed(next.id, e.message ?: "Not found")
+            } catch (e: app.canopy.core.domain.BridgeException.Unauthorized) {
+                return sent // signed out; the queue is cleared along with the session
+            } catch (e: app.canopy.core.domain.BridgeException) {
+                box.markFailed(next.id, e.message ?: "Rejected")
+            }
+        }
     }
 
     suspend fun preferences(budgetId: String): PreferencesDto = client.get("/v1/budgets/$budgetId/preferences")

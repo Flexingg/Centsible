@@ -1,5 +1,6 @@
 package app.canopy.feature.budget
 
+import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -30,6 +31,8 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -69,6 +72,8 @@ fun BudgetRoute(onManageCategories: () -> Unit, viewModel: BudgetViewModel = hil
         onMove = viewModel::move,
         onRollover = viewModel::setRollover,
         onMessageShown = viewModel::messageShown,
+        onApplyGoals = viewModel::applyGoals,
+        onSaveNote = viewModel::saveNote,
     )
 }
 
@@ -84,7 +89,10 @@ fun BudgetScreen(
     onRollover: (CategoryId, Boolean) -> Unit,
     onMessageShown: () -> Unit,
     onManageCategories: () -> Unit = {},
+    onApplyGoals: (Boolean) -> Unit = {},
+    onSaveNote: (CategoryId, String) -> Unit = { _, _ -> },
 ) {
+    var goalsMenu by remember { mutableStateOf(false) }
     val snackbar = remember { SnackbarHostState() }
     LaunchedEffect(state.message) {
         state.message?.let { snackbar.showSnackbar(it); onMessageShown() }
@@ -99,11 +107,30 @@ fun BudgetScreen(
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
                 Text("Budget", style = MaterialTheme.typography.headlineMedium)
-                MonthSwitcher(
-                    month = state.month,
-                    onPrevious = onPreviousMonth.takeIf { state.hasPrevious || state.availableMonths.isEmpty() },
-                    onNext = onNextMonth.takeIf { state.hasNext || state.availableMonths.isEmpty() },
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    MonthSwitcher(
+                        month = state.month,
+                        onPrevious = onPreviousMonth.takeIf { state.hasPrevious || state.availableMonths.isEmpty() },
+                        onNext = onNextMonth.takeIf { state.hasNext || state.availableMonths.isEmpty() },
+                    )
+                    if (state.canApplyGoals) {
+                        androidx.compose.foundation.layout.Box {
+                            androidx.compose.material3.IconButton(onClick = { goalsMenu = true }, enabled = !state.saving) {
+                                androidx.compose.material3.Icon(androidx.compose.material.icons.Icons.Rounded.MoreVert, contentDescription = "Budget actions")
+                            }
+                            androidx.compose.material3.DropdownMenu(expanded = goalsMenu, onDismissRequest = { goalsMenu = false }) {
+                                androidx.compose.material3.DropdownMenuItem(
+                                    text = { Text("Apply goals") },
+                                    onClick = { goalsMenu = false; onApplyGoals(false) },
+                                )
+                                androidx.compose.material3.DropdownMenuItem(
+                                    text = { Text("Apply goals, overwriting amounts") },
+                                    onClick = { goalsMenu = false; onApplyGoals(true) },
+                                )
+                            }
+                        }
+                    }
+                }
             }
         },
     ) { padding ->
@@ -132,6 +159,7 @@ fun BudgetScreen(
             onAssign = { onAssign(selected.id, it) },
             onMove = onMove,
             onRollover = { onRollover(selected.id, it) },
+            onSaveNote = { onSaveNote(selected.id, it) },
         )
     }
 }

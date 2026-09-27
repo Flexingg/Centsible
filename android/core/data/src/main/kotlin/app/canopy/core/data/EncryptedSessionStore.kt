@@ -39,6 +39,7 @@ private val SESSION = stringPreferencesKey("session.v1")
 class EncryptedSessionStore @Inject constructor(
     @ApplicationContext private val context: Context,
     private val cache: RoomResponseCache,
+    private val outbox: RoomOutbox,
 ) : SessionStore {
     private val json = Json { ignoreUnknownKeys = true }
     private val crypto = KeystoreCipher("canopy.session")
@@ -62,6 +63,7 @@ class EncryptedSessionStore @Inject constructor(
     override suspend fun clear() {
         context.sessionDataStore.edit { it.remove(SESSION) }
         cache.clear() // cached budget data belongs to the session that fetched it
+        outbox.clear() // queued changes can't be sent without this session's tokens
     }
 
     private suspend fun write(session: Session) {

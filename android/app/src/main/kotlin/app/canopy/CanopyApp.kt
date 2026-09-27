@@ -92,19 +92,20 @@ private object Routes {
 fun CanopyApp(pairingLink: String?, viewModel: AppViewModel = hiltViewModel()) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val offline by viewModel.offline.collectAsStateWithLifecycle()
+    val pending by viewModel.pending.collectAsStateWithLifecycle()
     CanopyTheme {
         when (val s = state) {
             AppState.Starting -> LoadingState()
             AppState.NeedsPairing -> PairingRoute(deepLink = pairingLink)
             AppState.NeedsBudget -> BudgetPickerRoute()
             // Switching budgets rebuilds navigation and every screen's state.
-            is AppState.Ready -> key(s.budget) { MainScaffold(offline) }
+            is AppState.Ready -> key(s.budget) { MainScaffold(offline, pending) }
         }
     }
 }
 
 @Composable
-private fun MainScaffold(offline: Boolean) {
+private fun MainScaffold(offline: Boolean, pending: Int) {
     val nav = rememberNavController()
     val backStack by nav.currentBackStackEntryAsState()
     val current = backStack?.destination?.route
@@ -112,7 +113,7 @@ private fun MainScaffold(offline: Boolean) {
     val colors = CanopyTheme.colors
     Scaffold(
         containerColor = colors.canvas,
-        topBar = { if (offline) OfflineBanner() },
+        topBar = { if (offline || pending > 0) OfflineBanner(offline, pending) },
         floatingActionButton = {
             if (tab?.canAdd == true) {
                 FloatingActionButton(onClick = { nav.navigate(Routes.transaction(null)) }, containerColor = colors.accent, contentColor = colors.card) {
@@ -185,12 +186,17 @@ private fun MainScaffold(offline: Boolean) {
     }
 }
 
-/** Shown while reads come from the offline cache; writes will fail until back online. */
+/** Shown while reads come from the offline cache, or changes are waiting to sync. */
 @Composable
-private fun OfflineBanner() {
+private fun OfflineBanner(offline: Boolean, pending: Int) {
     val colors = CanopyTheme.colors
+    val waiting = if (pending == 1) "1 change waiting to sync" else "$pending changes waiting to sync"
     Text(
-        "Offline · showing saved data. Changes need a connection.",
+        when {
+            offline && pending > 0 -> "Offline · $waiting"
+            offline -> "Offline · showing saved data"
+            else -> "Syncing · $waiting"
+        },
         style = androidx.compose.material3.MaterialTheme.typography.labelMedium,
         color = colors.textPrimary,
         modifier = Modifier

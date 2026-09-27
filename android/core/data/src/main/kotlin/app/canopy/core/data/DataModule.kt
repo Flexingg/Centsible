@@ -2,6 +2,7 @@ package app.canopy.core.data
 
 import app.canopy.core.domain.BudgetChanges
 import app.canopy.core.domain.ConnectionStatus
+import app.canopy.core.domain.PendingChanges
 import app.canopy.core.domain.BudgetEngine
 import app.canopy.core.domain.HouseholdGateway
 import app.canopy.core.domain.PairingGateway
@@ -35,6 +36,7 @@ abstract class DataModule {
     // The engine seam: swap this binding for an on-device engine later.
     @Binds abstract fun budgetEngine(impl: NotifyingBudgetEngine): BudgetEngine
     @Binds abstract fun budgetChanges(impl: NotifyingBudgetEngine): BudgetChanges
+    @Binds abstract fun pendingChanges(impl: OutboxSync): PendingChanges
     @Binds abstract fun household(impl: BridgeHouseholdGateway): HouseholdGateway
     @Binds abstract fun pairing(impl: BridgePairingGateway): PairingGateway
 
@@ -61,7 +63,7 @@ abstract class DataModule {
 
         @Provides
         @Singleton
-        fun bridgeApi(client: BridgeClient) = BridgeApi(client)
+        fun bridgeApi(client: BridgeClient, outbox: RoomOutbox) = BridgeApi(client, outbox)
 
         @Provides
         @Singleton

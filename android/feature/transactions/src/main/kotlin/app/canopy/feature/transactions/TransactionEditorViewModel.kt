@@ -3,6 +3,7 @@ package app.canopy.feature.transactions
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import app.canopy.core.domain.BridgeException
 import app.canopy.core.domain.BudgetEngine
 import app.canopy.core.domain.SelectedBudget
 import app.canopy.core.domain.SessionStore
@@ -41,7 +42,16 @@ data class EditorUiState(
     val saving: Boolean = false,
     val error: String? = null,
     val done: Boolean = false,
+    val canCreateRules: Boolean = false,
+    /** "Always use this category for {payee}": saved as an Actual rule after the transaction. */
+    val rememberCategory: Boolean = false,
 ) {
+    /** Offered for a named, non-transfer payee with one category. */
+    val canRememberCategory: Boolean
+        get() = canCreateRules && canEdit && form.kind != TxKind.Transfer && !form.isSplit &&
+            form.categoryId != null && form.payee.isNotBlank() &&
+            (original == null || original.categoryId != form.categoryId)
+
     val isNew get() = original == null
     val title get() = if (isNew) "New transaction" else if (canEdit) "Edit transaction" else "Transaction"
 
@@ -65,6 +75,7 @@ class TransactionEditorViewModel @Inject constructor(
     private val engine: BudgetEngine,
     private val selectedBudget: SelectedBudget,
     private val sessions: SessionStore,
+    private val planning: app.canopy.core.domain.PlanningGateway,
 ) : ViewModel() {
     private val transactionId: String? = savedState.get<String>(ARG_ID)?.takeIf { it.isNotBlank() }
     private val presetAccount: String? = savedState.get<String>(ARG_ACCOUNT)?.takeIf { it.isNotBlank() }
@@ -104,6 +115,7 @@ class TransactionEditorViewModel @Inject constructor(
                 canDelete = canWrite && tx != null && c.has(Feature.TransactionsDelete),
                 canSplit = c.has(Feature.TransactionsSplits),
                 canTransfer = c.has(Feature.TransactionsTransfers),
+                canCreateRules = canWrite && c.has(Feature.RulesWrite),
             )
         }
             .onSuccess { s -> state.value = s }
@@ -141,8 +153,36 @@ class TransactionEditorViewModel @Inject constructor(
                 if (original == null) engine.createTransaction(b, s.form.toNew(newId, s.payees))
                 else engine.updateTransaction(b, original.id, s.form.toPatch(original, s.payees))
             }
-                .onSuccess { state.update { it.copy(saving = false, done = true) } }
-                .onFailure { e -> state.update { it.copy(saving = false, error = e.userMessage()) } }
+                .onSuccess {
+                    if (s.rememberCategory && s.canRememberCategory) rememberCategory(b, s.form)
+                    state.update { it.copy(saving = false, done = true) }
+                }
+                .onFailure { e ->
+                    if (e is BridgeException.QueuedOffline) state.update { it.copy(saving = false, done = true) }
+                    else state.update { it.copy(saving = false, error = e.userMessage()) }
+                }
+        }
+    }
+
+    fun setRememberCategory(on: Boolean) = state.update { it.copy(rememberCategory = on) }
+
+    /**
+     * Best effort: the transaction is already saved, so a failed rule never blocks closing.
+     * A new payee only has an id after the save, so it's looked up again by name.
+     */
+    private suspend fun rememberCategory(b: BudgetId, form: TransactionForm) {
+        val category = form.categoryId ?: return
+        val name = form.payee.trim()
+        runCatching {
+            val payee = (state.value.payees.firstOrNull { it.name.equals(name, ignoreCase = true) }
+                ?: engine.payees(b).firstOrNull { it.name.equals(name, ignoreCase = true) }) ?: return
+            planning.createRule(
+                b,
+                app.canopy.core.model.RuleDraft(
+                    conditions = listOf(app.canopy.core.model.RuleClause("payee", "is", app.canopy.core.model.RuleValue.Text(payee.id.raw), "id")),
+                    actions = listOf(app.canopy.core.model.RuleClause("category", "set", app.canopy.core.model.RuleValue.Text(category.raw), "id")),
+                ),
+            )
         }
     }
 
@@ -152,6 +192,7 @@ class TransactionEditorViewModel @Inject constructor(
         state.update { it.copy(saving = true) }
         viewModelScope.launch {
             runCatching { engine.deleteTransaction(b, id) }
+                .recoverCatching { if (it !is BridgeException.QueuedOffline) throw it }
                 .onSuccess { state.update { it.copy(saving = false, done = true) } }
                 .onFailure { e -> state.update { it.copy(saving = false, error = e.userMessage()) } }
         }

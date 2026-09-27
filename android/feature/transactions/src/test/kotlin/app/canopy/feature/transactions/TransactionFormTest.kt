@@ -127,4 +127,14 @@ class TransactionFormTest {
         assertEquals(checking, f.transferAccountId)
         assertEquals(Money(20000), f.signedAmount)
     }
+
+    @Test fun rememberCategory_offeredOnlyForNamedSingleCategoryNonTransfer() {
+        val base = EditorUiState(loading = false, canEdit = true, canCreateRules = true,
+            form = TransactionForm(amount = "5", payee = "Cafe", categoryId = app.canopy.core.model.CategoryId("c1")))
+        org.junit.Assert.assertTrue(base.canRememberCategory)
+        org.junit.Assert.assertFalse(base.copy(canCreateRules = false).canRememberCategory)
+        org.junit.Assert.assertFalse(base.copy(form = base.form.copy(payee = " ")).canRememberCategory)
+        org.junit.Assert.assertFalse(base.copy(form = base.form.copy(kind = TxKind.Transfer)).canRememberCategory)
+        org.junit.Assert.assertFalse(base.copy(form = base.form.copy(categoryId = null)).canRememberCategory)
+    }
 }

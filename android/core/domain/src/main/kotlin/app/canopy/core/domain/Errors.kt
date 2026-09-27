@@ -14,10 +14,13 @@ sealed class BridgeException(message: String) : Exception(message) {
         init { cause?.let(::initCause) }
     }
     class Unexpected(message: String) : BridgeException(message)
+    /** The bridge was unreachable, so the change was saved on the phone to send later. */
+    class QueuedOffline(message: String = "Saved offline. It will sync when you're back online.") : BridgeException(message)
 }
 
 /** Short, human-readable text for snackbars and error states. */
 fun Throwable.userMessage(): String = when (this) {
+    is BridgeException.QueuedOffline -> message ?: "Saved offline"
     is BridgeException.Network -> "Can't reach your bridge. Check your connection."
     is BridgeException.Unauthorized -> "This device was signed out. Pair it again."
     is BridgeException.Forbidden -> "You don't have permission to do that."

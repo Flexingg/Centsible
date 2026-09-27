@@ -6,6 +6,7 @@ import app.canopy.core.data.CapabilitiesRepository
 import app.canopy.core.designsystem.component.MoneyFormat
 import app.canopy.core.domain.BudgetEngine
 import app.canopy.core.domain.ConnectionStatus
+import app.canopy.core.domain.PendingChanges
 import app.canopy.core.domain.SessionStore
 import app.canopy.core.model.BudgetId
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -32,8 +33,15 @@ class AppViewModel @Inject constructor(
     private val capabilities: CapabilitiesRepository,
     private val engine: BudgetEngine,
     connection: ConnectionStatus,
+    pendingChanges: PendingChanges,
+    outboxSync: app.canopy.core.data.OutboxSync,
 ) : ViewModel() {
     val offline: StateFlow<Boolean> = connection.offline
+    val pending: StateFlow<Int> = pendingChanges.pending
+
+    init {
+        outboxSync.start(connection.offline)
+    }
 
     val state: StateFlow<AppState> = sessions.session
         .map {

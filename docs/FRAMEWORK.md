@@ -1,6 +1,6 @@
 # Actual × Monarch for Android: Framework Design
 
-**Status:** v0.4 (Phase 1 built; see "Progress" below) · **Date:** 2026-09-27
+**Status:** v0.5 (Phase 2 built; see "Progress" below) · **Date:** 2026-09-27
 **Goal:** A native Android app that sits on a self-hosted **Actual Budget** server. It supports all of Actual's features, uses a **Monarch-style** UI/UX, and survives Actual upgrades without rewrites. Once the core works, it gets an extension layer for new features.
 
 ---
@@ -393,7 +393,14 @@ object CategoryIconsModule {
 |---|---|---|
 | 0: Foundations | ✅ Done | Bridge, contract, household auth, Android shell, CI, Renovate |
 | 1: Core parity MVP | ✅ Built, not yet tried on a device | Transaction create/edit/delete, splits, transfers, search and filters; account detail, add, rename, close and reopen; category and group management; envelope budget editing; budget switcher; currency from budget preferences; encrypted offline read cache with an offline banner |
-| 2: Full parity | Next | Rules, schedules/recurring, payees, bank sync, import, reconcile, tags, reports, goal templates, E2E budgets, **offline write outbox** |
+| 2: Full parity | ✅ Built, not yet tried on a device (gaps below) | Recurring (schedules: create, edit, skip, post, upcoming-bills widget); rules (simple editor, schedule rules read-only); merchants (rename, merge, delete, usage stats); tags; bank sync as a background job; OFX/QFX/QIF/CAMT/CSV import with preview, CSV column mapping and date formats; reconcile with an optional adjustment; cash flow, spending and net worth reports; category notes and goal templates with "Apply goals"; "Always use this category" rules from the editor; offline write outbox for transactions |
+| 2: Gaps | Open | "Hold for next month" is shown but can't be set yet. E2E-encrypted budgets rely on `ACTUAL_BUDGET_PASSWORDS` in the bridge and haven't been tested with a real encrypted file. Only transaction writes queue offline; other writes need a connection. Contract tests have run against one Actual version (26.9.0), not `latest` + `edge`. |
+
+Phase 2 notes, verified against Actual 26.9.0:
+- Bank sync can take longer than Cloudflare's ~100 s request limit, so `POST /sync` returns 202 with a job the app polls.
+- Goal templates run through the internal `budget/apply-goal-template` (or `overwrite-goal-template`) handler behind `budget.templates`. Templates are `#template` lines in the category note.
+- Import dedupes against existing transactions (Actual's matcher), so re-importing a statement merges instead of duplicating.
+- The rule behind a schedule is read-only in the app. Edit the schedule instead.
 
 Phase 1 notes, verified against Actual 26.9.0:
 - `updateTransaction`/`deleteTransaction` resolve one macrotask before their writes land, so the bridge waits a tick before reading back.

@@ -62,6 +62,7 @@ internal fun CategorySheet(
     onAssign: (Money) -> Unit,
     onMove: (BudgetPot, BudgetPot, Money) -> Unit,
     onRollover: (Boolean) -> Unit,
+    onSaveNote: (String) -> Unit = {},
 ) {
     var mode by remember { mutableStateOf(SheetMode.Details) }
     ModalBottomSheet(
@@ -71,7 +72,10 @@ internal fun CategorySheet(
     ) {
         Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp).navigationBarsPadding().padding(bottom = 16.dp)) {
             when (mode) {
-                SheetMode.Details -> CategoryDetails(category, state, onAssign, onRollover, onMoveMoney = { mode = SheetMode.Move })
+                SheetMode.Details -> {
+                    CategoryDetails(category, state, onAssign, onRollover, onMoveMoney = { mode = SheetMode.Move })
+                    if (state.canEditNotes) NoteEditor(category.id, state, onSaveNote)
+                }
                 SheetMode.Move -> MoveMoneyForm(category, month, onBack = { mode = SheetMode.Details }, onMove = { from, to, amount ->
                     onMove(from, to, amount)
                     mode = SheetMode.Details
@@ -209,5 +213,37 @@ private fun MoveMoneyForm(category: BudgetCategory, month: BudgetMonth, onBack: 
             enabled = amount != null,
             modifier = Modifier.weight(1f),
         ) { Text("Move") }
+    }
+}
+
+/** Notes and goals share Actual's category note: `#template` lines in it are goals. */
+@Composable
+private fun NoteEditor(category: app.canopy.core.model.CategoryId, state: BudgetUiState, onSave: (String) -> Unit) {
+    val colors = CanopyTheme.colors
+    HorizontalDivider(Modifier.padding(vertical = 12.dp), color = colors.border)
+    StatLabel("Notes & goals")
+    if (!state.noteLoaded) {
+        Text("Loading…", style = MaterialTheme.typography.bodySmall, color = colors.textTertiary)
+        return
+    }
+    var text by remember(category, state.note) { mutableStateOf(state.note.orEmpty()) }
+    val goals = text.lines().count { it.trimStart().startsWith("#template") || it.trimStart().startsWith("#goal") }
+    OutlinedTextField(
+        value = text,
+        onValueChange = { text = it },
+        placeholder = { Text("#template 400\nor #template up to 1200") },
+        minLines = 2,
+        maxLines = 6,
+        enabled = state.canEdit,
+        modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+    )
+    Row(Modifier.fillMaxWidth().padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+        Text(
+            if (goals > 0) "$goals goal line${if (goals == 1) "" else "s"}. Apply goals from the Budget menu." else "Add a #template line to set a goal",
+            style = MaterialTheme.typography.bodySmall,
+            color = colors.textSecondary,
+            modifier = Modifier.weight(1f),
+        )
+        if (state.canEdit) androidx.compose.material3.TextButton(onClick = { onSave(text) }, enabled = text != state.note.orEmpty()) { Text("Save note") }
     }
 }

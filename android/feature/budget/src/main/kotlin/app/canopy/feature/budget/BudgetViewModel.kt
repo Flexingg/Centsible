@@ -37,6 +37,11 @@ data class BudgetUiState(
     val selectedCategory: CategoryId? = null,
     val saving: Boolean = false,
     val message: String? = null,
+    val canApplyGoals: Boolean = false,
+    val canEditNotes: Boolean = false,
+    /** Note for the open category; goal templates live here as `#template` lines. */
+    val note: String? = null,
+    val noteLoaded: Boolean = false,
 ) {
     val hasPrevious get() = availableMonths.any { it < month }
     val hasNext get() = availableMonths.any { it > month }
@@ -50,6 +55,7 @@ class BudgetViewModel @Inject constructor(
     private val selectedBudget: SelectedBudget,
     private val sessions: SessionStore,
     private val moveMoney: MoveMoney,
+    private val planning: app.canopy.core.domain.PlanningGateway,
     changes: BudgetChanges,
 ) : ViewModel() {
     private val state = MutableStateFlow(BudgetUiState())
@@ -68,6 +74,8 @@ class BudgetViewModel @Inject constructor(
                     canMoveMoney = role?.canWrite == true && caps.has(Feature.BudgetMoveMoney),
                     canToggleRollover = role?.canWrite == true && caps.has(Feature.BudgetCarryover),
                     canManageCategories = role?.canWrite == true && caps.has(Feature.CategoriesWrite),
+                    canApplyGoals = role?.canWrite == true && caps.has(Feature.BudgetTemplates),
+                    canEditNotes = caps.has(Feature.CategoryNotes),
                     availableMonths = runCatching { engine.budgetMonths(budget) }.getOrDefault(emptyList()),
                 )
             }
@@ -80,7 +88,28 @@ class BudgetViewModel @Inject constructor(
     fun previousMonth() = changeMonth(-1)
     fun nextMonth() = changeMonth(+1)
     fun refresh() = viewModelScope.launch { load(refreshing = true) }
-    fun openCategory(id: CategoryId?) = state.update { it.copy(selectedCategory = id) }
+    fun openCategory(id: CategoryId?) {
+        state.update { it.copy(selectedCategory = id, note = null, noteLoaded = false) }
+        if (id != null && state.value.canEditNotes) viewModelScope.launch {
+            val note = runCatching { planning.categoryNote(budget, id) }.getOrNull()
+            if (state.value.selectedCategory == id) state.update { it.copy(note = note, noteLoaded = true) }
+        }
+    }
+
+    fun saveNote(category: CategoryId, note: String) = viewModelScope.launch {
+        val text = note.trim().ifEmpty { null }
+        runCatching { planning.setCategoryNote(budget, category, text) }
+            .onSuccess { state.update { it.copy(note = text, message = "Note saved") } }
+            .onFailure { e -> state.update { it.copy(message = e.userMessage()) } }
+    }
+
+    /** Runs Actual's goal templates for the month; Actual reports what it did. */
+    fun applyGoals(overwrite: Boolean) = viewModelScope.launch {
+        state.update { it.copy(saving = true) }
+        runCatching { planning.applyTemplates(budget, state.value.month, overwrite) }
+            .onSuccess { (m, msg) -> state.update { it.copy(data = Loadable.Ready(m), saving = false, message = msg) } }
+            .onFailure { e -> state.update { it.copy(saving = false, message = e.userMessage()) } }
+    }
     fun messageShown() = state.update { it.copy(message = null) }
 
     fun assign(category: CategoryId, amount: Money) = mutate("Budget updated") {

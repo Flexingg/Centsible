@@ -56,8 +56,23 @@ fun AccountDetailRoute(
     viewModel: AccountDetailViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val context = androidx.compose.ui.platform.LocalContext.current
     LaunchedEffect(state.gone) { if (state.gone) onBack() }
+    // The system file picker: no storage permission needed.
+    val picker = androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) readPickedFile(context, uri)?.let { (name, bytes) -> viewModel.pickedFile(name, bytes) }
+    }
     AccountDetailScreen(
+        actions = AccountActions(
+            sync = viewModel::syncNow,
+            import = { picker.launch(arrayOf("*/*")) },
+            importOptions = viewModel::importOptions,
+            confirmImport = { viewModel.confirmImport() },
+            cancelImport = viewModel::cancelImport,
+            reconcile = { viewModel.startReconcile() },
+            submitReconcile = { amount, adjust -> viewModel.reconcile(amount, adjust) },
+            cancelReconcile = viewModel::cancelReconcile,
+        ),
         state = state,
         onBack = onBack,
         onRetry = { viewModel.refresh() },
@@ -79,6 +94,7 @@ fun AccountDetailScreen(
     onClose: (AccountId?) -> Unit = {},
     onReopen: () -> Unit = {},
     onMessageShown: () -> Unit = {},
+    actions: AccountActions = AccountActions(),
 ) {
     val colors = CanopyTheme.colors
     val snackbar = remember { SnackbarHostState() }
@@ -126,6 +142,30 @@ fun AccountDetailScreen(
                                 style = MaterialTheme.typography.bodySmall,
                                 color = colors.textSecondary,
                             )
+                            if (d.account.syncSource != null) {
+                                Text(
+                                    "Bank sync · " + (d.account.lastSync?.let { "last synced ${it.take(10)}" } ?: "not synced yet"),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = colors.textTertiary,
+                                )
+                            }
+                        }
+                    }
+                    if (!d.account.closed && (state.canImport || state.canReconcile || (state.canSync && d.account.syncSource != null))) {
+                        item {
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                if (state.canSync && d.account.syncSource != null) {
+                                    androidx.compose.material3.FilledTonalButton(onClick = actions.sync, enabled = !state.syncing, modifier = Modifier.weight(1f)) {
+                                        Text(if (state.syncing) "Syncing…" else "Sync now")
+                                    }
+                                }
+                                if (state.canImport) {
+                                    androidx.compose.material3.OutlinedButton(onClick = actions.import, modifier = Modifier.weight(1f)) { Text("Import file") }
+                                }
+                                if (state.canReconcile) {
+                                    androidx.compose.material3.OutlinedButton(onClick = actions.reconcile, modifier = Modifier.weight(1f)) { Text("Reconcile") }
+                                }
+                            }
                         }
                     }
                     item {
@@ -157,6 +197,8 @@ fun AccountDetailScreen(
             dismissButton = { TextButton(onClick = { renaming = false }) { Text("Cancel") } },
         )
     }
+    state.importing?.let { ImportSheet(it, actions) }
+    state.reconcile?.let { ReconcileDialog(it, actions) }
     if (closing && detail != null) CloseAccountDialog(detail.account, detail.otherAccounts, onDismiss = { closing = false }, onClose = { closing = false; onClose(it) })
 }
 

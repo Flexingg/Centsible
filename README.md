@@ -5,6 +5,7 @@ A native Android app for a self-hosted [Actual Budget](https://actualbudget.org)
 "Canopy" is a placeholder app name.
 
 - **Design and roadmap:** [`docs/FRAMEWORK.md`](docs/FRAMEWORK.md)
+- **Status:** Phases 0–2 are built: accounts, transactions, envelope budget, recurring, rules, merchants, tags, bank sync, file import, reconcile, reports, goals, and offline edits. None of it has been tried on a real device yet. See the Progress table in FRAMEWORK.md for known gaps.
 - **Screenshots:** [`docs/screenshots/`](docs/screenshots). They're rendered from sample data by the screenshot tests.
 
 ## How it fits together
