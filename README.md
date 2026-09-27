@@ -50,6 +50,18 @@ cd android && ./gradlew recordRoborazziDebug   # update screenshots after UI cha
 cd android && ./gradlew :app:assembleDebug
 ```
 
+End-to-end: the app's data layer against a real bridge and Actual server, starting from a real pairing link.
+
+```sh
+cd bridge && npx tsx test/support/e2e-server.ts 8787    # prints {"pairingUri": ...} when ready
+cd android && E2E_PAIRING_URI='actualbridge://pair?...' ./gradlew :core:engine-bridge:test --tests '*EndToEndTest*'
+```
+
+The test layers, and what each one catches:
+- **Contract tests** (bridge): every response matches `contract/openapi.yaml`, against a real Actual.
+- **Request contract test** (app): every request body the app sends matches the same file.
+- **End-to-end test**: pairing, then every feature through the real HTTP stack. CI runs it on every push, and releases wait for it.
+
 ## Upgrading Actual
 
 Renovate groups `@actual-app/api`, `@actual-app/sync-server`, and the `actual-server` image into one PR. CI runs the contract suite against that exact version. A nightly job also runs it against Actual's newest release, so you hear about breakage before you upgrade.

@@ -27,4 +27,13 @@ class PairingLinksTest {
     fun `allows http on a LAN for development`() {
         assertEquals("http://192.168.1.20:8787", PairingLinks.parse("actualbridge://pair?u=http%3A%2F%2F192.168.1.20%3A8787&c=A")!!.bridgeUrl)
     }
+
+    @Test
+    fun `plain http only on networks that stay local`() {
+        val allowed = listOf("http://127.0.0.1:8787", "http://localhost:8787", "http://192.168.1.20:8787", "http://10.0.0.5",
+            "http://172.17.0.2:8787", "http://100.101.102.103", "http://nas.local", "https://budget-api.example.com")
+        val refused = listOf("http://budget-api.example.com", "http://172.32.0.1", "http://100.128.0.1", "http://8.8.8.8", "ftp://10.0.0.5", "http://192.168.1")
+        allowed.forEach { org.junit.Assert.assertTrue(it, PairingLinks.isAllowedBridgeUrl(it)) }
+        refused.forEach { org.junit.Assert.assertFalse(it, PairingLinks.isAllowedBridgeUrl(it)) }
+    }
 }

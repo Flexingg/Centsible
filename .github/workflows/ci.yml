@@ -75,11 +75,45 @@ jobs:
           name: screenshots
           path: android/feature/*/build/outputs/roborazzi
 
+  end-to-end:
+    # The app's real data layer against a real bridge and a real Actual server:
+    # pairing through the same link a QR code carries, then every feature.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: bridge/package-lock.json
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: gradle/actions/setup-gradle@v6
+      - run: npm ci
+        working-directory: bridge
+      - name: Start Actual and the bridge
+        working-directory: bridge
+        run: |
+          nohup npx tsx test/support/e2e-server.ts 8787 > "$RUNNER_TEMP/e2e.out" 2> "$RUNNER_TEMP/e2e.err" &
+          for i in $(seq 1 60); do grep -q pairingUri "$RUNNER_TEMP/e2e.out" && break; sleep 2; done
+          if ! grep -q pairingUri "$RUNNER_TEMP/e2e.out"; then cat "$RUNNER_TEMP/e2e.err"; exit 1; fi
+          echo "E2E_PAIRING_URI=$(tail -n 1 "$RUNNER_TEMP/e2e.out" | jq -r .pairingUri)" >> "$GITHUB_ENV"
+      - name: Run the app against it
+        working-directory: android
+        run: ./gradlew :core:engine-bridge:test --tests '*EndToEndTest*'
+      - uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: end-to-end-report
+          path: android/core/engine-bridge/build/reports/tests
+
   release:
     # Every green push to main becomes a release with the APK attached, so a phone
     # (or an updater like Obtainium) can always grab the newest build. Pushing a
     # tag like v0.3.0 publishes that version number instead.
-    needs: android
+    needs: [android, end-to-end]
     if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     permissions:

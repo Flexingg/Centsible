@@ -25,14 +25,26 @@ object PairingLinks {
         return PairingLink(url, code, params["cfid"], params["cfsecret"])
     }
 
-    /** HTTPS only, except plain HTTP on a local network for development. */
+    /**
+     * HTTPS anywhere. Plain HTTP only where traffic can't cross the internet: loopback,
+     * private LAN ranges (incl. Docker's 172.16/12), Tailscale's 100.64/10 and mDNS names.
+     */
     fun isAllowedBridgeUrl(url: String): Boolean {
         val uri = runCatching { URI(url) }.getOrNull() ?: return false
-        val host = uri.host ?: return false
+        val host = uri.host?.lowercase() ?: return false
         return when (uri.scheme?.lowercase()) {
             "https" -> true
-            "http" -> host == "localhost" || host.startsWith("10.") || host.startsWith("192.168.") || host.endsWith(".local")
+            "http" -> host == "localhost" || host.endsWith(".local") || isPrivateIpv4(host)
             else -> false
         }
+    }
+
+    private fun isPrivateIpv4(host: String): Boolean {
+        val o = host.split('.').map { it.toIntOrNull() ?: return false }
+        if (o.size != 4 || o.any { it !in 0..255 }) return false
+        return o[0] == 127 || o[0] == 10 ||
+            (o[0] == 172 && o[1] in 16..31) ||
+            (o[0] == 192 && o[1] == 168) ||
+            (o[0] == 100 && o[1] in 64..127)
     }
 }
