@@ -47,6 +47,9 @@ fun CanopyTheme(darkTheme: Boolean = isSystemInDarkTheme(), content: @Composable
             primary = colors.accent,
             onPrimary = colors.card,
             primaryContainer = colors.accentSoft,
+            // Segmented buttons, chips and nav indicators use the secondary container.
+            secondaryContainer = colors.accentSoft,
+            onSecondaryContainer = colors.textPrimary,
             background = colors.canvas,
             surface = colors.card,
             surfaceContainer = colors.card,
@@ -63,6 +66,9 @@ fun CanopyTheme(darkTheme: Boolean = isSystemInDarkTheme(), content: @Composable
             primary = colors.accent,
             onPrimary = colors.card,
             primaryContainer = colors.accentSoft,
+            // Segmented buttons, chips and nav indicators use the secondary container.
+            secondaryContainer = colors.accentSoft,
+            onSecondaryContainer = colors.textPrimary,
             background = colors.canvas,
             surface = colors.card,
             surfaceContainer = colors.card,

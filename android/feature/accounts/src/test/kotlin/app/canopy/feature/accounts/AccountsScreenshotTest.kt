@@ -22,7 +22,7 @@ class AccountsScreenshotTest {
     @get:Rule val compose = createComposeRule()
 
     @Test fun accounts_light() {
-        compose.setContent { CanopyTheme(darkTheme = false) { AccountsScreen(Loadable.Ready(AccountsSummary.from(SampleHousehold.accounts)), onRetry = {}) } }
+        compose.setContent { CanopyTheme(darkTheme = false) { AccountsScreen(AccountsUiState(Loadable.Ready(AccountsSummary.from(SampleHousehold.accounts)), canWrite = true), onRetry = {}) } }
         compose.onRoot().captureRoboImage("screenshots/accounts_light.png")
     }
 }

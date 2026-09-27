@@ -1,6 +1,23 @@
 package app.canopy.feature.accounts
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Switch
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.text.input.KeyboardType
+import app.canopy.core.designsystem.component.MoneyInput
+import app.canopy.core.model.AccountId
+import app.canopy.core.model.Money
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -40,27 +57,92 @@ import app.canopy.core.designsystem.theme.CanopyTheme
 import app.canopy.core.model.Account
 
 @Composable
-fun AccountsRoute(viewModel: AccountsViewModel = hiltViewModel()) {
+fun AccountsRoute(onOpenAccount: (AccountId) -> Unit, viewModel: AccountsViewModel = hiltViewModel()) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    AccountsScreen(state, onRetry = { viewModel.refresh() })
+    AccountsScreen(
+        state,
+        onRetry = { viewModel.refresh() },
+        onOpenAccount = onOpenAccount,
+        onAddAccount = { name, offBudget, balance -> viewModel.addAccount(name, offBudget, balance) },
+        onMessageShown = viewModel::messageShown,
+    )
 }
 
 @Composable
-fun AccountsScreen(state: Loadable<AccountsSummary>, onRetry: () -> Unit) {
-    Column(Modifier.fillMaxSize().background(CanopyTheme.colors.canvas)) {
-        Text("Accounts", style = MaterialTheme.typography.headlineMedium, modifier = Modifier.padding(start = 20.dp, top = 24.dp, bottom = 8.dp))
-        when (state) {
-            Loadable.Loading -> LoadingState()
-            is Loadable.Failed -> MessageState("Couldn't load accounts", state.message, emoji = "🔌", actionLabel = "Try again", onAction = onRetry)
-            is Loadable.Ready -> LazyColumn(
-                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 96.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                item { NetWorthCard(state.value) }
-                items(state.value.sections, key = { it.kind.name }) { SectionCard(it) }
+fun AccountsScreen(
+    state: AccountsUiState,
+    onRetry: () -> Unit,
+    onOpenAccount: (AccountId) -> Unit = {},
+    onAddAccount: (String, Boolean, Money) -> Unit = { _, _, _ -> },
+    onMessageShown: () -> Unit = {},
+) {
+    var adding by remember { mutableStateOf(false) }
+    var showClosed by remember { mutableStateOf(false) }
+    val snackbar = remember { SnackbarHostState() }
+    LaunchedEffect(state.message) { state.message?.let { snackbar.showSnackbar(it); onMessageShown() } }
+    Scaffold(containerColor = CanopyTheme.colors.canvas, snackbarHost = { SnackbarHost(snackbar) }) { padding ->
+        Column(Modifier.fillMaxSize().padding(padding)) {
+            Row(Modifier.fillMaxWidth().padding(start = 20.dp, end = 8.dp, top = 16.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text("Accounts", style = MaterialTheme.typography.headlineMedium, modifier = Modifier.weight(1f))
+                if (state.canWrite) TextButton(onClick = { adding = true }) { Text("Add account") }
+            }
+            when (val data = state.data) {
+                Loadable.Loading -> LoadingState()
+                is Loadable.Failed -> MessageState("Couldn't load accounts", data.message, emoji = "🔌", actionLabel = "Try again", onAction = onRetry)
+                is Loadable.Ready -> LazyColumn(
+                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 96.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    item { NetWorthCard(data.value) }
+                    items(data.value.sections, key = { it.kind.name }) { SectionCard(it, onOpenAccount) }
+                    if (data.value.closed.isNotEmpty()) {
+                        item(key = "closed") {
+                            TextButton(onClick = { showClosed = !showClosed }, modifier = Modifier.fillMaxWidth()) {
+                                Text(if (showClosed) "Hide closed accounts" else "Show ${data.value.closed.size} closed")
+                            }
+                            if (showClosed) SectionCard(AccountSection(AccountKind.Cash, data.value.closed), onOpenAccount, title = "Closed")
+                        }
+                    }
+                }
             }
         }
     }
+    if (adding) AddAccountDialog(onDismiss = { adding = false }, onAdd = { n, o, b -> adding = false; onAddAccount(n, o, b) })
+}
+
+@Composable
+private fun AddAccountDialog(onDismiss: () -> Unit, onAdd: (String, Boolean, Money) -> Unit) {
+    var name by remember { mutableStateOf("") }
+    var balance by remember { mutableStateOf("") }
+    var offBudget by remember { mutableStateOf(false) }
+    val parsed = if (balance.isBlank()) Money.Zero else MoneyInput.parse(balance)
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Add an account") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                OutlinedTextField(name, { name = it }, label = { Text("Name") }, singleLine = true)
+                OutlinedTextField(
+                    balance, { balance = it },
+                    label = { Text("Current balance") },
+                    supportingText = { Text("Negative for credit cards and loans") },
+                    prefix = { Text("$") },
+                    isError = parsed == null,
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("Track only (off budget)", style = MaterialTheme.typography.bodyLarge)
+                        Text("For investments, retirement and loans. Can't be changed later.", style = MaterialTheme.typography.bodySmall, color = CanopyTheme.colors.textSecondary)
+                    }
+                    Switch(checked = offBudget, onCheckedChange = { offBudget = it })
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = { onAdd(name, offBudget, parsed!!) }, enabled = name.isNotBlank() && parsed != null) { Text("Add") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
 }
 
 @Composable
@@ -97,24 +179,24 @@ private fun Legend(label: String, color: Color, value: @Composable () -> Unit) {
 }
 
 @Composable
-private fun SectionCard(section: AccountSection) {
+private fun SectionCard(section: AccountSection, onOpen: (AccountId) -> Unit, title: String = section.kind.title) {
     val colors = CanopyTheme.colors
     CanopyCard(contentPadding = PaddingValues(0.dp)) {
         Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text(section.kind.title, style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
+            Text(title, style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
             MoneyText(section.total, style = MaterialTheme.typography.titleSmall)
         }
         section.accounts.forEachIndexed { i, account ->
             if (i > 0) HorizontalDivider(Modifier.padding(start = 16.dp), color = colors.border)
-            AccountRow(account)
+            AccountRow(account, onClick = { onOpen(account.id) })
         }
     }
 }
 
 @Composable
-private fun AccountRow(account: Account) {
+private fun AccountRow(account: Account, onClick: () -> Unit) {
     val colors = CanopyTheme.colors
-    Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+    Row(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 16.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f)) {
             Text(account.name, style = MaterialTheme.typography.bodyLarge)
             Text(if (account.offBudget) "Tracking" else "On budget", style = MaterialTheme.typography.labelSmall, color = colors.textTertiary)

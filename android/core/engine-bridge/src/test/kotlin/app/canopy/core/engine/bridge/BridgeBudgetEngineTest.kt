@@ -78,4 +78,38 @@ class BridgeBudgetEngineTest {
         val page = engine { fixture("transactions-page") }.transactions(BudgetId("b"))
         assertTrue(page.items.isNotEmpty())
     }
+
+    @Test
+    fun `patch omits kept fields and sends explicit nulls`() = runTest {
+        engine { fixture("transaction") }.updateTransaction(
+            BudgetId("b"),
+            app.canopy.core.model.TransactionId("t1"),
+            app.canopy.core.model.TransactionPatch(
+                amount = app.canopy.core.model.Update.Set(Money(-1750)),
+                categoryId = app.canopy.core.model.Update.Set(null),
+                splits = app.canopy.core.model.Update.Set(
+                    listOf(app.canopy.core.model.SplitEdit(app.canopy.core.model.TransactionId("s1"), Money(-1750), CategoryId("food"))),
+                ),
+            ),
+        )
+        val req = requests.single()
+        assertEquals("PATCH", req.method.value)
+        val body = (req.body as OutgoingContent.ByteArrayContent).bytes().decodeToString()
+        assertEquals(
+            """{"amount":-1750,"categoryId":null,"subtransactions":[{"id":"s1","amount":-1750,"categoryId":"food","notes":null}]}""",
+            body,
+        )
+    }
+
+    @Test
+    fun `search and uncategorized filters become query parameters`() = runTest {
+        engine { fixture("transactions-page") }.transactions(
+            BudgetId("b"),
+            app.canopy.core.domain.TransactionQuery(search = " trader ", uncategorized = true, limit = 20),
+        )
+        val url = requests.single().url
+        assertEquals("trader", url.parameters["q"])
+        assertEquals("true", url.parameters["uncategorized"])
+        assertEquals("20", url.parameters["limit"])
+    }
 }

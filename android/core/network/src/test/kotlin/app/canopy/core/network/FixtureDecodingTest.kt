@@ -26,6 +26,8 @@ class FixtureDecodingTest {
         "transaction" to TransactionDto.serializer(),
         "budget-month" to BudgetMonthDto.serializer(),
         "problem-unauthorized" to ProblemDto.serializer(),
+        "transaction-updated" to TransactionDto.serializer(),
+        "preferences" to PreferencesDto.serializer(),
     )
 
     @Test

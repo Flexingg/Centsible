@@ -15,6 +15,11 @@ import app.canopy.core.model.Page
 import app.canopy.core.model.Payee
 import app.canopy.core.model.Transaction
 import app.canopy.core.model.YearMonth
+import app.canopy.core.model.Category
+import app.canopy.core.model.CategoryGroupId
+import app.canopy.core.model.Preferences
+import app.canopy.core.model.TransactionId
+import app.canopy.core.model.TransactionPatch
 
 /**
  * The seam between the app and Actual. Today it is implemented over the bridge's HTTP
@@ -34,6 +39,24 @@ interface BudgetEngine {
 
     suspend fun transactions(budget: BudgetId, query: TransactionQuery = TransactionQuery(), cursor: String? = null): Page<Transaction>
     suspend fun createTransaction(budget: BudgetId, transaction: NewTransaction): Transaction
+    suspend fun transaction(budget: BudgetId, id: TransactionId): Transaction
+    suspend fun updateTransaction(budget: BudgetId, id: TransactionId, patch: TransactionPatch): Transaction
+    suspend fun deleteTransaction(budget: BudgetId, id: TransactionId)
+
+    suspend fun preferences(budget: BudgetId): Preferences
+
+    suspend fun createAccount(budget: BudgetId, name: String, offBudget: Boolean, initialBalance: Money): Account
+    suspend fun renameAccount(budget: BudgetId, id: AccountId, name: String): Account
+    /** Returns null when Actual deleted the account because it had no transactions. */
+    suspend fun closeAccount(budget: BudgetId, id: AccountId, moveBalanceTo: AccountId?, balanceCategory: CategoryId?): Account?
+    suspend fun reopenAccount(budget: BudgetId, id: AccountId): Account
+
+    suspend fun createCategory(budget: BudgetId, name: String, group: CategoryGroupId): Category
+    suspend fun updateCategory(budget: BudgetId, id: CategoryId, name: String? = null, hidden: Boolean? = null, group: CategoryGroupId? = null): Category
+    suspend fun deleteCategory(budget: BudgetId, id: CategoryId, moveTo: CategoryId?)
+    suspend fun createCategoryGroup(budget: BudgetId, name: String): CategoryGroup
+    suspend fun updateCategoryGroup(budget: BudgetId, id: CategoryGroupId, name: String? = null, hidden: Boolean? = null): CategoryGroup
+    suspend fun deleteCategoryGroup(budget: BudgetId, id: CategoryGroupId, moveTo: CategoryId?)
 
     suspend fun budgetMonths(budget: BudgetId): List<YearMonth>
     suspend fun budgetMonth(budget: BudgetId, month: YearMonth): BudgetMonth
@@ -48,5 +71,9 @@ data class TransactionQuery(
     val categoryId: CategoryId? = null,
     val since: String? = null,
     val until: String? = null,
+    /** Matches payee, notes or category name. */
+    val search: String? = null,
+    /** Only on-budget transactions still waiting for a category. */
+    val uncategorized: Boolean = false,
     val limit: Int = 100,
 )

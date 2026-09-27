@@ -34,6 +34,19 @@ import app.canopy.core.network.DeviceDto
 import app.canopy.core.network.MemberDto
 import app.canopy.core.network.PayeeDto
 import app.canopy.core.network.TransactionDto
+import app.canopy.core.network.CategoryDto
+import app.canopy.core.network.PreferencesDto
+import app.canopy.core.model.Preferences
+import app.canopy.core.model.TransactionPatch
+import app.canopy.core.model.Update
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.add
+import kotlinx.serialization.json.buildJsonArray
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 
 // Wire → domain. Unknown enum values map to Unknown instead of crashing.
 
@@ -76,7 +89,7 @@ internal fun CategoryGroupDto.toModel() = CategoryGroup(
     name = name,
     isIncome = isIncome,
     hidden = hidden,
-    categories = categories.map { Category(CategoryId(it.id), it.name, CategoryGroupId(it.groupId), it.isIncome, it.hidden) },
+    categories = categories.map { it.toModel() },
 )
 
 internal fun TransactionDto.toModel(): Transaction = Transaction(
@@ -90,7 +103,7 @@ internal fun TransactionDto.toModel(): Transaction = Transaction(
     notes = notes,
     cleared = cleared,
     reconciled = reconciled,
-    isTransfer = transferId != null,
+    transferId = transferId?.let(::TransactionId),
     isParent = isParent,
     subtransactions = subtransactions.map { it.toModel() },
 )
@@ -136,3 +149,50 @@ internal fun BudgetMonthDto.toModel() = BudgetMonth(
         )
     },
 )
+
+internal fun PreferencesDto.toModel() = Preferences(
+    budgetType = when (budgetType) {
+        "envelope" -> BudgetType.Envelope
+        "tracking" -> BudgetType.Tracking
+        else -> BudgetType.Unknown
+    },
+    currencyCode = currencyCode,
+    numberFormat = numberFormat,
+    dateFormat = dateFormat,
+    firstDayOfWeek = firstDayOfWeek,
+    hideFraction = hideFraction,
+)
+
+internal fun CategoryDto.toModel() = Category(CategoryId(id), name, CategoryGroupId(groupId), isIncome, hidden)
+
+/**
+ * PATCH body: fields left as [Update.Keep] are omitted, [Update.Set] with null is sent as
+ * an explicit JSON null, which the bridge reads as "clear this field".
+ */
+internal fun TransactionPatch.toJson(): JsonObject = buildJsonObject {
+    fun <T> put(key: String, u: Update<T>, encode: (T) -> JsonElement) {
+        if (u is Update.Set) put(key, u.value?.let(encode) ?: JsonNull)
+    }
+    put("accountId", accountId) { JsonPrimitive(it.raw) }
+    put("date", date) { JsonPrimitive(it) }
+    put("amount", amount) { JsonPrimitive(it.minor) }
+    put("payeeId", payeeId) { JsonPrimitive(it?.raw) }
+    if (payeeId == Update.Keep) put("payeeName", payeeName) { JsonPrimitive(it) }
+    put("categoryId", categoryId) { JsonPrimitive(it?.raw) }
+    put("notes", notes) { JsonPrimitive(it) }
+    put("cleared", cleared) { JsonPrimitive(it) }
+    put("subtransactions", splits) { list ->
+        buildJsonArray {
+            list.forEach { s ->
+                add(
+                    buildJsonObject {
+                        s.id?.let { put("id", it.raw) }
+                        put("amount", s.amount.minor)
+                        put("categoryId", s.categoryId?.raw)
+                        put("notes", s.notes)
+                    },
+                )
+            }
+        }
+    }
+}

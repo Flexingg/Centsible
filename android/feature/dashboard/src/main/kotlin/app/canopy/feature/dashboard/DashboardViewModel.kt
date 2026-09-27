@@ -3,6 +3,7 @@ package app.canopy.feature.dashboard
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.canopy.core.designsystem.component.Loadable
+import app.canopy.core.domain.BudgetChanges
 import app.canopy.core.domain.BudgetEngine
 import app.canopy.core.domain.SelectedBudget
 import app.canopy.core.domain.SessionStore
@@ -34,11 +35,15 @@ class DashboardViewModel @Inject constructor(
     private val selectedBudget: SelectedBudget,
     private val sessions: SessionStore,
     private val allWidgets: Set<@JvmSuppressWildcards DashboardWidget>,
+    changes: BudgetChanges,
 ) : ViewModel() {
     private val state = MutableStateFlow(DashboardUiState())
     val uiState: StateFlow<DashboardUiState> = state.asStateFlow()
 
-    init { refresh() }
+    init {
+        refresh()
+        viewModelScope.launch { changes.changes.collect { refresh() } }
+    }
 
     fun refresh() = viewModelScope.launch {
         val member = sessions.current()?.member

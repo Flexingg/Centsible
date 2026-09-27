@@ -6,7 +6,9 @@ import io.ktor.client.request.parameter
 import io.ktor.client.request.setBody
 import io.ktor.http.ContentType
 import io.ktor.http.HttpMethod
+import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
+import kotlinx.serialization.json.JsonObject
 
 /** Typed endpoints of contract/openapi.yaml v1. */
 class BridgeApi(private val client: BridgeClient) {
@@ -43,7 +45,11 @@ class BridgeApi(private val client: BridgeClient) {
         until: String?,
         limit: Int,
         cursor: String?,
+        search: String? = null,
+        uncategorized: Boolean = false,
     ): TransactionPageDto = client.get("/v1/budgets/$budgetId/transactions") {
+        search?.takeIf { it.isNotBlank() }?.let { parameter("q", it.trim()) }
+        if (uncategorized) parameter("uncategorized", true)
         accountId?.let { parameter("accountId", it) }
         categoryId?.let { parameter("categoryId", it) }
         since?.let { parameter("since", it) }
@@ -54,6 +60,47 @@ class BridgeApi(private val client: BridgeClient) {
 
     suspend fun createTransaction(budgetId: String, body: NewTransactionDto): TransactionDto =
         client.send(HttpMethod.Post, "/v1/budgets/$budgetId/transactions", body)
+
+    suspend fun transaction(budgetId: String, id: String): TransactionDto = client.get("/v1/budgets/$budgetId/transactions/$id")
+
+    /** The body is built by hand so "set to null" and "leave alone" stay distinct. */
+    suspend fun updateTransaction(budgetId: String, id: String, patch: JsonObject): TransactionDto =
+        client.send(HttpMethod.Patch, "/v1/budgets/$budgetId/transactions/$id", patch)
+
+    suspend fun deleteTransaction(budgetId: String, id: String) {
+        client.execute(HttpMethod.Delete, "/v1/budgets/$budgetId/transactions/$id")
+    }
+
+    suspend fun preferences(budgetId: String): PreferencesDto = client.get("/v1/budgets/$budgetId/preferences")
+
+    suspend fun createAccount(budgetId: String, body: NewAccountDto): AccountDto = client.send(HttpMethod.Post, "/v1/budgets/$budgetId/accounts", body)
+    suspend fun updateAccount(budgetId: String, id: String, body: AccountPatchDto): AccountDto =
+        client.send(HttpMethod.Patch, "/v1/budgets/$budgetId/accounts/$id", body)
+
+    /** Null when Actual deleted the account (204). */
+    suspend fun closeAccount(budgetId: String, id: String, body: CloseAccountDto): AccountDto? {
+        val res = client.execute(HttpMethod.Post, "/v1/budgets/$budgetId/accounts/$id/close") {
+            contentType(ContentType.Application.Json)
+            setBody(body)
+        }
+        return if (res.status == HttpStatusCode.NoContent) null else res.body()
+    }
+
+    suspend fun reopenAccount(budgetId: String, id: String): AccountDto = client.execute(HttpMethod.Post, "/v1/budgets/$budgetId/accounts/$id/reopen").body()
+
+    suspend fun createCategory(budgetId: String, body: NewCategoryDto): CategoryDto = client.send(HttpMethod.Post, "/v1/budgets/$budgetId/categories", body)
+    suspend fun updateCategory(budgetId: String, id: String, body: CategoryPatchDto): CategoryDto =
+        client.send(HttpMethod.Patch, "/v1/budgets/$budgetId/categories/$id", body)
+    suspend fun deleteCategory(budgetId: String, id: String, transferCategoryId: String?) {
+        client.execute(HttpMethod.Delete, "/v1/budgets/$budgetId/categories/$id") { transferCategoryId?.let { parameter("transferCategoryId", it) } }
+    }
+
+    suspend fun createGroup(budgetId: String, body: NewGroupDto): CategoryGroupDto = client.send(HttpMethod.Post, "/v1/budgets/$budgetId/category-groups", body)
+    suspend fun updateGroup(budgetId: String, id: String, body: GroupPatchDto): CategoryGroupDto =
+        client.send(HttpMethod.Patch, "/v1/budgets/$budgetId/category-groups/$id", body)
+    suspend fun deleteGroup(budgetId: String, id: String, transferCategoryId: String?) {
+        client.execute(HttpMethod.Delete, "/v1/budgets/$budgetId/category-groups/$id") { transferCategoryId?.let { parameter("transferCategoryId", it) } }
+    }
 
     suspend fun months(budgetId: String): List<String> = client.get<MonthsDto>("/v1/budgets/$budgetId/months").months
     suspend fun month(budgetId: String, month: String): BudgetMonthDto = client.get("/v1/budgets/$budgetId/months/$month")

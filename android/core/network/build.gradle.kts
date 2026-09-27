@@ -6,6 +6,7 @@ plugins {
 dependencies {
     api(project(":core:domain"))
     api(libs.ktor.client.core)
+    api(libs.kotlinx.serialization.json) // BridgeApi takes JsonObject patches
     implementation(libs.ktor.client.content.negotiation)
     implementation(libs.ktor.serialization.kotlinx.json)
     testImplementation(libs.ktor.client.mock)

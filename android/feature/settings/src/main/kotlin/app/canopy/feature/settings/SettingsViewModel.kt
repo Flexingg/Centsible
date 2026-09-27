@@ -8,6 +8,8 @@ import app.canopy.core.domain.HouseholdGateway
 import app.canopy.core.domain.Me
 import app.canopy.core.domain.SessionStore
 import app.canopy.core.domain.userMessage
+import app.canopy.core.model.Budget
+import app.canopy.core.model.BudgetId
 import app.canopy.core.model.Capabilities
 import app.canopy.core.model.DeviceId
 import app.canopy.core.model.Member
@@ -28,6 +30,8 @@ data class SettingsData(
     val members: List<Member>,
     val capabilities: Capabilities,
     val bridgeUrl: String,
+    val budgets: List<Budget> = emptyList(),
+    val selectedBudget: BudgetId? = null,
 )
 
 data class SettingsUiState(
@@ -52,8 +56,10 @@ class SettingsViewModel @Inject constructor(
             val me = async { household.me() }
             val caps = async { engine.capabilities() }
             val m = me.await()
+            val budgets = async { runCatching { engine.budgets() }.getOrDefault(emptyList()) }
             val members = if (m.member.role == Role.Owner) household.members() else listOf(m.member)
-            SettingsData(m, members, caps.await(), sessions.current()?.bridgeUrl.orEmpty())
+            val session = sessions.current()
+            SettingsData(m, members, caps.await(), session?.bridgeUrl.orEmpty(), budgets.await(), session?.selectedBudget)
         }
             .onSuccess { d -> state.update { it.copy(data = Loadable.Ready(d)) } }
             .onFailure { e -> state.update { it.copy(data = Loadable.Failed(e.userMessage())) } }
@@ -77,6 +83,9 @@ class SettingsViewModel @Inject constructor(
         state.update { it.copy(message = "Access granted") }
         refresh()
     }
+
+    /** The app rebuilds its screens for the newly selected budget. */
+    fun switchBudget(id: BudgetId) = viewModelScope.launch { sessions.selectBudget(id) }
 
     fun signOut() = viewModelScope.launch {
         runCatching { household.logout() }

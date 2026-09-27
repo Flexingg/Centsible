@@ -15,6 +15,18 @@ import app.canopy.core.network.CategoryBudgetPatchDto
 import app.canopy.core.network.MoneyTransferDto
 import app.canopy.core.network.NewSplitDto
 import app.canopy.core.network.NewTransactionDto
+import app.canopy.core.network.AccountPatchDto
+import app.canopy.core.network.CategoryPatchDto
+import app.canopy.core.network.CloseAccountDto
+import app.canopy.core.network.GroupPatchDto
+import app.canopy.core.network.NewAccountDto
+import app.canopy.core.network.NewCategoryDto
+import app.canopy.core.network.NewGroupDto
+import app.canopy.core.model.AccountId
+import app.canopy.core.model.CategoryGroupId
+import app.canopy.core.model.Transaction
+import app.canopy.core.model.TransactionId
+import app.canopy.core.model.TransactionPatch
 import javax.inject.Inject
 
 /** [BudgetEngine] over the bridge's v1 HTTP contract. */
@@ -27,7 +39,7 @@ class BridgeBudgetEngine @Inject constructor(private val api: BridgeApi) : Budge
     override suspend fun payees(budget: BudgetId) = api.payees(budget.raw).map { it.toModel() }
 
     override suspend fun transactions(budget: BudgetId, query: TransactionQuery, cursor: String?) =
-        api.transactions(budget.raw, query.accountId?.raw, query.categoryId?.raw, query.since, query.until, query.limit, cursor)
+        api.transactions(budget.raw, query.accountId?.raw, query.categoryId?.raw, query.since, query.until, query.limit, cursor, query.search, query.uncategorized)
             .let { page -> Page(page.items.map { it.toModel() }, page.nextCursor) }
 
     override suspend fun createTransaction(budget: BudgetId, transaction: NewTransaction) = api.createTransaction(
@@ -45,6 +57,39 @@ class BridgeBudgetEngine @Inject constructor(private val api: BridgeApi) : Budge
             subtransactions = transaction.splits.takeIf { it.isNotEmpty() }?.map { NewSplitDto(it.amount.minor, it.categoryId?.raw, it.notes) },
         ),
     ).toModel()
+
+    override suspend fun transaction(budget: BudgetId, id: TransactionId) = api.transaction(budget.raw, id.raw).toModel()
+
+    override suspend fun updateTransaction(budget: BudgetId, id: TransactionId, patch: TransactionPatch): Transaction =
+        if (patch.isEmpty) transaction(budget, id) else api.updateTransaction(budget.raw, id.raw, patch.toJson()).toModel()
+
+    override suspend fun deleteTransaction(budget: BudgetId, id: TransactionId) = api.deleteTransaction(budget.raw, id.raw)
+
+    override suspend fun preferences(budget: BudgetId) = api.preferences(budget.raw).toModel()
+
+    override suspend fun createAccount(budget: BudgetId, name: String, offBudget: Boolean, initialBalance: Money) =
+        api.createAccount(budget.raw, NewAccountDto(name, offBudget, initialBalance.minor)).toModel()
+
+    override suspend fun renameAccount(budget: BudgetId, id: AccountId, name: String) = api.updateAccount(budget.raw, id.raw, AccountPatchDto(name)).toModel()
+
+    override suspend fun closeAccount(budget: BudgetId, id: AccountId, moveBalanceTo: AccountId?, balanceCategory: CategoryId?) =
+        api.closeAccount(budget.raw, id.raw, CloseAccountDto(moveBalanceTo?.raw, balanceCategory?.raw))?.toModel()
+
+    override suspend fun reopenAccount(budget: BudgetId, id: AccountId) = api.reopenAccount(budget.raw, id.raw).toModel()
+
+    override suspend fun createCategory(budget: BudgetId, name: String, group: CategoryGroupId) = api.createCategory(budget.raw, NewCategoryDto(name, group.raw)).toModel()
+
+    override suspend fun updateCategory(budget: BudgetId, id: CategoryId, name: String?, hidden: Boolean?, group: CategoryGroupId?) =
+        api.updateCategory(budget.raw, id.raw, CategoryPatchDto(name, hidden, group?.raw)).toModel()
+
+    override suspend fun deleteCategory(budget: BudgetId, id: CategoryId, moveTo: CategoryId?) = api.deleteCategory(budget.raw, id.raw, moveTo?.raw)
+
+    override suspend fun createCategoryGroup(budget: BudgetId, name: String) = api.createGroup(budget.raw, NewGroupDto(name)).toModel()
+
+    override suspend fun updateCategoryGroup(budget: BudgetId, id: CategoryGroupId, name: String?, hidden: Boolean?) =
+        api.updateGroup(budget.raw, id.raw, GroupPatchDto(name, hidden)).toModel()
+
+    override suspend fun deleteCategoryGroup(budget: BudgetId, id: CategoryGroupId, moveTo: CategoryId?) = api.deleteGroup(budget.raw, id.raw, moveTo?.raw)
 
     override suspend fun budgetMonths(budget: BudgetId) = api.months(budget.raw).map(::YearMonth)
     override suspend fun budgetMonth(budget: BudgetId, month: YearMonth) = api.month(budget.raw, month.raw).toModel()

@@ -56,9 +56,10 @@ import app.canopy.core.model.CategoryId
 import app.canopy.core.model.Money
 
 @Composable
-fun BudgetRoute(viewModel: BudgetViewModel = hiltViewModel()) {
+fun BudgetRoute(onManageCategories: () -> Unit, viewModel: BudgetViewModel = hiltViewModel()) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     BudgetScreen(
+        onManageCategories = onManageCategories,
         state = state,
         onPreviousMonth = viewModel::previousMonth,
         onNextMonth = viewModel::nextMonth,
@@ -82,6 +83,7 @@ fun BudgetScreen(
     onMove: (app.canopy.core.model.BudgetPot, app.canopy.core.model.BudgetPot, Money) -> Unit,
     onRollover: (CategoryId, Boolean) -> Unit,
     onMessageShown: () -> Unit,
+    onManageCategories: () -> Unit = {},
 ) {
     val snackbar = remember { SnackbarHostState() }
     LaunchedEffect(state.message) {
@@ -115,7 +117,7 @@ fun BudgetScreen(
                 onAction = onRetry,
                 modifier = Modifier.padding(padding),
             )
-            is Loadable.Ready -> BudgetContent(data.value, state, onOpenCategory, Modifier.padding(padding))
+            is Loadable.Ready -> BudgetContent(data.value, state, onOpenCategory, onManageCategories, Modifier.padding(padding))
         }
     }
 
@@ -135,7 +137,7 @@ fun BudgetScreen(
 }
 
 @Composable
-private fun BudgetContent(month: BudgetMonth, state: BudgetUiState, onOpenCategory: (CategoryId) -> Unit, modifier: Modifier) {
+private fun BudgetContent(month: BudgetMonth, state: BudgetUiState, onOpenCategory: (CategoryId) -> Unit, onManageCategories: () -> Unit, modifier: Modifier) {
     val collapsed = remember { mutableStateMapOf<CategoryGroupId, Boolean>() }
     LazyColumn(
         modifier.fillMaxSize(),
@@ -152,6 +154,11 @@ private fun BudgetContent(month: BudgetMonth, state: BudgetUiState, onOpenCatego
             )
         }
         items(month.incomeGroups.filter { !it.hidden }, key = { it.id.raw }) { IncomeCard(it) }
+        if (state.canManageCategories) {
+            item(key = "manage") {
+                androidx.compose.material3.TextButton(onClick = onManageCategories, modifier = Modifier.fillMaxWidth()) { Text("Edit categories") }
+            }
+        }
         if (!state.canEdit) {
             item(key = "readonly") {
                 Text(

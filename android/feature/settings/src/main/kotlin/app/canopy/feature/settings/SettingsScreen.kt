@@ -2,6 +2,7 @@ package app.canopy.feature.settings
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -62,6 +63,7 @@ fun SettingsRoute(viewModel: SettingsViewModel = hiltViewModel()) {
             revokeDevice = { viewModel.revoke(it) },
             dismissInvite = viewModel::dismissInvite,
             signOut = { viewModel.signOut() },
+            switchBudget = { viewModel.switchBudget(it) },
             messageShown = viewModel::messageShown,
         ),
     )
@@ -75,6 +77,7 @@ data class SettingsActions(
     val revokeDevice: (app.canopy.core.model.DeviceId) -> Unit = {},
     val dismissInvite: () -> Unit = {},
     val signOut: () -> Unit = {},
+    val switchBudget: (app.canopy.core.model.BudgetId) -> Unit = {},
     val messageShown: () -> Unit = {},
 )
 
@@ -128,6 +131,21 @@ fun SettingsScreen(state: SettingsUiState, actions: SettingsActions, renderQr: B
                                         Text("Last seen ${dev.lastSeenAt?.take(10) ?: "never"}", style = MaterialTheme.typography.labelSmall, color = colors.textTertiary)
                                     }
                                     if (dev.id != d.me.device.id && isOwner) TextButton(onClick = { actions.revokeDevice(dev.id) }) { Text("Remove") }
+                                }
+                            }
+                        }
+                    }
+                    if (d.budgets.size > 1) {
+                        item {
+                            SectionCard("Budget") {
+                                d.budgets.forEach { b ->
+                                    Row(
+                                        Modifier.fillMaxWidth().clickable { actions.switchBudget(b.id) }.padding(vertical = 10.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                    ) {
+                                        Text(b.name + if (b.encrypted) " 🔒" else "", style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+                                        if (b.id == d.selectedBudget) Text("Current", style = MaterialTheme.typography.labelLarge, color = colors.accent)
+                                    }
                                 }
                             }
                         }

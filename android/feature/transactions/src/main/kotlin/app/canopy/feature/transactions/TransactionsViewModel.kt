@@ -3,19 +3,39 @@ package app.canopy.feature.transactions
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.canopy.core.designsystem.component.Loadable
+import app.canopy.core.domain.BudgetChanges
 import app.canopy.core.domain.BudgetEngine
 import app.canopy.core.domain.SelectedBudget
 import app.canopy.core.domain.TransactionQuery
 import app.canopy.core.domain.userMessage
+import app.canopy.core.model.Account
+import app.canopy.core.model.AccountId
 import app.canopy.core.model.Transaction
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+
+data class TransactionFilters(
+    val search: String = "",
+    val needsCategory: Boolean = false,
+    val account: AccountId? = null,
+) {
+    val isActive get() = search.isNotBlank() || needsCategory || account != null
+
+    fun toQuery(limit: Int) = TransactionQuery(
+        accountId = account,
+        search = search.trim().takeIf { it.isNotEmpty() },
+        uncategorized = needsCategory,
+        limit = limit,
+    )
+}
 
 data class TransactionsData(
     val items: List<Transaction>,
@@ -23,40 +43,71 @@ data class TransactionsData(
     val accountNames: Map<String, String>,
     val nextCursor: String?,
     val loadingMore: Boolean = false,
+    val accounts: List<Account> = emptyList(),
+)
+
+data class TransactionsUiState(
+    val filters: TransactionFilters = TransactionFilters(),
+    val data: Loadable<TransactionsData> = Loadable.Loading,
 )
 
 @HiltViewModel
 class TransactionsViewModel @Inject constructor(
     private val engine: BudgetEngine,
     private val selectedBudget: SelectedBudget,
+    changes: BudgetChanges,
 ) : ViewModel() {
-    private val state = MutableStateFlow<Loadable<TransactionsData>>(Loadable.Loading)
-    val uiState: StateFlow<Loadable<TransactionsData>> = state.asStateFlow()
+    private val state = MutableStateFlow(TransactionsUiState())
+    val uiState: StateFlow<TransactionsUiState> = state.asStateFlow()
+    private var loadJob: Job? = null
 
-    init { refresh() }
+    init {
+        refresh()
+        viewModelScope.launch { changes.changes.collect { refresh(debounceMs = 0) } }
+    }
 
-    fun refresh() = viewModelScope.launch {
-        runCatching {
-            val budget = selectedBudget()
-            val page = async { engine.transactions(budget, TransactionQuery(limit = 50)) }
-            val cats = async { engine.categoryGroups(budget).flatMap { it.categories }.associate { it.id.raw to it.name } }
-            val accts = async { engine.accounts(budget).associate { it.id.raw to it.name } }
-            val p = page.await()
-            TransactionsData(p.items, cats.await(), accts.await(), p.nextCursor)
+    fun setSearch(text: String) = updateFilters(debounceMs = 300) { it.copy(search = text) }
+    fun toggleNeedsCategory() = updateFilters { it.copy(needsCategory = !it.needsCategory) }
+    fun setAccount(id: AccountId?) = updateFilters { it.copy(account = id) }
+    fun clearFilters() = updateFilters { TransactionFilters() }
+
+    private fun updateFilters(debounceMs: Long = 0, f: (TransactionFilters) -> TransactionFilters) {
+        state.update { it.copy(filters = f(it.filters)) }
+        refresh(debounceMs)
+    }
+
+    fun refresh(debounceMs: Long = 0) {
+        loadJob?.cancel()
+        loadJob = viewModelScope.launch {
+            if (debounceMs > 0) delay(debounceMs)
+            val filters = state.value.filters
+            runCatching {
+                val budget = selectedBudget()
+                val page = async { engine.transactions(budget, filters.toQuery(PAGE)) }
+                val cats = async { engine.categoryGroups(budget).flatMap { it.categories }.associate { it.id.raw to it.name } }
+                val accounts = async { engine.accounts(budget) }
+                val p = page.await()
+                val a = accounts.await()
+                TransactionsData(p.items, cats.await(), a.associate { it.id.raw to it.name }, p.nextCursor, accounts = a)
+            }
+                .onSuccess { d -> state.update { it.copy(data = Loadable.Ready(d)) } }
+                .onFailure { e -> if (e !is kotlinx.coroutines.CancellationException) state.update { it.copy(data = Loadable.Failed(e.userMessage())) } }
         }
-            .onSuccess { state.value = Loadable.Ready(it) }
-            .onFailure { state.value = Loadable.Failed(it.userMessage()) }
     }
 
     fun loadMore() {
-        val current = (state.value as? Loadable.Ready)?.value ?: return
+        val current = state.value.data.valueOrNull ?: return
         val cursor = current.nextCursor ?: return
         if (current.loadingMore) return
-        state.value = Loadable.Ready(current.copy(loadingMore = true))
+        state.update { it.copy(data = Loadable.Ready(current.copy(loadingMore = true))) }
         viewModelScope.launch {
-            runCatching { engine.transactions(selectedBudget(), TransactionQuery(limit = 50), cursor) }
-                .onSuccess { p -> state.update { Loadable.Ready(current.copy(items = current.items + p.items, nextCursor = p.nextCursor)) } }
-                .onFailure { state.update { Loadable.Ready(current.copy(loadingMore = false)) } }
+            runCatching { engine.transactions(selectedBudget(), state.value.filters.toQuery(PAGE), cursor) }
+                .onSuccess { p -> state.update { it.copy(data = Loadable.Ready(current.copy(items = current.items + p.items, nextCursor = p.nextCursor))) } }
+                .onFailure { state.update { it.copy(data = Loadable.Ready(current.copy(loadingMore = false))) } }
         }
+    }
+
+    private companion object {
+        const val PAGE = 50
     }
 }

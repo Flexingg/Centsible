@@ -28,7 +28,7 @@ class TransactionsScreenshotTest {
             accountNames = SampleHousehold.accounts.associate { it.id.raw to it.name },
             nextCursor = "next",
         )
-        compose.setContent { CanopyTheme(darkTheme = false) { TransactionsScreen(Loadable.Ready(data), onRetry = {}, onLoadMore = {}, today = LocalDate.of(2026, 9, 26)) } }
+        compose.setContent { CanopyTheme(darkTheme = false) { TransactionsScreen(TransactionsUiState(data = Loadable.Ready(data)), onRetry = {}, onLoadMore = {}, today = LocalDate.of(2026, 9, 26)) } }
         compose.onRoot().captureRoboImage("screenshots/transactions_light.png")
     }
 }

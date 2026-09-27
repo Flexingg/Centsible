@@ -87,7 +87,7 @@ import kotlinx.serialization.Serializable
     val subtransactions: List<NewSplitDto>? = null,
 )
 
-@Serializable data class NewSplitDto(val amount: Long, val categoryId: String? = null, val notes: String? = null)
+@Serializable data class NewSplitDto(val amount: Long, val categoryId: String? = null, val notes: String? = null, val id: String? = null)
 
 @Serializable data class MonthsDto(val months: List<String>)
 
@@ -132,3 +132,20 @@ import kotlinx.serialization.Serializable
 @Serializable data class CategoryBudgetPatchDto(val budgeted: Long? = null, val carryover: Boolean? = null)
 @Serializable data class MoneyTransferDto(val from: String, val to: String, val amount: Long)
 @Serializable data class HoldDto(val amount: Long)
+
+@Serializable data class PreferencesDto(
+    val budgetType: String = "envelope",
+    val currencyCode: String = "USD",
+    val numberFormat: String = "comma-dot",
+    val dateFormat: String = "MM/dd/yyyy",
+    val firstDayOfWeek: Int = 0,
+    val hideFraction: Boolean = false,
+)
+
+@Serializable data class NewAccountDto(val name: String, val offBudget: Boolean = false, val initialBalance: Long = 0)
+@Serializable data class AccountPatchDto(val name: String)
+@Serializable data class CloseAccountDto(val transferAccountId: String? = null, val transferCategoryId: String? = null)
+@Serializable data class NewCategoryDto(val name: String, val groupId: String)
+@Serializable data class CategoryPatchDto(val name: String? = null, val hidden: Boolean? = null, val groupId: String? = null)
+@Serializable data class NewGroupDto(val name: String)
+@Serializable data class GroupPatchDto(val name: String? = null, val hidden: Boolean? = null)

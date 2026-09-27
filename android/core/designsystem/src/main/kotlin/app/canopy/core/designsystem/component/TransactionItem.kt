@@ -1,6 +1,7 @@
 package app.canopy.core.designsystem.component
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -31,14 +32,17 @@ fun dayLabel(date: String, today: LocalDate): String {
 }
 
 @Composable
-fun TransactionRow(t: Transaction, categoryNames: Map<String, String>, accountNames: Map<String, String>) {
+fun TransactionRow(t: Transaction, categoryNames: Map<String, String>, accountNames: Map<String, String>, onClick: (() -> Unit)? = null) {
     val colors = CanopyTheme.colors
     val category = when {
         t.isParent -> "Split · ${t.subtransactions.size}"
         t.isTransfer -> "Transfer"
         else -> t.categoryId?.let { categoryNames[it.raw] }
     }
-    Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+    Row(
+        Modifier.fillMaxWidth().then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier).padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
         MerchantAvatar(t.payeeName)
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {

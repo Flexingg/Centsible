@@ -6,6 +6,10 @@ import app.canopy.core.designsystem.component.Loadable
 import app.canopy.core.domain.BudgetEngine
 import app.canopy.core.domain.SelectedBudget
 import app.canopy.core.domain.userMessage
+import app.canopy.core.domain.BudgetChanges
+import app.canopy.core.domain.SessionStore
+import app.canopy.core.model.Feature
+import kotlinx.coroutines.flow.update
 import app.canopy.core.model.Account
 import app.canopy.core.model.Money
 import app.canopy.core.model.sum
@@ -41,7 +45,7 @@ data class AccountSection(val kind: AccountKind, val accounts: List<Account>) {
     val total: Money get() = accounts.map { it.balance }.sum()
 }
 
-data class AccountsSummary(val sections: List<AccountSection>) {
+data class AccountsSummary(val sections: List<AccountSection>, val closed: List<Account> = emptyList()) {
     private val all get() = sections.flatMap { it.accounts }
     val assets: Money get() = all.filter { !it.balance.isNegative }.map { it.balance }.sum()
     val liabilities: Money get() = all.filter { it.balance.isNegative }.map { it.balance }.sum()
@@ -52,23 +56,46 @@ data class AccountsSummary(val sections: List<AccountSection>) {
             accounts.filter { !it.closed }.groupBy { it.kind() }
                 .map { (kind, list) -> AccountSection(kind, list.sortedByDescending { it.balance.abs() }) }
                 .sortedBy { it.kind.ordinal },
+            closed = accounts.filter { it.closed }.sortedBy { it.name },
         )
     }
 }
+
+data class AccountsUiState(
+    val data: Loadable<AccountsSummary> = Loadable.Loading,
+    val canWrite: Boolean = false,
+    val message: String? = null,
+)
 
 @HiltViewModel
 class AccountsViewModel @Inject constructor(
     private val engine: BudgetEngine,
     private val selectedBudget: SelectedBudget,
+    private val sessions: SessionStore,
+    changes: BudgetChanges,
 ) : ViewModel() {
-    private val state = MutableStateFlow<Loadable<AccountsSummary>>(Loadable.Loading)
-    val uiState: StateFlow<Loadable<AccountsSummary>> = state.asStateFlow()
+    private val state = MutableStateFlow(AccountsUiState())
+    val uiState: StateFlow<AccountsUiState> = state.asStateFlow()
 
-    init { refresh() }
+    init {
+        refresh()
+        viewModelScope.launch { changes.changes.collect { refresh() } }
+    }
 
     fun refresh() = viewModelScope.launch {
-        runCatching { engine.accounts(selectedBudget()) }
-            .onSuccess { state.value = Loadable.Ready(AccountsSummary.from(it)) }
-            .onFailure { state.value = Loadable.Failed(it.userMessage()) }
+        val budget = selectedBudget()
+        val canWrite = sessions.current()?.member?.role?.canWrite == true &&
+            runCatching { engine.capabilities().has(Feature.AccountsWrite) }.getOrDefault(false)
+        runCatching { engine.accounts(budget) }
+            .onSuccess { a -> state.update { it.copy(data = Loadable.Ready(AccountsSummary.from(a)), canWrite = canWrite) } }
+            .onFailure { e -> state.update { it.copy(data = Loadable.Failed(e.userMessage())) } }
     }
+
+    fun addAccount(name: String, offBudget: Boolean, startingBalance: Money) = viewModelScope.launch {
+        runCatching { engine.createAccount(selectedBudget(), name, offBudget, startingBalance) }
+            .onSuccess { a -> state.update { it.copy(message = "Added ${a.name}") } }
+            .onFailure { e -> state.update { it.copy(message = e.userMessage()) } }
+    }
+
+    fun messageShown() = state.update { it.copy(message = null) }
 }

@@ -135,7 +135,7 @@ object SampleHousehold {
             notes = notes,
             cleared = true,
             reconciled = false,
-            isTransfer = false,
+            transferId = null,
             isParent = false,
             subtransactions = emptyList(),
         )

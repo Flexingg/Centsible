@@ -39,10 +39,12 @@ data class Transaction(
     val notes: String?,
     val cleared: Boolean,
     val reconciled: Boolean,
-    val isTransfer: Boolean,
+    val transferId: TransactionId?,
     val isParent: Boolean,
     val subtransactions: List<Transaction>,
-)
+) {
+    val isTransfer: Boolean get() = transferId != null
+}
 
 data class NewTransaction(
     val id: TransactionId,
@@ -58,5 +60,40 @@ data class NewTransaction(
 ) {
     data class Split(val amount: Money, val categoryId: CategoryId?, val notes: String? = null)
 }
+
+/** A change to one field: [Keep] leaves it alone, [Set] replaces it (possibly with null). */
+sealed interface Update<out T> {
+    data object Keep : Update<Nothing>
+    data class Set<T>(val value: T) : Update<T>
+}
+
+data class TransactionPatch(
+    val accountId: Update<AccountId> = Update.Keep,
+    val date: Update<String> = Update.Keep,
+    val amount: Update<Money> = Update.Keep,
+    /** Existing payee (including an account's transfer payee) or null to clear. */
+    val payeeId: Update<PayeeId?> = Update.Keep,
+    /** New or existing payee by name; ignored when [payeeId] is set. */
+    val payeeName: Update<String> = Update.Keep,
+    val categoryId: Update<CategoryId?> = Update.Keep,
+    val notes: Update<String?> = Update.Keep,
+    val cleared: Update<Boolean> = Update.Keep,
+    /** Replaces all splits; an empty list unsplits. */
+    val splits: Update<List<SplitEdit>> = Update.Keep,
+) {
+    val isEmpty get() = listOf(accountId, date, amount, payeeId, payeeName, categoryId, notes, cleared, splits).all { it == Update.Keep }
+}
+
+/** A split in an edit. [id] is set for splits that already exist. */
+data class SplitEdit(val id: TransactionId?, val amount: Money, val categoryId: CategoryId?, val notes: String? = null)
+
+data class Preferences(
+    val budgetType: BudgetType,
+    val currencyCode: String,
+    val numberFormat: String,
+    val dateFormat: String,
+    val firstDayOfWeek: Int,
+    val hideFraction: Boolean,
+)
 
 data class Page<T>(val items: List<T>, val nextCursor: String?)

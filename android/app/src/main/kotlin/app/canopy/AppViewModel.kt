@@ -3,11 +3,16 @@ package app.canopy
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.canopy.core.data.CapabilitiesRepository
+import app.canopy.core.designsystem.component.MoneyFormat
+import app.canopy.core.domain.BudgetEngine
 import app.canopy.core.domain.SessionStore
+import app.canopy.core.model.BudgetId
 import dagger.hilt.android.lifecycle.HiltViewModel
+import java.util.Currency
 import javax.inject.Inject
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
@@ -17,22 +22,33 @@ sealed interface AppState {
     data object Starting : AppState
     data object NeedsPairing : AppState
     data object NeedsBudget : AppState
-    data object Ready : AppState
+    data class Ready(val budget: BudgetId) : AppState
 }
 
 @HiltViewModel
 class AppViewModel @Inject constructor(
     sessions: SessionStore,
     private val capabilities: CapabilitiesRepository,
+    private val engine: BudgetEngine,
 ) : ViewModel() {
     val state: StateFlow<AppState> = sessions.session
-        .onEach { if (it?.selectedBudget != null) viewModelScope.launch { capabilities.refresh() } }
         .map {
+            val budget = it?.selectedBudget
             when {
                 it == null -> AppState.NeedsPairing
-                it.selectedBudget == null -> AppState.NeedsBudget
-                else -> AppState.Ready
+                budget == null -> AppState.NeedsBudget
+                else -> AppState.Ready(budget)
             }
         }
+        .distinctUntilChanged()
+        .onEach { if (it is AppState.Ready) onBudgetOpened(it.budget) }
         .stateIn(viewModelScope, SharingStarted.Eagerly, AppState.Starting)
+
+    private fun onBudgetOpened(budget: BudgetId) = viewModelScope.launch {
+        capabilities.refresh()
+        // Actual budgets are single-currency; format money the way the budget says.
+        runCatching { engine.preferences(budget) }.onSuccess { prefs ->
+            runCatching { Currency.getInstance(prefs.currencyCode) }.onSuccess { MoneyFormat.currency = it }
+        }
+    }
 }

@@ -3,6 +3,7 @@ package app.canopy.feature.budget
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.canopy.core.designsystem.component.Loadable
+import app.canopy.core.domain.BudgetChanges
 import app.canopy.core.domain.BudgetEngine
 import app.canopy.core.domain.MoveMoney
 import app.canopy.core.domain.SelectedBudget
@@ -32,6 +33,7 @@ data class BudgetUiState(
     val canEdit: Boolean = false,
     val canMoveMoney: Boolean = false,
     val canToggleRollover: Boolean = false,
+    val canManageCategories: Boolean = false,
     val selectedCategory: CategoryId? = null,
     val saving: Boolean = false,
     val message: String? = null,
@@ -48,6 +50,7 @@ class BudgetViewModel @Inject constructor(
     private val selectedBudget: SelectedBudget,
     private val sessions: SessionStore,
     private val moveMoney: MoveMoney,
+    changes: BudgetChanges,
 ) : ViewModel() {
     private val state = MutableStateFlow(BudgetUiState())
     val uiState: StateFlow<BudgetUiState> = state.asStateFlow()
@@ -64,10 +67,13 @@ class BudgetViewModel @Inject constructor(
                     canEdit = role?.canWrite == true && caps.has(Feature.BudgetEnvelope),
                     canMoveMoney = role?.canWrite == true && caps.has(Feature.BudgetMoveMoney),
                     canToggleRollover = role?.canWrite == true && caps.has(Feature.BudgetCarryover),
+                    canManageCategories = role?.canWrite == true && caps.has(Feature.CategoriesWrite),
                     availableMonths = runCatching { engine.budgetMonths(budget) }.getOrDefault(emptyList()),
                 )
             }
             load()
+            // Transactions edited elsewhere change "spent"; reload quietly.
+            changes.changes.collect { load(refreshing = true) }
         }
     }
 

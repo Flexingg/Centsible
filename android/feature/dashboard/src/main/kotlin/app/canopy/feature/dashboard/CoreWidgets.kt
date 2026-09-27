@@ -132,7 +132,7 @@ class RecentTransactionsWidget @Inject constructor() : DashboardWidget {
         ) {
             context.recentTransactions.take(5).forEachIndexed { i, t ->
                 if (i > 0) HorizontalDivider(Modifier.padding(start = 64.dp), color = CanopyTheme.colors.border)
-                TransactionRow(t, context.categoryNames, accountNames)
+                TransactionRow(t, context.categoryNames, accountNames, onClick = { context.navigate(Destination.Transaction(t.id)) })
             }
         }
     }
