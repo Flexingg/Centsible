@@ -35,7 +35,9 @@ class AppViewModel @Inject constructor(
     connection: ConnectionStatus,
     pendingChanges: PendingChanges,
     outboxSync: app.centsible.core.data.OutboxSync,
+    undoCenter: app.centsible.core.domain.UndoCenter,
 ) : ViewModel() {
+    val undoOffers: kotlinx.coroutines.flow.SharedFlow<app.centsible.core.domain.Undoable> = undoCenter.offers
     val offline: StateFlow<Boolean> = connection.offline
     val pending: StateFlow<Int> = pendingChanges.pending
 

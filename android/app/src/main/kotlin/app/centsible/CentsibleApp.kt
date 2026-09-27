@@ -1,5 +1,7 @@
 package app.centsible
 
+import app.centsible.core.domain.userMessage
+import kotlinx.coroutines.launch
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -99,20 +101,31 @@ fun CentsibleApp(pairingLink: String?, viewModel: AppViewModel = hiltViewModel()
             AppState.NeedsPairing -> PairingRoute(deepLink = pairingLink)
             AppState.NeedsBudget -> BudgetPickerRoute()
             // Switching budgets rebuilds navigation and every screen's state.
-            is AppState.Ready -> key(s.budget) { MainScaffold(offline, pending) }
+            is AppState.Ready -> key(s.budget) { MainScaffold(offline, pending, viewModel.undoOffers) }
         }
     }
 }
 
 @Composable
-private fun MainScaffold(offline: Boolean, pending: Int) {
+private fun MainScaffold(offline: Boolean, pending: Int, undoOffers: kotlinx.coroutines.flow.Flow<app.centsible.core.domain.Undoable>) {
     val nav = rememberNavController()
+    val snackbar = androidx.compose.runtime.remember { androidx.compose.material3.SnackbarHostState() }
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    androidx.compose.runtime.LaunchedEffect(undoOffers) {
+        undoOffers.collect { offer ->
+            val result = snackbar.showSnackbar(offer.message, actionLabel = "Undo", duration = androidx.compose.material3.SnackbarDuration.Long)
+            if (result == androidx.compose.material3.SnackbarResult.ActionPerformed) scope.launch {
+                runCatching { offer.undo() }.onFailure { e -> snackbar.showSnackbar("Couldn't undo: ${e.userMessage()}") }
+            }
+        }
+    }
     val backStack by nav.currentBackStackEntryAsState()
     val current = backStack?.destination?.route
     val tab = Tab.entries.firstOrNull { it.route == current }
     val colors = CentsibleTheme.colors
     Scaffold(
         containerColor = colors.canvas,
+        snackbarHost = { androidx.compose.material3.SnackbarHost(snackbar) },
         topBar = { if (offline || pending > 0) OfflineBanner(offline, pending) },
         floatingActionButton = {
             if (tab?.canAdd == true) {

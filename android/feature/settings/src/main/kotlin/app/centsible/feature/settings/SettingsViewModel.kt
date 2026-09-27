@@ -38,6 +38,7 @@ data class SettingsUiState(
     val data: Loadable<SettingsData> = Loadable.Loading,
     val invite: Pair<Member, PairingInvite>? = null,
     val message: String? = null,
+    val appLock: Boolean = false,
 )
 
 @HiltViewModel
@@ -45,9 +46,16 @@ class SettingsViewModel @Inject constructor(
     private val household: HouseholdGateway,
     private val engine: BudgetEngine,
     private val sessions: SessionStore,
+    private val appLock: app.centsible.core.domain.AppLockSettings,
 ) : ViewModel() {
     private val state = MutableStateFlow(SettingsUiState())
     val uiState: StateFlow<SettingsUiState> = state.asStateFlow()
+
+    init {
+        viewModelScope.launch { appLock.enabled.collect { on -> state.update { it.copy(appLock = on) } } }
+    }
+
+    fun setAppLock(enabled: Boolean) = viewModelScope.launch { appLock.setEnabled(enabled) }
 
     init { refresh() }
 

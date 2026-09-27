@@ -1,6 +1,7 @@
 package app.centsible.core.engine.bridge
 
 import app.centsible.core.domain.PairingLinks
+import app.centsible.core.domain.recreate
 import app.centsible.core.model.AccountId
 import app.centsible.core.model.AmountOp
 import app.centsible.core.model.BudgetPot
@@ -113,6 +114,17 @@ class EndToEndTest {
                 splits = listOf(NewTransaction.Split(Money(-3000), food), NewTransaction.Split(Money(-2000), general))))
         }
         step("delete transaction") { engine.deleteTransaction(budget, txId) }
+        // Undo: delete the split, then bring it back the way the snackbar does.
+        val split = step("read split") { engine.transaction(budget, splitId) }
+        if (split != null) {
+            step("delete split") { engine.deleteTransaction(budget, splitId) }
+            val again = split.recreate()
+            step("undo delete") { engine.createTransaction(budget, again) }
+            step("read restored") { engine.transaction(budget, again.id) }?.let { restored ->
+                check("restored split keeps its parts", restored.subtransactions.map { it.amount } == listOf(Money(-3000), Money(-2000))) { "${restored.subtransactions}" }
+                check("restored split keeps its payee", restored.payeeId == split.payeeId) { "${restored.payeeId} vs ${split.payeeId}" }
+            }
+        }
 
         // Envelope budgeting.
         if (food != null) {

@@ -32,6 +32,7 @@ import javax.inject.Singleton
 @InstallIn(SingletonComponent::class)
 abstract class DataModule {
     @Binds abstract fun sessionStore(impl: EncryptedSessionStore): SessionStore
+    @Binds abstract fun appLock(impl: DataStoreAppLockSettings): app.centsible.core.domain.AppLockSettings
 
     // The engine seam: swap this binding for an on-device engine later.
     @Binds abstract fun budgetEngine(impl: NotifyingBudgetEngine): BudgetEngine

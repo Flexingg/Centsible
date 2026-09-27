@@ -65,7 +65,12 @@ fun SettingsRoute(viewModel: SettingsViewModel = hiltViewModel()) {
             signOut = { viewModel.signOut() },
             switchBudget = { viewModel.switchBudget(it) },
             messageShown = viewModel::messageShown,
+            setAppLock = viewModel::setAppLock,
         ),
+        deviceSecure = run {
+            val context = androidx.compose.ui.platform.LocalContext.current
+            androidx.compose.runtime.remember { context.getSystemService(android.app.KeyguardManager::class.java)?.isDeviceSecure == true }
+        },
     )
 }
 
@@ -79,10 +84,11 @@ data class SettingsActions(
     val signOut: () -> Unit = {},
     val switchBudget: (app.centsible.core.model.BudgetId) -> Unit = {},
     val messageShown: () -> Unit = {},
+    val setAppLock: (Boolean) -> Unit = {},
 )
 
 @Composable
-fun SettingsScreen(state: SettingsUiState, actions: SettingsActions, renderQr: Boolean = true) {
+fun SettingsScreen(state: SettingsUiState, actions: SettingsActions, renderQr: Boolean = true, deviceSecure: Boolean = true) {
     val colors = CentsibleTheme.colors
     val snackbar = remember { SnackbarHostState() }
     var adding by remember { mutableStateOf(false) }
@@ -132,6 +138,26 @@ fun SettingsScreen(state: SettingsUiState, actions: SettingsActions, renderQr: B
                                     }
                                     if (dev.id != d.me.device.id && isOwner) TextButton(onClick = { actions.revokeDevice(dev.id) }) { Text("Remove") }
                                 }
+                            }
+                        }
+                    }
+                    item {
+                        SectionCard("Security") {
+                            Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Column(Modifier.weight(1f)) {
+                                    Text("Lock with fingerprint or PIN", style = MaterialTheme.typography.bodyLarge)
+                                    Text(
+                                        if (deviceSecure) "Asks when you open the app, or come back after a minute away. Also hides balances from screenshots and recent apps."
+                                        else "Set a screen lock on this phone first.",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = colors.textSecondary,
+                                    )
+                                }
+                                androidx.compose.material3.Switch(
+                                    checked = state.appLock,
+                                    onCheckedChange = actions.setAppLock,
+                                    enabled = deviceSecure || state.appLock,
+                                )
                             }
                         }
                     }

@@ -7,6 +7,7 @@ import app.centsible.core.domain.BridgeException
 import app.centsible.core.domain.BudgetEngine
 import app.centsible.core.domain.SelectedBudget
 import app.centsible.core.domain.SessionStore
+import app.centsible.core.domain.recreate
 import app.centsible.core.domain.userMessage
 import app.centsible.core.model.Account
 import app.centsible.core.model.AccountId
@@ -76,6 +77,7 @@ class TransactionEditorViewModel @Inject constructor(
     private val selectedBudget: SelectedBudget,
     private val sessions: SessionStore,
     private val planning: app.centsible.core.domain.PlanningGateway,
+    private val undo: app.centsible.core.domain.UndoCenter,
 ) : ViewModel() {
     private val transactionId: String? = savedState.get<String>(ARG_ID)?.takeIf { it.isNotBlank() }
     private val presetAccount: String? = savedState.get<String>(ARG_ACCOUNT)?.takeIf { it.isNotBlank() }
@@ -188,12 +190,18 @@ class TransactionEditorViewModel @Inject constructor(
 
     fun delete() {
         val b = budget ?: return
-        val id = state.value.original?.id ?: return
+        val original = state.value.original ?: return
         state.update { it.copy(saving = true) }
         viewModelScope.launch {
-            runCatching { engine.deleteTransaction(b, id) }
+            runCatching { engine.deleteTransaction(b, original.id) }
                 .recoverCatching { if (it !is BridgeException.QueuedOffline) throw it }
-                .onSuccess { state.update { it.copy(saving = false, done = true) } }
+                .onSuccess {
+                    val again = original.recreate()
+                    undo.offer("Transaction deleted") {
+                        runCatching { engine.createTransaction(b, again) }.recoverCatching { if (it !is BridgeException.QueuedOffline) throw it }.getOrThrow()
+                    }
+                    state.update { it.copy(saving = false, done = true) }
+                }
                 .onFailure { e -> state.update { it.copy(saving = false, error = e.userMessage()) } }
         }
     }
