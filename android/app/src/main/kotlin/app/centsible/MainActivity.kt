@@ -36,8 +36,14 @@ class MainActivity : ComponentActivity() {
         if (result.resultCode == Activity.RESULT_OK) locked = false
     }
 
+    /** The launch animation plays on a cold start only, over the app as it loads underneath. */
+    private var splash by mutableStateOf(false)
+
     override fun onCreate(savedInstanceState: Bundle?) {
+        // The launch theme only paints the window brand green; switch to the real one before any UI.
+        setTheme(R.style.Theme_Centsible)
         super.onCreate(savedInstanceState)
+        splash = savedInstanceState == null
         enableEdgeToEdge()
         pairingLink = intent?.pairingLink()
         openScreen = intent?.getStringExtra(EXTRA_OPEN)
@@ -52,10 +58,13 @@ class MainActivity : ComponentActivity() {
             }
         }
         setContent {
-            when (locked) {
-                null -> BlankScreen()
-                true -> LockScreen(onUnlock = { DeviceUnlock.prompt(this, confirmCredential) { locked = false } })
-                false -> CentsibleApp(pairingLink = pairingLink, openScreen = openScreen, onOpened = { openScreen = null })
+            androidx.compose.foundation.layout.Box {
+                when (locked) {
+                    null -> BlankScreen()
+                    true -> LockScreen(onUnlock = { DeviceUnlock.prompt(this@MainActivity, confirmCredential) { locked = false } })
+                    false -> CentsibleApp(pairingLink = pairingLink, openScreen = openScreen, onOpened = { openScreen = null })
+                }
+                if (splash) app.centsible.feature.onboarding.AnimatedSplash(onFinished = { splash = false })
             }
         }
     }

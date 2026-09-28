@@ -2,4 +2,11 @@
     <style name="Theme.Centsible" parent="android:Theme.Material.Light.NoActionBar">
         <item name="android:windowBackground">#F6F5F2</item>
     </style>
+
+    <!-- While the app starts: brand green, so the animated splash follows without a flash. -->
+    <style name="Theme.Centsible.Launch">
+        <item name="android:windowBackground">@color/brand_forest</item>
+        <item name="android:statusBarColor">@color/brand_forest</item>
+        <item name="android:navigationBarColor">@color/brand_forest</item>
+    </style>
 </resources>
