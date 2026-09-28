@@ -47,6 +47,34 @@ export class ActualHost {
     });
   }
 
+  /** Signed in to Actual. False while waiting for the owner to finish setup. */
+  get connected() {
+    return this.lib !== null;
+  }
+
+  get hasCredentials() {
+    return !!(this.config.actual.password || this.config.actual.sessionToken);
+  }
+
+  /** Creates an empty budget on the Actual server and returns its sync id. */
+  createBudget(name: string): Promise<RemoteBudget> {
+    return this.enqueue(async () => {
+      const lib = this.requireLib();
+      const before = new Set((await api.getBudgets()).map((f) => f.groupId).filter(Boolean));
+      const created = (await (lib.send as (n: string, a: unknown) => Promise<{ error?: string } | undefined>)('create-budget', { budgetName: name })) as
+        | { error?: string }
+        | undefined;
+      if (created?.error) throw ApiError.validation(`Actual couldn't create the budget: ${created.error}`);
+      await api.sync();
+      const files = await api.getBudgets();
+      const file = files.find((f) => f.groupId && !before.has(f.groupId) && f.state !== 'remote');
+      if (!file?.groupId) throw new Error('New budget did not get a sync id');
+      this.openBudgetId = file.groupId; // create-budget leaves it open
+      this.lastSyncAt = Date.now();
+      return { id: file.groupId, name: file.name, encrypted: !!file.encryptKeyId };
+    });
+  }
+
   get apiVersion() {
     return ACTUAL_API_VERSION;
   }

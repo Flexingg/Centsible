@@ -17,6 +17,7 @@ import { ActualHost } from '../../src/actual/host.js';
 import { HouseholdStore } from '../../src/auth/store.js';
 import type { BridgeConfig } from '../../src/config.js';
 import { buildServer } from '../../src/http/server.js';
+import { SetupService } from '../../src/setup.js';
 import { startSeededActual, type SeededActual } from '../support/actual-server.js';
 import { expectContract, recordFixture } from '../support/contract.js';
 
@@ -95,7 +96,7 @@ beforeAll(async () => {
   store = new HouseholdStore(join(bridgeData, 'bridge.sqlite'));
   host = new ActualHost(config, silent);
   await host.start();
-  app = await buildServer({ config, store, host, ops: new BudgetOps(host), transactions: new TransactionOps(host), structure: new StructureOps(host), planning: new PlanningOps(host), accountOps: new AccountOps(host), reports: new ReportOps(host), jobs: new JobStore() }, { logger: false });
+  app = await buildServer({ config, store, host, setup: new SetupService(config, store, host, silent, () => host.start()), ops: new BudgetOps(host), transactions: new TransactionOps(host), structure: new StructureOps(host), planning: new PlanningOps(host), accountOps: new AccountOps(host), reports: new ReportOps(host), jobs: new JobStore() }, { logger: false });
 
   const jo = store.createMember({ displayName: 'Jo', role: 'owner' });
   owner = await pair(jo.id, 'Pixel 9');

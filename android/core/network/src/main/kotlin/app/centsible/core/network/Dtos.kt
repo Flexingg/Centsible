@@ -20,6 +20,15 @@ import kotlinx.serialization.Serializable
     @Serializable data class ActualInfo(val serverVersion: String? = null, val apiVersion: String, val compatibility: String)
 }
 
+@Serializable data class SetupStatusDto(val needsOwner: Boolean, val actual: String? = null)
+@Serializable data class SetupClaimDto(
+    val setupCode: String,
+    val displayName: String,
+    val deviceName: String,
+    val platform: String = "android",
+    val actualPassword: String? = null,
+)
+@Serializable data class NewBudgetDto(val name: String)
 @Serializable data class PairRequestDto(val code: String, val deviceName: String, val platform: String = "android")
 @Serializable data class RefreshRequestDto(val refreshToken: String)
 

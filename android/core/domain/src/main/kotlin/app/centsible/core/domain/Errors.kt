@@ -10,6 +10,8 @@ sealed class BridgeException(message: String) : Exception(message) {
     class FeatureUnavailable(message: String) : BridgeException(message)
     class ActualUnavailable(message: String) : BridgeException(message)
     class RateLimited(message: String) : BridgeException(message)
+    /** Cloudflare Access answered instead of the bridge: a service token is missing or wrong. */
+    class AccessBlocked(message: String = "This address is protected by Cloudflare Access. Add a service token to connect.") : BridgeException(message)
     /** End-to-end encrypted budget the bridge has no (or the wrong) password for. */
     class BudgetEncrypted(message: String) : BridgeException(message)
     class Network(message: String, cause: Throwable? = null) : BridgeException(message) {
@@ -27,7 +29,7 @@ fun Throwable.userMessage(): String = when (this) {
     is BridgeException.Unauthorized -> "This device was signed out. Pair it again."
     is BridgeException.Forbidden -> "You don't have permission to do that."
     is BridgeException.FeatureUnavailable -> "Your Actual server doesn't support this yet."
-    is BridgeException.ActualUnavailable -> "The bridge can't reach your Actual server."
+    is BridgeException.ActualUnavailable -> message?.takeIf { it.isNotBlank() && !it.startsWith("HTTP ") } ?: "The bridge can't reach your Actual server."
     is BridgeException -> message ?: "Something went wrong."
     else -> "Something went wrong."
 }

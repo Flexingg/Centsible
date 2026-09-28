@@ -17,21 +17,24 @@ The **bridge** is a small Node service. It wraps Actual's official API behind a 
 
 ## Run it
 
-1. Copy `deploy/.env.example` to `deploy/.env` and fill it in.
+1. Copy `deploy/.env.example` to `deploy/.env`. Set `BRIDGE_PUBLIC_URL` and `CLOUDFLARE_TUNNEL_TOKEN`; everything else is optional.
 2. In the Cloudflare dashboard, give your tunnel two public hostnames:
    - `actual.example.com` → `http://actual:5006`
    - `budget-api.example.com` → `http://bridge:8787`
 
    Optionally, put the bridge hostname behind Cloudflare Access with a Service Auth token.
-3. Start everything:
+3. Start everything, and note the setup code the bridge prints:
    ```sh
    cd deploy && docker compose up -d
+   docker compose logs bridge     # "Setup code: ABCD-EFGH"
    ```
-4. Create the first household owner. This prints a pairing QR code:
-   ```sh
-   docker compose exec bridge node dist/admin/cli.js add-member --name "Jo" --role owner --pair
-   ```
-5. Install the app from the [latest release](https://github.com/Flexingg/Centsible/releases/latest) (download the `.apk` on your phone and allow installing from your browser), then scan the QR code. Invite the rest of the household from **More → Household → Add person**.
+4. Install the app from the [latest release](https://github.com/Flexingg/Centsible/releases/latest) (download the `.apk` on your phone and allow installing from your browser). Enter your bridge's address, and the app walks you through the rest:
+   - the setup code, and your name (you become the household owner)
+   - Actual's password: on a brand-new Actual server you choose it; otherwise you enter the one you already use. The bridge keeps it, so it never goes in `.env`.
+   - your first budget, if Actual has none yet
+5. Invite the rest of the household from **More → Settings → Household**: add each person, then tap **Invite** to show a QR code for them to scan.
+
+The setup code works once, until the first owner exists; knowing the bridge's address isn't enough to claim it. Prefer the command line? `docker compose exec bridge node dist/admin/cli.js add-member --name "Jo" --role owner --pair` still prints an owner invite QR code.
 
 ## Releases
 

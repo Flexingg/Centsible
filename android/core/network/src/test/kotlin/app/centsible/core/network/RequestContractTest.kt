@@ -69,6 +69,9 @@ class RequestContractTest {
 
         // The app builds this exactly like this, relying on the default platform.
         call { api.pair("https://budget-api.example.com", null, null, PairRequestDto("ABCD-EFGH", "Pixel 9")) }
+        call { api.claim("https://budget-api.example.com", null, null, SetupClaimDto("ABCD-EFGH", "Jo", "Pixel 9", actualPassword = "household-pass")) }
+        call { api.claim("https://budget-api.example.com", null, null, SetupClaimDto("ABCD-EFGH", "Jo", "Pixel 9")) } // Actual already signed in
+        call { api.createBudget("Our Budget") }
         call { api.createMember(NewMemberDto("Sam", "member")) }
         call { api.setMemberBudgets("m2", listOf(b)) }
         call { api.createTransaction(b, NewTransactionDto("t1", "acc", "2026-09-27", -1234, payeeName = "Cafe", categoryId = "c1")) }

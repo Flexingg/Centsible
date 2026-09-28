@@ -40,6 +40,7 @@ abstract class DataModule {
     @Binds abstract fun pendingChanges(impl: OutboxSync): PendingChanges
     @Binds abstract fun household(impl: BridgeHouseholdGateway): HouseholdGateway
     @Binds abstract fun pairing(impl: BridgePairingGateway): PairingGateway
+    @Binds abstract fun setup(impl: app.centsible.core.engine.bridge.BridgeSetupGateway): app.centsible.core.domain.SetupGateway
 
     companion object {
         @Provides

@@ -1,8 +1,11 @@
-// Boots a seeded Actual server plus the real bridge on a real port, for the Android
-// end-to-end suite (android/core/engine-bridge ... EndToEndTest). Prints one JSON line
-// {"bridgeUrl","pairingUri","budgetId"} once ready, then serves until killed.
+// Boots Actual plus the real bridge on a real port, for the Android end-to-end suite
+// (android/core/engine-bridge ... EndToEndTest). Prints one JSON line once ready, then
+// serves until killed.
 //
-//   npx tsx test/support/e2e-server.ts [port]
+//   npx tsx test/support/e2e-server.ts [port]           seeded budget, owner invite
+//     -> {"bridgeUrl","pairingUri","budgetId"}
+//   npx tsx test/support/e2e-server.ts [port] --fresh   first run: new Actual, no owner
+//     -> {"bridgeUrl","setupCode"}
 import { mkdirSync, rmSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -17,15 +20,18 @@ import { HouseholdStore } from '../../src/auth/store.js';
 import { pairingUri } from '../../src/auth/pairing.js';
 import type { BridgeConfig } from '../../src/config.js';
 import { buildServer } from '../../src/http/server.js';
+import { SetupService } from '../../src/setup.js';
 import { JobStore } from '../../src/jobs.js';
-import { startSeededActual } from './actual-server.js';
+import { startActual, startSeededActual } from './actual-server.js';
 
 const port = Number(process.argv[2] ?? 8787);
-const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '.test-data', 'e2e');
+const fresh = process.argv.includes('--fresh');
+const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '.test-data', fresh ? 'e2e-fresh' : 'e2e');
 rmSync(root, { recursive: true, force: true });
 const silent = { debug() {}, info() {}, warn() {} };
 
-const actual = await startSeededActual(join(root, 'actual'), 5100 + Math.floor(Math.random() * 800));
+const actualPort = 5100 + Math.floor(Math.random() * 800);
+const actual = fresh ? { ...(await startActual(join(root, 'actual'), actualPort)), password: undefined, budgetId: undefined } : await startSeededActual(join(root, 'actual'), actualPort);
 const dataDir = join(root, 'bridge');
 mkdirSync(join(dataDir, 'actual'), { recursive: true });
 const config: BridgeConfig = {
@@ -35,6 +41,7 @@ const config: BridgeConfig = {
   publicUrl: `http://127.0.0.1:${port}`,
   trustProxy: false,
   actual: { serverUrl: actual.url, password: actual.password, budgetPasswords: {} },
+  setupCode: fresh ? 'E2E-SETUP' : undefined,
   cfAccess: { clientId: 'cf-id.access', clientSecret: 'cf-secret' }, // exercises the header path
   syncMaxAgeMs: 0,
   accessTokenTtlSec: 3600,
@@ -43,17 +50,22 @@ const config: BridgeConfig = {
 };
 const store = new HouseholdStore(join(dataDir, 'bridge.sqlite'));
 const host = new ActualHost(config, silent);
-await host.start();
+if (!fresh) await host.start(); // fresh: the app's setup signs the bridge in
+const setup = new SetupService(config, store, host, silent, () => host.start());
 const app = await buildServer(
-  { config, store, host, ops: new BudgetOps(host), transactions: new TransactionOps(host), structure: new StructureOps(host), planning: new PlanningOps(host), accountOps: new AccountOps(host), reports: new ReportOps(host), jobs: new JobStore() },
+  { config, store, host, setup, ops: new BudgetOps(host), transactions: new TransactionOps(host), structure: new StructureOps(host), planning: new PlanningOps(host), accountOps: new AccountOps(host), reports: new ReportOps(host), jobs: new JobStore() },
   { logger: false },
 );
 await app.listen({ port, host: '127.0.0.1' });
 
-const owner = store.createMember({ displayName: 'Jo', role: 'owner' });
-const { code } = store.createPairingCode(owner.id, null);
 // console.log is silenced once @actual-app/api loads, so write to stdout directly.
-process.stdout.write(`${JSON.stringify({ bridgeUrl: config.publicUrl, pairingUri: pairingUri(config, code), budgetId: actual.budgetId })}\n`);
+if (fresh) {
+  process.stdout.write(`${JSON.stringify({ bridgeUrl: config.publicUrl, setupCode: setup.prepare() })}\n`);
+} else {
+  const owner = store.createMember({ displayName: 'Jo', role: 'owner' });
+  const { code } = store.createPairingCode(owner.id, null);
+  process.stdout.write(`${JSON.stringify({ bridgeUrl: config.publicUrl, pairingUri: pairingUri(config, code), budgetId: actual.budgetId })}\n`);
+}
 
 for (const sig of ['SIGINT', 'SIGTERM'] as const) {
   process.once(sig, async () => {

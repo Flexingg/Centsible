@@ -18,17 +18,11 @@ export type SeededActual = {
   stop: () => Promise<void>;
 };
 
-/**
- * Boots the real @actual-app/sync-server pinned in package.json (the same version the
- * bridge's @actual-app/api targets), bootstraps it, and seeds a household budget.
- * This is the upgrade gate: bump both packages, and these tests say whether it's safe.
- */
-export async function startSeededActual(root: string, port: number): Promise<SeededActual> {
+/** A fresh actual-server with no password set yet, as after a first `docker compose up`. */
+export async function startActual(root: string, port: number): Promise<{ url: string; stop: () => Promise<void> }> {
   rmSync(root, { recursive: true, force: true });
   const serverData = join(root, 'server');
-  const seedData = join(root, 'seed');
   mkdirSync(serverData, { recursive: true });
-  mkdirSync(seedData, { recursive: true });
 
   const bin = join(dirname(require.resolve('@actual-app/sync-server/package.json')), 'build/bin/actual-server.js');
   const logFile = join(root, 'actual-server.log');
@@ -46,6 +40,24 @@ export async function startSeededActual(root: string, port: number): Promise<See
     child.kill();
     throw new Error(`actual-server did not start:\n${readFileSync(logFile, 'utf8').slice(-2000)}`);
   }
+  return {
+    url,
+    stop: async () => {
+      child.kill();
+      await new Promise((r) => child.once('exit', r));
+    },
+  };
+}
+
+/**
+ * Boots the real @actual-app/sync-server pinned in package.json (the same version the
+ * bridge's @actual-app/api targets), bootstraps it, and seeds a household budget.
+ * This is the upgrade gate: bump both packages, and these tests say whether it's safe.
+ */
+export async function startSeededActual(root: string, port: number): Promise<SeededActual> {
+  const { url, stop } = await startActual(root, port);
+  const seedData = join(root, 'seed');
+  mkdirSync(seedData, { recursive: true });
 
   const password = 'household-test-pass';
   const boot = await fetch(`${url}/account/bootstrap`, {
@@ -67,10 +79,7 @@ export async function startSeededActual(root: string, port: number): Promise<See
     password,
     month,
     ...seeded,
-    stop: async () => {
-      child.kill();
-      await new Promise((r) => child.once('exit', r));
-    },
+    stop,
   };
 }
 

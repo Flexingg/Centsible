@@ -34,6 +34,7 @@ class BridgeBudgetEngine @Inject constructor(private val api: BridgeApi) : Budge
 
     override suspend fun capabilities() = api.capabilities().toModel()
     override suspend fun budgets() = api.budgets().map { it.toModel() }
+    override suspend fun createBudget(name: String) = api.createBudget(name).toModel()
     override suspend fun accounts(budget: BudgetId) = api.accounts(budget.raw).map { it.toModel() }
     override suspend fun categoryGroups(budget: BudgetId) = api.categoryGroups(budget.raw).map { it.toModel() }
     override suspend fun payees(budget: BudgetId) = api.payees(budget.raw).map { it.toModel() }

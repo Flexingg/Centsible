@@ -32,6 +32,21 @@ class BridgeApi(private val client: BridgeClient, private val outbox: Outbox? = 
             setBody(request)
         }.body()
 
+    /** Older bridges have no setup endpoint: treat them as already set up. */
+    suspend fun setupStatus(bridgeUrl: String, cfId: String?, cfSecret: String?): SetupStatusDto = try {
+        client.executeAnonymous(bridgeUrl, HttpMethod.Get, "/v1/setup", cfId, cfSecret).body()
+    } catch (e: app.centsible.core.domain.BridgeException.NotFound) {
+        SetupStatusDto(needsOwner = false)
+    }
+
+    suspend fun claim(bridgeUrl: String, cfId: String?, cfSecret: String?, request: SetupClaimDto): TokenResponseDto =
+        client.executeAnonymous(bridgeUrl, HttpMethod.Post, "/v1/setup/claim", cfId, cfSecret) {
+            contentType(ContentType.Application.Json)
+            setBody(request)
+        }.body()
+
+    suspend fun createBudget(name: String): BudgetDto = client.send(HttpMethod.Post, "/v1/budgets", NewBudgetDto(name))
+
     suspend fun capabilities(): CapabilitiesDto = client.get("/v1/capabilities")
     suspend fun me(): MeDto = client.get("/v1/me")
     suspend fun logout() { client.execute(HttpMethod.Post, "/v1/auth/logout") }

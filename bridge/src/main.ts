@@ -11,6 +11,7 @@ import { ActualHost } from './actual/host.js';
 import { HouseholdStore } from './auth/store.js';
 import { loadConfig } from './config.js';
 import { buildServer } from './http/server.js';
+import { SetupService } from './setup.js';
 
 const config = loadConfig();
 const store = new HouseholdStore(join(config.dataDir, 'bridge.sqlite'), {
@@ -25,28 +26,48 @@ const host = new ActualHost(config, {
   info: (o, m) => log?.info(o, m),
   warn: (o, m) => log?.warn(o, m),
 });
-const app = await buildServer({ config, store, host, ops: new BudgetOps(host), transactions: new TransactionOps(host), structure: new StructureOps(host), planning: new PlanningOps(host), accountOps: new AccountOps(host), reports: new ReportOps(host), jobs: new JobStore() });
+async function connect() {
+  await host.start();
+  log?.info({ server: host.actualServerVersion, api: host.apiVersion, compatibility: host.compatibility() }, 'connected to Actual');
+}
+const setup = new SetupService(config, store, host, { info: (o, m) => log?.info(o, m), warn: (o, m) => log?.warn(o, m) }, connect);
+const app = await buildServer({ config, store, host, setup, ops: new BudgetOps(host), transactions: new TransactionOps(host), structure: new StructureOps(host), planning: new PlanningOps(host), accountOps: new AccountOps(host), reports: new ReportOps(host), jobs: new JobStore() });
 log = app.log;
 
-try {
-  await host.start();
-  app.log.info({ server: host.actualServerVersion, api: host.apiVersion, compatibility: host.compatibility() }, 'connected to Actual');
-} catch (err) {
-  // Keep serving: /v1/capabilities reports "unavailable" and the app shows a banner.
-  app.log.error({ err }, 'could not connect to Actual; retrying in the background');
-  const retry = setInterval(async () => {
-    try {
-      await host.start();
-      clearInterval(retry);
-      app.log.info('connected to Actual');
-    } catch {
-      /* keep retrying */
-    }
-  }, 30_000);
+if (!host.hasCredentials) {
+  // No ACTUAL_PASSWORD yet: the owner enters it in the app during setup.
+  app.log.info('Waiting for setup in the app to sign in to Actual');
+} else {
+  try {
+    await connect();
+  } catch (err) {
+    // Keep serving: /v1/capabilities reports "unavailable" and the app shows a banner.
+    app.log.error({ err }, 'could not connect to Actual; retrying in the background');
+    const retry = setInterval(async () => {
+      try {
+        await connect();
+        clearInterval(retry);
+      } catch {
+        /* keep retrying */
+      }
+    }, 30_000);
+  }
 }
 
-if (store.listMembers().length === 0) {
-  app.log.warn('No household members yet. Create the first owner with: node dist/admin/cli.js add-member --name <you> --role owner --pair');
+const setupCode = setup.prepare();
+if (setupCode) {
+  // Printed plainly so `docker compose logs bridge` shows it at a glance.
+  const lines = [
+    '',
+    '============================================================',
+    '  Centsible bridge: first-time setup',
+    `  1. In the app, choose "Set up a new bridge" and enter ${config.publicUrl}`,
+    `  2. Setup code: ${setupCode}`,
+    '  The code works once, until the first owner is created.',
+    '============================================================',
+    '',
+  ];
+  process.stdout.write(`${lines.join('\n')}\n`);
 }
 
 setInterval(() => store.pruneIdempotency(), 6 * 3600 * 1000).unref();

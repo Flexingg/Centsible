@@ -1,5 +1,6 @@
 import { mkdirSync } from 'node:fs';
 import { join, resolve } from 'node:path';
+import { readSavedActualPassword } from './setup.js';
 
 export type BridgeConfig = {
   port: number;
@@ -15,6 +16,8 @@ export type BridgeConfig = {
     /** E2E encryption passwords keyed by budget sync id. */
     budgetPasswords: Record<string, string>;
   };
+  /** Optional fixed first-run setup code; otherwise one is generated and logged. */
+  setupCode?: string;
   /** Optional Cloudflare Access service token, handed to devices inside the pairing QR. */
   cfAccess?: { clientId: string; clientSecret: string };
   /** Reads re-sync with the Actual server when the last sync is older than this. */
@@ -45,11 +48,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): BridgeConfig {
   const dataDir = resolve(env.BRIDGE_DATA_DIR ?? './data');
   mkdirSync(join(dataDir, 'actual'), { recursive: true });
 
-  const password = env.ACTUAL_PASSWORD;
+  // Optional: without either, the owner enters the Actual password in the app during setup.
+  const password = env.ACTUAL_PASSWORD || readSavedActualPassword(dataDir);
   const sessionToken = env.ACTUAL_SESSION_TOKEN;
-  if (!password && !sessionToken) {
-    throw new Error('Set ACTUAL_PASSWORD (password login) or ACTUAL_SESSION_TOKEN (OIDC / multi-user)');
-  }
 
   const cfId = env.CF_ACCESS_CLIENT_ID;
   const cfSecret = env.CF_ACCESS_CLIENT_SECRET;
@@ -66,6 +67,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): BridgeConfig {
       sessionToken,
       budgetPasswords: parseBudgetPasswords(env.ACTUAL_BUDGET_PASSWORDS),
     },
+    setupCode: env.BRIDGE_SETUP_CODE || undefined,
     cfAccess: cfId && cfSecret ? { clientId: cfId, clientSecret: cfSecret } : undefined,
     syncMaxAgeMs: Number(env.BRIDGE_SYNC_MAX_AGE_MS ?? 5000),
     accessTokenTtlSec: Number(env.BRIDGE_ACCESS_TTL_SEC ?? 3600),

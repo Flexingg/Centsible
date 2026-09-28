@@ -53,6 +53,7 @@ class FakeBudgetEngine(
 
     override suspend fun capabilities() = capabilities.also { check() }
     override suspend fun budgets(): List<Budget> = listOf(SampleHousehold.budget).also { check() }
+    override suspend fun createBudget(name: String): Budget = Budget(app.centsible.core.model.BudgetId("budget-new"), name, encrypted = false).also { check() }
     override suspend fun accounts(budget: BudgetId): List<Account> = accounts.toList().also { check() }
 
     override suspend fun categoryGroups(budget: BudgetId): List<CategoryGroup> = month.groups.map { g ->

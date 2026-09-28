@@ -32,6 +32,8 @@ import app.centsible.core.model.TransactionPatch
 interface BudgetEngine {
     suspend fun capabilities(): Capabilities
     suspend fun budgets(): List<Budget>
+    /** Owners only: an empty budget, e.g. the household's first. */
+    suspend fun createBudget(name: String): Budget
 
     suspend fun accounts(budget: BudgetId): List<Account>
     suspend fun categoryGroups(budget: BudgetId): List<CategoryGroup>

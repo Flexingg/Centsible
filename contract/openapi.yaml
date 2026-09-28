@@ -50,6 +50,42 @@ paths:
               schema: { $ref: '#/components/schemas/Capabilities' }
         '401': { $ref: '#/components/responses/Problem' }
 
+  /v1/setup:
+    get:
+      tags: [setup]
+      operationId: setupStatus
+      summary: First-run state. Public; says nothing once the bridge has an owner.
+      security: []
+      responses:
+        '200':
+          description: Setup state
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SetupStatus' }
+
+  /v1/setup/claim:
+    post:
+      tags: [setup]
+      operationId: claimBridge
+      summary: Become the first owner with the one-time setup code, signing the bridge in to Actual on the way.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SetupClaim' }
+      responses:
+        '200':
+          description: Owner created and this device signed in
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TokenResponse' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '429': { $ref: '#/components/responses/Problem' }
+        '503': { $ref: '#/components/responses/Problem' }
+
   /v1/auth/pair:
     post:
       tags: [auth]
@@ -212,6 +248,28 @@ paths:
                   items:
                     type: array
                     items: { $ref: '#/components/schemas/Budget' }
+    post:
+      tags: [budgets]
+      operationId: createBudget
+      summary: Create an empty budget (owners only), e.g. the first one after setup.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              additionalProperties: false
+              properties:
+                name: { type: string, minLength: 1, maxLength: 100 }
+      responses:
+        '201':
+          description: Budget created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Budget' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
 
   /v1/budgets/{budgetId}/accounts:
     get:
@@ -1309,6 +1367,30 @@ components:
           schema: { $ref: '#/components/schemas/Problem' }
 
   schemas:
+    SetupStatus:
+      type: object
+      required: [needsOwner]
+      additionalProperties: false
+      properties:
+        needsOwner: { type: boolean }
+        actual:
+          type: string
+          enum: [ready, needs-password, needs-login, unsupported, unreachable]
+          description: >
+            Only while needsOwner. ready: the bridge is signed in to Actual. needs-password: a new
+            Actual server, the owner picks its password. needs-login: Actual has a password the
+            bridge doesn't know. unsupported: Actual uses OpenID (set ACTUAL_SESSION_TOKEN).
+            unreachable: nothing answers at ACTUAL_SERVER_URL.
+    SetupClaim:
+      type: object
+      required: [setupCode, displayName, deviceName, platform]
+      additionalProperties: false
+      properties:
+        setupCode: { type: string, minLength: 4, maxLength: 64, description: From the bridge logs or BRIDGE_SETUP_CODE }
+        displayName: { type: string, minLength: 1, maxLength: 80 }
+        deviceName: { type: string, minLength: 1, maxLength: 80 }
+        platform: { type: string, enum: [android, ios, web, other] }
+        actualPassword: { type: string, maxLength: 256, description: Required when actual is needs-password or needs-login }
     Money:
       type: integer
       format: int64

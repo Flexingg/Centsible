@@ -7,6 +7,7 @@ import type { AccountOps } from '../actual/account-ops.js';
 import type { PlanningOps } from '../actual/planning-ops.js';
 import type { ReportOps } from '../actual/report-ops.js';
 import type { JobStore } from '../jobs.js';
+import type { SetupService } from '../setup.js';
 import type { HouseholdStore, Member, Device, Role } from '../auth/store.js';
 import type { BridgeConfig } from '../config.js';
 import { ApiError } from '../errors.js';
@@ -18,6 +19,7 @@ import { transactionRoutes } from './routes/transactions.js';
 import { planningRoutes } from './routes/planning.js';
 import { operationRoutes } from './routes/operations.js';
 import { systemRoutes } from './routes/system.js';
+import { setupRoutes } from './routes/setup.js';
 
 export type Deps = {
   config: BridgeConfig;
@@ -30,6 +32,7 @@ export type Deps = {
   accountOps: AccountOps;
   reports: ReportOps;
   jobs: JobStore;
+  setup: SetupService;
 };
 
 declare module 'fastify' {
@@ -38,7 +41,7 @@ declare module 'fastify' {
   }
 }
 
-const PUBLIC_ROUTES = new Set(['/v1/health', '/v1/auth/pair', '/v1/auth/refresh']);
+const PUBLIC_ROUTES = new Set(['/v1/health', '/v1/auth/pair', '/v1/auth/refresh', '/v1/setup', '/v1/setup/claim']);
 
 export async function buildServer(deps: Deps, opts: { logger?: boolean | object } = {}): Promise<FastifyInstance> {
   const app = Fastify({
@@ -90,6 +93,7 @@ export async function buildServer(deps: Deps, opts: { logger?: boolean | object 
   );
 
   await app.register(systemRoutes(deps));
+  await app.register(setupRoutes(deps));
   await app.register(authRoutes(deps));
   await app.register(householdRoutes(deps));
   await app.register(budgetRoutes(deps));

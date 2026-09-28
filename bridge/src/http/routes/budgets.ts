@@ -40,6 +40,18 @@ export const budgetRoutes =
       return { items: budgets.filter((b) => store.canAccessBudget(member, b.id)) };
     });
 
+    /** First budget for a new household (or another one). Owners only. */
+    app.post<{ Body: { name: string } }>(
+      '/v1/budgets',
+      { schema: { body: { type: 'object', required: ['name'], additionalProperties: false, properties: { name: { type: 'string', minLength: 1, maxLength: 100 } } } } },
+      async (req, reply) => {
+        const { member, device } = requireRole(req, 'owner');
+        const budget = await host.createBudget(req.body.name.trim());
+        store.audit({ memberId: member.id, deviceId: device.id, action: 'budget.created', budgetId: budget.id });
+        return reply.status(201).send(budget);
+      },
+    );
+
     app.get<{ Params: BudgetParams }>('/v1/budgets/:budgetId/accounts', async (req) => {
       requireBudget(deps, req, req.params.budgetId);
       return { items: await ops.accounts(req.params.budgetId) };

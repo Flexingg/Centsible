@@ -15,4 +15,6 @@ tasks.test {
     systemProperty("contract.fixtures", rootProject.file("../contract/fixtures").absolutePath)
     // Set by CI (or by hand) after starting bridge/test/support/e2e-server.ts.
     System.getenv("E2E_PAIRING_URI")?.let { systemProperty("e2e.pairingUri", it) }
+    System.getenv("E2E_SETUP_URL")?.let { systemProperty("e2e.setupUrl", it) }
+    System.getenv("E2E_SETUP_CODE")?.let { systemProperty("e2e.setupCode", it) }
 }

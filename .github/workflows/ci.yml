@@ -93,14 +93,18 @@ jobs:
       - uses: gradle/actions/setup-gradle@v6
       - run: npm ci
         working-directory: bridge
-      - name: Start Actual and the bridge
+      - name: Start Actual and the bridge (an existing household, and a first run)
         working-directory: bridge
         run: |
           nohup npx tsx test/support/e2e-server.ts 8787 > "$RUNNER_TEMP/e2e.out" 2> "$RUNNER_TEMP/e2e.err" &
-          for i in $(seq 1 60); do grep -q pairingUri "$RUNNER_TEMP/e2e.out" && break; sleep 2; done
+          nohup npx tsx test/support/e2e-server.ts 8788 --fresh > "$RUNNER_TEMP/fresh.out" 2> "$RUNNER_TEMP/fresh.err" &
+          for i in $(seq 1 60); do grep -q pairingUri "$RUNNER_TEMP/e2e.out" && grep -q setupCode "$RUNNER_TEMP/fresh.out" && break; sleep 2; done
           if ! grep -q pairingUri "$RUNNER_TEMP/e2e.out"; then cat "$RUNNER_TEMP/e2e.err"; exit 1; fi
+          if ! grep -q setupCode "$RUNNER_TEMP/fresh.out"; then cat "$RUNNER_TEMP/fresh.err"; exit 1; fi
           echo "E2E_PAIRING_URI=$(tail -n 1 "$RUNNER_TEMP/e2e.out" | jq -r .pairingUri)" >> "$GITHUB_ENV"
-      - name: Run the app against it
+          echo "E2E_SETUP_URL=$(tail -n 1 "$RUNNER_TEMP/fresh.out" | jq -r .bridgeUrl)" >> "$GITHUB_ENV"
+          echo "E2E_SETUP_CODE=$(tail -n 1 "$RUNNER_TEMP/fresh.out" | jq -r .setupCode)" >> "$GITHUB_ENV"
+      - name: Run the app against them
         working-directory: android
         run: ./gradlew :core:engine-bridge:test --tests '*EndToEndTest*'
       - uses: actions/upload-artifact@v7

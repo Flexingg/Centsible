@@ -40,3 +40,38 @@ class BridgePairingGateway @Inject constructor(private val api: BridgeApi) : Pai
         )
     }
 }
+
+class BridgeSetupGateway @Inject constructor(private val api: BridgeApi) : app.centsible.core.domain.SetupGateway {
+    override suspend fun status(address: app.centsible.core.model.BridgeAddress): app.centsible.core.model.SetupStatus {
+        val dto = api.setupStatus(address.url, address.cfAccessClientId, address.cfAccessClientSecret)
+        val actual = when (dto.actual) {
+            null, "ready" -> app.centsible.core.model.ActualSetup.Ready
+            "needs-password" -> app.centsible.core.model.ActualSetup.NeedsPassword
+            "needs-login" -> app.centsible.core.model.ActualSetup.NeedsLogin
+            "unsupported" -> app.centsible.core.model.ActualSetup.Unsupported
+            "unreachable" -> app.centsible.core.model.ActualSetup.Unreachable
+            else -> app.centsible.core.model.ActualSetup.Unknown // a newer bridge; let the claim explain
+        }
+        return app.centsible.core.model.SetupStatus(dto.needsOwner, actual)
+    }
+
+    override suspend fun claim(
+        address: app.centsible.core.model.BridgeAddress,
+        setupCode: String,
+        displayName: String,
+        deviceName: String,
+        actualPassword: String?,
+    ): Session {
+        val res = api.claim(address.url, address.cfAccessClientId, address.cfAccessClientSecret,
+            app.centsible.core.network.SetupClaimDto(setupCode.trim(), displayName.trim(), deviceName.trim(), actualPassword = actualPassword))
+        return Session(
+            bridgeUrl = address.url,
+            accessToken = res.accessToken,
+            refreshToken = res.refreshToken,
+            cfAccessClientId = address.cfAccessClientId,
+            cfAccessClientSecret = address.cfAccessClientSecret,
+            member = res.member.toModel(),
+            deviceId = DeviceId(res.device.id),
+        )
+    }
+}

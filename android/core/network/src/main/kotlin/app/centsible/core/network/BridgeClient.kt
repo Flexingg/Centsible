@@ -14,6 +14,7 @@ import io.ktor.client.request.url
 import io.ktor.client.statement.HttpResponse
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
+import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpMethod
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
@@ -84,7 +85,12 @@ class BridgeClient(
         cfId: String?,
         cfSecret: String?,
         configure: HttpRequestBuilder.() -> Unit = {},
-    ): HttpResponse = send(bridgeUrl, method, path, null, cfId, cfSecret, configure).also { ensureSuccess(it) }
+    ): HttpResponse = try {
+        send(bridgeUrl, method, path, null, cfId, cfSecret, configure).also { ensureSuccess(it) }
+    } catch (e: BridgeException.Unauthorized) {
+        // Not signed in yet, so a 401 here means a wrong pairing or setup code, not a lost session.
+        throw BridgeException.Validation(e.message ?: "That code didn't work.")
+    }
 
     suspend inline fun <reified T> get(path: String, noinline configure: HttpRequestBuilder.() -> Unit = {}): T =
         json.decodeFromString(getText(path, configure))
@@ -170,6 +176,12 @@ class BridgeClient(
     }
 
     private suspend fun ensureSuccess(res: HttpResponse) {
+        // Cloudflare Access answers with its login page (after a redirect) or a 403 page
+        // when the service token is missing or wrong. The bridge only ever sends JSON.
+        val html = res.headers[HttpHeaders.ContentType]?.startsWith("text/html") == true
+        if (html && (res.call.request.url.host.endsWith("cloudflareaccess.com") || res.status.value in listOf(200, 401, 403))) {
+            throw BridgeException.AccessBlocked()
+        }
         if (res.status.isSuccess()) return
         val text = runCatching { res.bodyAsText() }.getOrDefault("")
         val problem = runCatching { json.decodeFromString(ProblemDto.serializer(), text) }.getOrNull()
