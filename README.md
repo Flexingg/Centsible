@@ -17,7 +17,7 @@ The **bridge** is a small Node service. It wraps Actual's official API behind a 
 
 ## Run it
 
-1. Copy `deploy/.env.example` to `deploy/.env`. Set `BRIDGE_PUBLIC_URL` and `CLOUDFLARE_TUNNEL_TOKEN`; everything else is optional.
+1. From the [latest release](https://github.com/Flexingg/Centsible/releases/latest), download `docker-compose.yml` and `env.example` into one folder on your server, and rename `env.example` to `.env`. Set `BRIDGE_PUBLIC_URL` and `CLOUDFLARE_TUNNEL_TOKEN`; everything else is optional. (No need to clone this repo: the bridge image is published to `ghcr.io/flexingg/centsible-bridge`.)
 2. In the Cloudflare dashboard, give your tunnel two public hostnames:
    - `actual.example.com` → `http://actual:5006`
    - `budget-api.example.com` → `http://bridge:8787`
@@ -25,7 +25,7 @@ The **bridge** is a small Node service. It wraps Actual's official API behind a 
    Optionally, put the bridge hostname behind Cloudflare Access with a Service Auth token.
 3. Start everything, and note the setup code the bridge prints:
    ```sh
-   cd deploy && docker compose up -d
+   docker compose up -d
    docker compose logs bridge     # "Setup code: ABCD-EFGH"
    ```
 4. Install the app from the [latest release](https://github.com/Flexingg/Centsible/releases/latest) (download the `.apk` on your phone and allow installing from your browser). Enter your bridge's address, and the app walks you through the rest:
@@ -37,6 +37,9 @@ The **bridge** is a small Node service. It wraps Actual's official API behind a 
 The setup code works once, until the first owner exists; knowing the bridge's address isn't enough to claim it. Prefer the command line? `docker compose exec bridge node dist/admin/cli.js add-member --name "Jo" --role owner --pair` still prints an owner invite QR code.
 
 ## Releases
+
+Update the server with `docker compose pull && docker compose up -d`.
+
 
 CI builds a signed APK for every push to `main` that passes the tests, and publishes it as a GitHub release (`v0.2.<build>`). Push a tag like `v0.3.0` to publish a specific version. The version code is the CI run number, so each build installs over the previous one. To get updates automatically, point [Obtainium](https://github.com/ImranR98/Obtainium) at this repo.
 

@@ -1,5 +1,9 @@
 # Actual + bridge behind a Cloudflare Tunnel.
 #
+# Only this file and .env are needed (both are attached to every GitHub release):
+#   docker compose up -d && docker compose logs bridge   # shows the setup code
+# Update with: docker compose pull && docker compose up -d
+#
 # In the Cloudflare Zero Trust dashboard, give the tunnel two public hostnames:
 #   actual.example.com      -> http://actual:5006   (Actual web app, as today)
 #   budget-api.example.com  -> http://bridge:8787   (the Android app talks to this)
@@ -13,7 +17,9 @@ services:
       - ./actual-data:/data
 
   bridge:
-    build: ../bridge
+    # Published by CI for amd64 and arm64. To build from a clone instead, replace this
+    # line with:  build: ../bridge
+    image: ${BRIDGE_IMAGE:-ghcr.io/flexingg/centsible-bridge:latest}
     restart: unless-stopped
     depends_on: [actual]
     env_file: .env

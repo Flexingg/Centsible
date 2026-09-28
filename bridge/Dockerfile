@@ -16,8 +16,10 @@ WORKDIR /app
 COPY --from=build /app/package.json ./
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist
+COPY docker-entrypoint.sh /usr/local/bin/
 VOLUME ["/data"]
 EXPOSE 8787
-USER node
+# Starts as root only to fix /data ownership, then runs as "node" (see the script).
+ENTRYPOINT ["docker-entrypoint.sh"]
 HEALTHCHECK --interval=30s --timeout=5s CMD node -e "fetch('http://127.0.0.1:8787/v1/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 CMD ["node", "dist/main.js"]
