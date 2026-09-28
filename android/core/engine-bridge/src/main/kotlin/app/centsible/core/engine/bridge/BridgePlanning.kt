@@ -83,3 +83,39 @@ class BridgeReports(private val api: PlanningApi) : ReportsGateway {
     override suspend fun spending(budget: BudgetId, start: YearMonth, end: YearMonth) = api.spending(budget.raw, start.raw, end.raw).toModel()
     override suspend fun netWorth(budget: BudgetId, months: Int) = api.netWorth(budget.raw, months).points.map { it.toModel() }
 }
+
+class BridgeBankSync(private val api: PlanningApi, private val onWrite: () -> Unit) : app.centsible.core.domain.BankSyncGateway {
+    override suspend fun overview() = api.bankSyncOverview().toModel()
+    override suspend fun connect(setupToken: String) = api.connectSimpleFin(setupToken.trim()).toModel()
+    override suspend fun disconnect() = api.resetSimpleFin()
+    override suspend fun setSchedule(intervalHours: Int) = api.setSyncSchedule(intervalHours).toModel()
+    override suspend fun externalAccounts(budget: BudgetId, refresh: Boolean) = api.externalAccounts(budget.raw, refresh).map {
+        app.centsible.core.model.ExternalAccount(it.id, it.name, it.institution, Money(it.balance), it.linkedAccountId?.let(::AccountId), it.linkedAccountName)
+    }
+    override suspend fun link(budget: BudgetId, externalId: String, existing: AccountId?, offBudget: Boolean) =
+        AccountId(api.linkSimpleFin(budget.raw, app.centsible.core.network.LinkRequestDto(externalId, existing?.raw, offBudget.takeIf { existing == null })).accountId).also { onWrite() }
+    override suspend fun unlink(budget: BudgetId, account: AccountId) = api.unlink(budget.raw, account.raw).also { onWrite() }
+    override suspend fun settings(budget: BudgetId, account: AccountId) = api.bankSyncSettings(budget.raw, account.raw).toModel()
+    override suspend fun updateSettings(budget: BudgetId, account: AccountId, settings: app.centsible.core.model.BankSyncSettings) =
+        api.updateBankSyncSettings(budget.raw, account.raw, settings.toDto()).toModel()
+}
+
+private fun app.centsible.core.network.BankSyncOverviewDto.toModel() =
+    app.centsible.core.model.BankSyncOverview(simplefin.configured, simplefin.requestsToday, simplefin.dailyQuota, schedule.toModel(), intervals)
+
+private fun app.centsible.core.network.ScheduleStateDto.toModel() = app.centsible.core.model.SyncSchedule(
+    intervalHours, lastRunAt, nextRunAt,
+    lastResult?.let { app.centsible.core.model.SyncRunResult(it.newTransactions, it.accounts, it.errors, it.skipped) },
+)
+
+private fun app.centsible.core.network.FieldMappingDto.toModel() = app.centsible.core.model.FieldMapping(date, payee, notes)
+private fun app.centsible.core.model.FieldMapping.toDto() = app.centsible.core.network.FieldMappingDto(date, payee, notes)
+
+private fun app.centsible.core.network.BankSyncSettingsDto.toModel() = app.centsible.core.model.BankSyncSettings(
+    importTransactions, importPending, importNotes, reimportDeleted, updateDates, mapping.payment.toModel(), mapping.deposit.toModel(),
+)
+
+private fun app.centsible.core.model.BankSyncSettings.toDto() = app.centsible.core.network.BankSyncSettingsDto(
+    importTransactions, importPending, importNotes, reimportDeleted, updateDates,
+    app.centsible.core.network.SyncMappingsDto(payment.toDto(), deposit.toDto()),
+)

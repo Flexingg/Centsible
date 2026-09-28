@@ -60,6 +60,7 @@ import kotlinx.serialization.Serializable
     val accountGroupId: String? = null,
     val syncSource: String? = null,
     val lastSync: String? = null,
+    val bankSyncStatus: String? = null,
 )
 
 @Serializable data class CategoryDto(val id: String, val name: String, val groupId: String, val isIncome: Boolean, val hidden: Boolean)

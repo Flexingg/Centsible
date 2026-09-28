@@ -17,6 +17,7 @@ import { buildServer } from '../../src/http/server.js';
 import { createDeps } from '../../src/deps.js';
 import { SetupService } from '../../src/setup.js';
 import { startActual, startSeededActual } from './actual-server.js';
+import { day, startFakeSimpleFin } from './fake-simplefin.js';
 
 const port = Number(process.argv[2] ?? 8787);
 const fresh = process.argv.includes('--fresh');
@@ -58,7 +59,15 @@ if (fresh) {
 } else {
   const owner = store.createMember({ displayName: 'Jo', role: 'owner' });
   const { code } = store.createPairingCode(owner.id, null);
-  process.stdout.write(`${JSON.stringify({ bridgeUrl: config.publicUrl, pairingUri: pairingUri(config, code), budgetId: actual.budgetId })}\n`);
+  // A stand-in SimpleFIN Bridge for the bank sync steps.
+  const today = new Date().toISOString().slice(0, 10);
+  const simplefin = await startFakeSimpleFin([
+    {
+      id: 'SF-CHK', name: 'Everyday Checking', org: { domain: 'bank.example', name: 'Example Bank' }, balance: '1234.56',
+      transactions: [{ id: 'T1', posted: day(today), amount: '-12.34', description: 'COFFEE SHOP 123', payee: 'Coffee Shop' }],
+    },
+  ]);
+  process.stdout.write(`${JSON.stringify({ bridgeUrl: config.publicUrl, pairingUri: pairingUri(config, code), budgetId: actual.budgetId, simplefinToken: simplefin.setupToken })}\n`);
 }
 
 for (const sig of ['SIGINT', 'SIGTERM'] as const) {

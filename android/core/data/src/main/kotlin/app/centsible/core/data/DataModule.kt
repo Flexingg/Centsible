@@ -78,6 +78,11 @@ abstract class DataModule {
 
         @Provides
         @Singleton
+        fun bankSync(api: PlanningApi, changes: NotifyingBudgetEngine): app.centsible.core.domain.BankSyncGateway =
+            app.centsible.core.engine.bridge.BridgeBankSync(api, changes::notifyChanged)
+
+        @Provides
+        @Singleton
         fun planning(api: PlanningApi, changes: NotifyingBudgetEngine): PlanningGateway = BridgePlanningGateway(api, changes::notifyChanged)
 
         @Provides

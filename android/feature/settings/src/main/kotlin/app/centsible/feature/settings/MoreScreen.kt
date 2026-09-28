@@ -34,6 +34,7 @@ enum class MoreItem(val emoji: String, val title: String, val subtitle: String) 
     Merchants("🏪", "Merchants", "Rename, merge and tidy up"),
     Rules("⚙️", "Rules", "Categorize automatically"),
     Tags("🏷️", "Tags", "#tags from your notes"),
+    BankSync("🏦", "Bank sync", "SimpleFIN accounts and automatic syncing"),
     Settings("👥", "Household & settings", "People, devices and connection"),
 }
 

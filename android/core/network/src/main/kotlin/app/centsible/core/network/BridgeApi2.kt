@@ -57,4 +57,17 @@ class PlanningApi(private val client: BridgeClient) {
     suspend fun spending(budgetId: String, start: String, end: String): SpendingDto =
         client.get("${b(budgetId)}/reports/spending") { parameter("start", start); parameter("end", end) }
     suspend fun netWorth(budgetId: String, months: Int): NetWorthDto = client.get("${b(budgetId)}/reports/net-worth") { parameter("months", months) }
+
+    // ── Bank sync (SimpleFIN) ──
+    suspend fun bankSyncOverview(): BankSyncOverviewDto = client.get("/v1/bank-sync")
+    suspend fun connectSimpleFin(token: String): BankSyncOverviewDto = client.send(HttpMethod.Put, "/v1/bank-sync/simplefin", SetupTokenDto(token))
+    suspend fun resetSimpleFin() { client.execute(HttpMethod.Delete, "/v1/bank-sync/simplefin") }
+    suspend fun setSyncSchedule(hours: Int): ScheduleStateDto = client.send(HttpMethod.Put, "/v1/bank-sync/schedule", ScheduleInputDtoBankSync(hours))
+    suspend fun externalAccounts(budgetId: String, refresh: Boolean): List<ExternalAccountDto> =
+        client.get<ItemsDto<ExternalAccountDto>>("${b(budgetId)}/bank-sync/simplefin/accounts") { parameter("refresh", refresh) }.items
+    suspend fun linkSimpleFin(budgetId: String, body: LinkRequestDto): LinkedDto = client.send(HttpMethod.Post, "${b(budgetId)}/bank-sync/simplefin/link", body)
+    suspend fun unlink(budgetId: String, accountId: String) { client.execute(HttpMethod.Post, "${b(budgetId)}/accounts/$accountId/unlink") }
+    suspend fun bankSyncSettings(budgetId: String, accountId: String): BankSyncSettingsDto = client.get("${b(budgetId)}/accounts/$accountId/bank-sync-settings")
+    suspend fun updateBankSyncSettings(budgetId: String, accountId: String, body: BankSyncSettingsDto): BankSyncSettingsDto =
+        client.send(HttpMethod.Patch, "${b(budgetId)}/accounts/$accountId/bank-sync-settings", body)
 }

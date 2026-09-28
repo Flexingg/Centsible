@@ -128,3 +128,33 @@ import kotlinx.serialization.json.JsonObject
 @Serializable data class SpendingDto(val start: String, val end: String, val total: Long, val categories: List<SpendingCategoryDto>)
 @Serializable data class NetWorthPointDto(val month: String, val assets: Long, val liabilities: Long, val netWorth: Long)
 @Serializable data class NetWorthDto(val points: List<NetWorthPointDto>)
+
+@Serializable data class SimpleFinStatusDto(val configured: Boolean, val requestsToday: Int = 0, val dailyQuota: Int = 24)
+@Serializable data class SyncRunResultDto(val newTransactions: Int = 0, val accounts: Int = 0, val errors: List<String> = emptyList(), val skipped: String? = null)
+@Serializable data class ScheduleStateDto(val intervalHours: Int, val lastRunAt: String? = null, val nextRunAt: String? = null, val lastResult: SyncRunResultDto? = null)
+@Serializable data class BankSyncOverviewDto(val simplefin: SimpleFinStatusDto, val schedule: ScheduleStateDto, val intervals: List<Int> = listOf(0, 2, 4, 6, 12, 24))
+@Serializable data class SetupTokenDto(val setupToken: String)
+@Serializable data class ScheduleInputDtoBankSync(val intervalHours: Int)
+@Serializable data class ExternalAccountDto(
+    val id: String,
+    val name: String,
+    val institution: String? = null,
+    val balance: Long,
+    val currency: String = "USD",
+    val linkedAccountId: String? = null,
+    val linkedAccountName: String? = null,
+)
+@Serializable data class LinkRequestDto(val externalId: String, val accountId: String? = null, val offBudget: Boolean? = null)
+@Serializable data class LinkedDto(val accountId: String)
+@Serializable data class FieldMappingDto(val date: String, val payee: String, val notes: String)
+@Serializable data class SyncMappingsDto(val payment: FieldMappingDto, val deposit: FieldMappingDto)
+@Serializable data class BankSyncSettingsDto(
+    val importTransactions: Boolean,
+    val importPending: Boolean,
+    val importNotes: Boolean,
+    val reimportDeleted: Boolean,
+    val updateDates: Boolean,
+    val mapping: SyncMappingsDto,
+)
+@Serializable data class AccountSyncResultDto(val accountId: String, val name: String, val newTransactions: Int = 0, val matchedTransactions: Int = 0, val error: String? = null, val status: String? = null)
+@Serializable data class SyncSummaryDto(val accounts: Int = 0, val newTransactions: Int = 0, val results: List<AccountSyncResultDto> = emptyList(), val simplefinRequests: Int = 0)

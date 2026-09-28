@@ -200,6 +200,34 @@ class EndToEndTest {
         step("spending") { reports.spending(budget, start, month) }
         step("net worth") { reports.netWorth(budget, 6) }
 
+        // Bank sync with SimpleFIN (a stand-in SimpleFIN Bridge on the test server).
+        System.getProperty("e2e.simplefinToken")?.let { token ->
+            val bankSync = BridgeBankSync(planningApi) {}
+            step("bank sync overview") { bankSync.overview() }?.let { check("starts disconnected", !it.simplefinConfigured) { "$it" } }
+            step("connect SimpleFIN") { bankSync.connect(token) }?.let { check("connected", it.simplefinConfigured && it.requestsToday >= 1) { "$it" } }
+            val external = step("list SimpleFIN accounts") { bankSync.externalAccounts(budget) }.orEmpty()
+            check("SimpleFIN account listed", external.singleOrNull()?.name == "Everyday Checking") { "$external" }
+            val linkedId = external.firstOrNull()?.let { e -> step("link SimpleFIN account") { bankSync.link(budget, e.id, existing = null, offBudget = false) } }
+            if (linkedId != null) {
+                step("linked account shows up") { engine.accounts(budget).single { it.id == linkedId } }
+                    ?.let { check("linked to SimpleFIN", it.syncSource == "simpleFin" && it.balance == Money(123456)) { "$it" } }
+                val settings = step("sync options") { bankSync.settings(budget, linkedId) }
+                settings?.let { s -> step("change sync options") { bankSync.updateSettings(budget, linkedId, s.copy(importPending = false)) } }
+                    ?.let { check("options saved", !it.importPending) { "$it" } }
+                val job = step("sync all") { accounts.startBankSync(budget, null) }
+                job?.let { j ->
+                    var current = j
+                    repeat(40) { if (current.status == JobStatus.Running) { delay(500); current = accounts.job(j.id) } }
+                    check("sync all finished", current.status == JobStatus.Succeeded && current.results.any { it.accountId == linkedId && it.error == null }) { "$current" }
+                }
+                step("background schedule") { bankSync.setSchedule(6) }?.let { check("schedule set", it.intervalHours == 6 && it.nextRunAt != null) { "$it" } }
+                step("schedule off") { bankSync.setSchedule(0) }
+                step("unlink") { bankSync.unlink(budget, linkedId) }
+                step("unlinked") { engine.accounts(budget).single { it.id == linkedId } }?.let { check("no longer synced", it.syncSource == null) { "$it" } }
+            }
+            step("disconnect SimpleFIN") { bankSync.disconnect() }
+        }
+
         // Household.
         step("members") { household.members() }
         val sam = step("add member") { household.addMember("Sam", Role.Member, listOf(budget)) }

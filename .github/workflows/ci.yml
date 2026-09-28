@@ -102,6 +102,7 @@ jobs:
           if ! grep -q pairingUri "$RUNNER_TEMP/e2e.out"; then cat "$RUNNER_TEMP/e2e.err"; exit 1; fi
           if ! grep -q setupCode "$RUNNER_TEMP/fresh.out"; then cat "$RUNNER_TEMP/fresh.err"; exit 1; fi
           echo "E2E_PAIRING_URI=$(tail -n 1 "$RUNNER_TEMP/e2e.out" | jq -r .pairingUri)" >> "$GITHUB_ENV"
+          echo "E2E_SIMPLEFIN_TOKEN=$(tail -n 1 "$RUNNER_TEMP/e2e.out" | jq -r .simplefinToken)" >> "$GITHUB_ENV"
           echo "E2E_SETUP_URL=$(tail -n 1 "$RUNNER_TEMP/fresh.out" | jq -r .bridgeUrl)" >> "$GITHUB_ENV"
           echo "E2E_SETUP_CODE=$(tail -n 1 "$RUNNER_TEMP/fresh.out" | jq -r .setupCode)" >> "$GITHUB_ENV"
       - name: Run the app against them

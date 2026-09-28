@@ -158,6 +158,9 @@ fun AccountDetailScreen(
                                     style = MaterialTheme.typography.bodySmall,
                                     color = colors.textTertiary,
                                 )
+                                app.centsible.core.model.BankSyncStatus.describe(d.account.bankSyncStatus)?.let {
+                                    Text("⚠ $it", style = MaterialTheme.typography.bodySmall, color = colors.warning)
+                                }
                             }
                         }
                     }

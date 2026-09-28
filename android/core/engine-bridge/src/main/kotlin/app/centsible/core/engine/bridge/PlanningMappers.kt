@@ -180,6 +180,12 @@ internal fun JobDto.toModel() = Job(
     },
     error = error,
     newTransactions = ((result as? JsonObject)?.get("newTransactions") as? JsonPrimitive)?.contentOrNull?.toIntOrNull(),
+    // A bank-sync job's per-account outcome (older bridges only sent the totals).
+    results = runCatching {
+        app.centsible.core.network.BridgeJson.decodeFromJsonElement(app.centsible.core.network.SyncSummaryDto.serializer(), result!!).results.map {
+            app.centsible.core.model.AccountSyncResult(AccountId(it.accountId), it.name, it.newTransactions, it.error, it.status)
+        }
+    }.getOrDefault(emptyList()),
 )
 
 internal fun CsvMappingDto.toModel() = CsvMapping(date, payee, amount, inflow, outflow, notes)

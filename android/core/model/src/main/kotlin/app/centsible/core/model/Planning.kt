@@ -94,7 +94,7 @@ data class Tag(val id: String, val tag: String, val color: String?, val descript
 
 enum class JobStatus { Running, Succeeded, Failed, Unknown }
 
-data class Job(val id: String, val status: JobStatus, val error: String?, val newTransactions: Int?)
+data class Job(val id: String, val status: JobStatus, val error: String?, val newTransactions: Int?, val results: List<AccountSyncResult> = emptyList())
 
 data class CsvMapping(
     val date: String? = null,

@@ -11,6 +11,8 @@ data class Account(
     /** Bank sync provider once the account is linked in Actual (null = manual). */
     val syncSource: String? = null,
     val lastSync: String? = null,
+    /** Actual's result of the last bank sync (ok, reauth-required, ...). */
+    val bankSyncStatus: String? = null,
 )
 
 data class Category(

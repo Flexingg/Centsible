@@ -110,6 +110,12 @@ class RequestContractTest {
         call { planning.previewImport(b, "acc", file) }
         call { planning.importFile(b, "acc", file) }
         call { planning.reconcile(b, "acc", ReconcileRequestDto(-58234, createAdjustment = true)) }
+        call { planning.connectSimpleFin("aHR0cHM6Ly9icmlkZ2Uuc2ltcGxlZmluLm9yZy9jbGFpbS9kZW1v") }
+        call { planning.setSyncSchedule(6) }
+        call { planning.linkSimpleFin(b, LinkRequestDto("SF-CHK", offBudget = false)) }
+        call { planning.linkSimpleFin(b, LinkRequestDto("SF-CARD", accountId = "acc")) }
+        val mapping = FieldMappingDto("postedDate", "notes", "payeeName")
+        call { planning.updateBankSyncSettings(b, "acc", BankSyncSettingsDto(true, false, true, true, false, SyncMappingsDto(mapping, mapping))) }
 
         val withBodies = sent.filter { it.body != null }
         assertTrue("expected every write to be captured, got ${withBodies.size}", withBodies.size >= 30)

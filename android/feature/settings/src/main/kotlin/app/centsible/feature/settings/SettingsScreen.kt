@@ -52,7 +52,7 @@ import app.centsible.core.model.PairingInvite
 import app.centsible.core.model.Role
 
 @Composable
-fun SettingsRoute(viewModel: SettingsViewModel = hiltViewModel()) {
+fun SettingsRoute(onOpenBankSync: () -> Unit = {}, viewModel: SettingsViewModel = hiltViewModel()) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val context = androidx.compose.ui.platform.LocalContext.current
     val notificationPermission = androidx.activity.compose.rememberLauncherForActivityResult(
@@ -79,6 +79,7 @@ fun SettingsRoute(viewModel: SettingsViewModel = hiltViewModel()) {
             setAppLock = viewModel::setAppLock,
             setReminders = { on -> if (on) askNotifications() else viewModel.setReminders(false) },
             setReminderDays = viewModel::setReminderDays,
+            openBankSync = onOpenBankSync,
         ),
         deviceSecure = run {
             val context = androidx.compose.ui.platform.LocalContext.current
@@ -100,6 +101,7 @@ data class SettingsActions(
     val setAppLock: (Boolean) -> Unit = {},
     val setReminders: (Boolean) -> Unit = {},
     val setReminderDays: (Int) -> Unit = {},
+    val openBankSync: () -> Unit = {},
 )
 
 @Composable
@@ -154,6 +156,15 @@ fun SettingsScreen(state: SettingsUiState, actions: SettingsActions, renderQr: B
                                     if (dev.id != d.me.device.id && isOwner) TextButton(onClick = { actions.revokeDevice(dev.id) }) { Text("Remove") }
                                 }
                             }
+                        }
+                    }
+                    item {
+                        SectionCard("Bank sync", action = "Open", onAction = actions.openBankSync) {
+                            Text(
+                                "Link bank accounts with SimpleFIN, choose how they import, and sync them automatically.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = colors.textSecondary,
+                            )
                         }
                     }
                     item {

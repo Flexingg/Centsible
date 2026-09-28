@@ -413,6 +413,14 @@ Performance, measured with `npm run bench` (12,000 transactions over 24 months, 
 
 The one-time download happens in the background right after the bridge connects, so phones don't wait for it. Lists load 50 at a time as you scroll.
 
+Bank sync (SimpleFIN), verified against Actual 26.9.0 with a stand-in SimpleFIN Bridge that speaks the real protocol:
+- A setup token is base64 of a claim URL. Actual's server claims it on the first account listing and keeps the access URL as the `simplefin_accessKey` secret; a used token answers 403. The bridge claims right away on connect, so a bad token fails there.
+- The bridge calls Actual's own handlers: `simplefin-accounts`, `simplefin-accounts-link` (new account, or `upgradingId` to keep an existing account's history), `account-unlink`, `simplefin-batch-sync` (all SimpleFIN accounts in one request, like Actual's "Sync all") and `accounts-bank-sync`.
+- Per-account options are Actual's synced preferences: `sync-import-transactions/pending/notes/reimport-deleted/update-dates-<id>` and `custom-sync-mappings-<id>`.
+- Actual records each account's outcome in `accounts.bank_sync_status` (ok, reauth-required, attention-required, rate-limit-exceeded, timed-out, account-missing, failed); the app explains it.
+- SimpleFIN Bridge asks for 24 or fewer requests a day and refreshes data about daily. The bridge logs every request; background sync (every 2 to 24 hours, owner setting) skips runs within 4 of the limit.
+- Actual's SimpleFIN import requires a payee: a transaction without one fails the sync. Mapping payee to the description works around it.
+
 First-run setup, verified against Actual 26.9.0:
 - A new Actual server reports `bootstrapped: false` at `GET /account/needs-bootstrap`; `POST /account/bootstrap {password}` sets the first password and returns `already-bootstrapped` afterwards. `POST /account/login` answers `invalid-password` for a wrong one.
 - The bridge only accepts a claim with the one-time setup code, because its URL is public. The Actual password entered in the app is kept in `bridge-data/actual-password` (mode 600) and read on restart, so `ACTUAL_PASSWORD` is optional.

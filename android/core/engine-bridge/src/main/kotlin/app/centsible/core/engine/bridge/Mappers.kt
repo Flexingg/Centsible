@@ -81,7 +81,7 @@ internal fun Role.wire() = when (this) {
 internal fun MemberDto.toModel() = Member(MemberId(id), displayName, role.toRole(), disabled, budgetIds.map(::BudgetId))
 internal fun DeviceDto.toModel() = Device(DeviceId(id), name, platform, lastSeenAt)
 internal fun BudgetDto.toModel() = Budget(BudgetId(id), name, encrypted)
-internal fun AccountDto.toModel() = Account(AccountId(id), name, offBudget, closed, Money(balance), syncSource, lastSync)
+internal fun AccountDto.toModel() = Account(AccountId(id), name, offBudget, closed, Money(balance), syncSource, lastSync, bankSyncStatus)
 internal fun PayeeDto.toModel() = Payee(PayeeId(id), name, transferAccountId?.let(::AccountId))
 
 internal fun CategoryGroupDto.toModel() = CategoryGroup(

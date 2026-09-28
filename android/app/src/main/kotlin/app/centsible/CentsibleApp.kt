@@ -77,6 +77,7 @@ private object Routes {
     const val CATEGORIES = "budget/categories"
     const val SETTINGS = "settings"
     const val RECURRING = "recurring"
+    const val BANK_SYNC = "bank-sync"
     const val REPORTS = "reports"
     const val MERCHANTS = "merchants"
     const val RULES = "rules"
@@ -163,12 +164,14 @@ private fun MainScaffold(
                             MoreItem.Merchants -> Routes.MERCHANTS
                             MoreItem.Rules -> Routes.RULES
                             MoreItem.Tags -> Routes.TAGS
+                            MoreItem.BankSync -> Routes.BANK_SYNC
                             MoreItem.Settings -> Routes.SETTINGS
                         },
                     )
                 })
             }
-            composable(Routes.SETTINGS) { SettingsRoute() }
+            composable(Routes.SETTINGS) { SettingsRoute(onOpenBankSync = { nav.navigate(Routes.BANK_SYNC) }) }
+            composable(Routes.BANK_SYNC) { app.centsible.feature.settings.BankSyncRoute(onBack = { nav.popBackStack() }) }
             composable(Routes.RECURRING) { RecurringRoute(onBack = { nav.popBackStack() }) }
             composable(Routes.REPORTS) { ReportsRoute(onBack = { nav.popBackStack() }) }
             composable(Routes.MERCHANTS) { MerchantsRoute(onBack = { nav.popBackStack() }) }
