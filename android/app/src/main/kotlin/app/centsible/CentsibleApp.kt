@@ -1,5 +1,16 @@
 package app.centsible
 
+import androidx.compose.animation.AnimatedContentTransitionScope
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.ui.unit.IntOffset
+import androidx.navigation.NavBackStackEntry
 import app.centsible.core.domain.userMessage
 import kotlinx.coroutines.launch
 import androidx.compose.foundation.background
@@ -165,7 +176,45 @@ private fun MainScaffold(
             }
         } else null,
     ) { padding ->
-        NavHost(nav, startDestination = Tab.Dashboard.route, modifier = Modifier.padding(padding)) {
+        // Tabs fade through each other; drilling in slides along the shared X axis (and back out on pop).
+        val reduced = app.centsible.core.designsystem.motion.reducedMotion
+        val tabRoutes = androidx.compose.runtime.remember { Tab.entries.map { it.route }.toSet() }
+        fun AnimatedContentTransitionScope<NavBackStackEntry>.tabSwitch() =
+            initialState.destination.route in tabRoutes && targetState.destination.route in tabRoutes
+        val axis = tween<IntOffset>(320, easing = app.centsible.core.designsystem.motion.Motion.Dial)
+        NavHost(
+            nav,
+            startDestination = Tab.Dashboard.route,
+            modifier = Modifier.padding(padding),
+            enterTransition = {
+                when {
+                    reduced -> EnterTransition.None
+                    tabSwitch() -> fadeIn(tween(220, delayMillis = 90)) + scaleIn(tween(220, delayMillis = 90), initialScale = 0.97f)
+                    else -> slideInHorizontally(axis) { it / 8 } + fadeIn(tween(260, delayMillis = 40))
+                }
+            },
+            exitTransition = {
+                when {
+                    reduced -> ExitTransition.None
+                    tabSwitch() -> fadeOut(tween(90))
+                    else -> slideOutHorizontally(axis) { -it / 8 } + fadeOut(tween(160))
+                }
+            },
+            popEnterTransition = {
+                when {
+                    reduced -> EnterTransition.None
+                    tabSwitch() -> fadeIn(tween(220, delayMillis = 90))
+                    else -> slideInHorizontally(axis) { -it / 8 } + fadeIn(tween(260, delayMillis = 40))
+                }
+            },
+            popExitTransition = {
+                when {
+                    reduced -> ExitTransition.None
+                    tabSwitch() -> fadeOut(tween(90))
+                    else -> slideOutHorizontally(axis) { it / 8 } + fadeOut(tween(160))
+                }
+            },
+        ) {
             composable(Tab.Dashboard.route) { DashboardRoute(onNavigate = { nav.go(it) }) }
             composable(Tab.Accounts.route) { AccountsRoute(onOpenAccount = { nav.navigate(Routes.account(it)) }) }
             composable(Tab.Transactions.route) { TransactionsRoute(onOpen = { nav.navigate(Routes.transaction(it)) }) }

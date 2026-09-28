@@ -1,5 +1,6 @@
 package app.centsible.feature.planning
 
+import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -199,11 +200,11 @@ private fun ForecastSummary(f: Forecast) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Column {
                 StatLabel("Today")
-                MoneyText(f.startingBalance, style = MaterialTheme.typography.titleLarge, showCents = false)
+                MoneyText(f.startingBalance, style = MaterialTheme.typography.titleLarge, showCents = false, animate = true)
             }
             Column(horizontalAlignment = Alignment.End) {
                 StatLabel("Lowest")
-                MoneyText(f.lowest.balance, style = MaterialTheme.typography.titleLarge, showCents = false, color = if (f.lowest.balance.isNegative) colors.negative else colors.textPrimary)
+                MoneyText(f.lowest.balance, style = MaterialTheme.typography.titleLarge, showCents = false, color = if (f.lowest.balance.isNegative) colors.negative else colors.textPrimary, animate = true)
                 Text(shortDate(f.lowest.date), style = MaterialTheme.typography.bodySmall, color = colors.textSecondary)
             }
         }
@@ -238,6 +239,7 @@ private fun ForecastChart(f: Forecast, selected: Int?, onSelect: (Int?) -> Unit)
     val lo = minV - pad
     val hi = maxV + pad
     val description = "Projected balance from ${MoneyFormat.format(f.startingBalance)} today to ${MoneyFormat.format(f.days.last().balance)} on ${shortDate(f.days.last().date)}, lowest ${MoneyFormat.format(f.lowest.balance)} on ${shortDate(f.lowest.date)}"
+    val trace = app.centsible.core.designsystem.motion.rememberEntrance(key = values, durationMillis = app.centsible.core.designsystem.motion.Motion.LONG, easing = app.centsible.core.designsystem.motion.Motion.Dial)
     fun indexAt(x: Float, width: Float, left: Float) = (((x - left) / ((width - 2 * left) / values.lastIndex))).let { kotlin.math.round(it).toInt() }.coerceIn(0, values.lastIndex)
     Canvas(
         Modifier.fillMaxWidth().height(180.dp)
@@ -263,8 +265,11 @@ private fun ForecastChart(f: Forecast, selected: Int?, onSelect: (Int?) -> Unit)
             lineTo(pt(0).x, bottom)
             close()
         }
-        drawPath(area, colors.series1.copy(alpha = 0.10f))
-        drawPath(line, colors.series1, style = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round))
+        clipRect(right = left + (right - left) * trace + 4.dp.toPx()) {
+            drawPath(area, colors.series1.copy(alpha = 0.10f))
+            drawPath(line, colors.series1, style = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round))
+        }
+        if (trace < 1f) return@Canvas
         val low = pt(lowIndex)
         drawCircle(colors.card, radius = 6.dp.toPx(), center = low)
         drawCircle(if (f.lowest.balance.isNegative) colors.negative else colors.warning, radius = 4.dp.toPx(), center = low)

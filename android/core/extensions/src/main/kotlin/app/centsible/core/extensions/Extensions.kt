@@ -46,6 +46,8 @@ data class DashboardContext(
     val recentTransactions: List<Transaction>,
     val categoryNames: Map<String, String>,
     val navigate: (Destination) -> Unit,
+    /** Today, for anything paced through the month (injectable for tests). */
+    val today: java.time.LocalDate = java.time.LocalDate.now(),
 )
 
 /** Places a widget (or any screen) may send the person. */

@@ -1,6 +1,5 @@
 package app.centsible.core.designsystem.component
 
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -29,7 +28,15 @@ fun BudgetProgressBar(
     color: Color? = null,
 ) {
     val colors = CentsibleTheme.colors
-    val animated by animateFloatAsState(progress.coerceIn(0f, 1f), label = "progress")
+    // Fills from empty when it first appears, with the brand's springy overshoot; later changes glide.
+    val reduced = app.centsible.core.designsystem.motion.reducedMotion
+    val fillAnim = androidx.compose.runtime.remember { androidx.compose.animation.core.Animatable(if (reduced) progress.coerceIn(0f, 1f) else 0f) }
+    androidx.compose.runtime.LaunchedEffect(progress) {
+        val target = progress.coerceIn(0f, 1f)
+        if (reduced) fillAnim.snapTo(target)
+        else fillAnim.animateTo(target, androidx.compose.animation.core.tween(app.centsible.core.designsystem.motion.Motion.LONG, easing = app.centsible.core.designsystem.motion.Motion.Spring))
+    }
+    val animated = fillAnim.value.coerceIn(0f, 1f)
     val fill = color ?: when {
         overspent -> colors.negative
         // Nearly used up is worth a glance; exactly used up (a paid bill) is fine.

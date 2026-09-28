@@ -19,7 +19,6 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -84,7 +83,7 @@ internal fun ImportSheet(imp: PendingImport, actions: AccountActions) {
             val p = imp.preview
             if (imp.loading && p == null) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    CircularProgressIndicator(Modifier.height(20.dp))
+                    app.centsible.core.designsystem.component.DialSpinner(size = 20.dp)
                     Text("  Reading file…")
                 }
             }
@@ -173,7 +172,7 @@ internal fun ReconcileDialog(state: ReconcileState, actions: AccountActions) {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 val status = state.status
                 if (status == null) {
-                    CircularProgressIndicator()
+                    app.centsible.core.designsystem.component.DialSpinner()
                 } else if (result == null) {
                     Text("Cleared balance in Actual: ${MoneyFormat.format(status.cleared)}", style = MaterialTheme.typography.bodyMedium)
                     OutlinedTextField(

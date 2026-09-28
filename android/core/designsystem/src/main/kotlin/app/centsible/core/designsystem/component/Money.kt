@@ -57,9 +57,16 @@ fun MoneyText(
     signed: Boolean = false,
     fontWeight: FontWeight? = null,
     color: Color = Color.Unspecified,
+    /**
+     * Hero numbers count up from zero when first shown, then roll to each new value,
+     * glowing green (up) or red (down) for a moment.
+     */
+    animate: Boolean = false,
 ) {
     val colors = CentsibleTheme.colors
-    val resolved = when {
+    val shown = if (animate) Money(app.centsible.core.designsystem.motion.animateMinorUnits(amount.minor)) else amount
+    val glow = if (animate) changeGlow(amount.minor) else 0f to 0
+    val base = when {
         color != Color.Unspecified -> color
         tone == MoneyTone.Positive -> colors.positive
         tone == MoneyTone.Negative -> colors.negative
@@ -67,12 +74,36 @@ fun MoneyText(
         tone == MoneyTone.Signed && amount.minor < 0 -> colors.textPrimary
         else -> Color.Unspecified
     }
+    val resolved = if (glow.first > 0f) {
+        val tint = if (glow.second > 0) colors.positive else colors.negative
+        androidx.compose.ui.graphics.lerp(if (base == Color.Unspecified) androidx.compose.material3.LocalContentColor.current else base, tint, glow.first)
+    } else {
+        base
+    }
     Text(
-        text = MoneyFormat.format(amount, showCents = showCents, signed = signed),
+        text = MoneyFormat.format(shown, showCents = showCents, signed = signed),
         modifier = modifier,
         style = style.copy(fontFeatureSettings = "tnum"),
         color = resolved,
         fontWeight = fontWeight,
         maxLines = 1,
     )
+}
+
+/** A brief tint after the value changes (not on first show): (strength 0..1, direction). */
+@Composable
+private fun changeGlow(value: Long): Pair<Float, Int> {
+    val reduced = app.centsible.core.designsystem.motion.reducedMotion
+    val previous = androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf<Long?>(null) }
+    val strength = androidx.compose.runtime.remember { androidx.compose.animation.core.Animatable(0f) }
+    val direction = androidx.compose.runtime.remember { androidx.compose.runtime.mutableIntStateOf(0) }
+    androidx.compose.runtime.LaunchedEffect(value) {
+        val before = previous.value
+        previous.value = value
+        if (before == null || before == value || reduced) return@LaunchedEffect
+        direction.intValue = if (value > before) 1 else -1
+        strength.snapTo(0.9f)
+        strength.animateTo(0f, androidx.compose.animation.core.tween(1200, easing = app.centsible.core.designsystem.motion.Motion.EaseOut))
+    }
+    return strength.value to direction.intValue
 }

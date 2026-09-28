@@ -1,5 +1,6 @@
 package app.centsible.core.designsystem.component
 
+import app.centsible.core.designsystem.motion.bounceOnSelect
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -63,7 +64,7 @@ fun AdaptiveNavScaffold(
                             NavigationBarItem(
                                 selected = t.key == selected,
                                 onClick = { onSelect(t.key) },
-                                icon = { Icon(t.icon, contentDescription = null) },
+                                icon = { Icon(t.icon, contentDescription = null, modifier = Modifier.bounceOnSelect(t.key == selected)) },
                                 label = { Text(t.label) },
                                 colors = NavigationBarItemDefaults.colors(
                                     selectedIconColor = colors.accent,
@@ -88,7 +89,7 @@ fun AdaptiveNavScaffold(
                     NavigationRailItem(
                         selected = t.key == selected,
                         onClick = { onSelect(t.key) },
-                        icon = { Icon(t.icon, contentDescription = null) },
+                        icon = { Icon(t.icon, contentDescription = null, modifier = Modifier.bounceOnSelect(t.key == selected)) },
                         label = { Text(t.label) },
                         colors = NavigationRailItemDefaults.colors(
                             selectedIconColor = colors.accent,

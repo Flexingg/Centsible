@@ -38,7 +38,10 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.centsible.core.designsystem.component.MoneyFormat
+import app.centsible.core.designsystem.motion.Motion
+import app.centsible.core.designsystem.motion.rememberEntrance
 import app.centsible.core.designsystem.theme.CentsibleTheme
+import androidx.compose.ui.graphics.drawscope.clipRect
 import app.centsible.core.model.Money
 import kotlin.math.log10
 import kotlin.math.max
@@ -88,6 +91,8 @@ internal fun PairedColumnChart(
     val measurer = rememberTextMeasurer()
     val axisStyle = TextStyle(fontSize = 11.sp, color = colors.textTertiary, fontFeatureSettings = "tnum")
     val maxValue = niceCeiling(max(a.maxOrNull() ?: 0, b.maxOrNull() ?: 0).toDouble())
+    // Columns grow from the baseline, each period a beat after the one before.
+    val grow = rememberEntrance(key = a to b, durationMillis = Motion.LONG + Motion.STAGGER * labels.size, easing = androidx.compose.animation.core.LinearEasing)
     Canvas(
         modifier
             .fillMaxWidth()
@@ -120,8 +125,11 @@ internal fun PairedColumnChart(
             if (selected == i) {
                 drawRect(colors.cardMuted, Offset(left + band * i, top), Size(band, plotH))
             }
+            val total = (Motion.LONG + Motion.STAGGER * labels.size).toFloat()
+            val t = ((grow * total - Motion.STAGGER * i) / Motion.LONG).coerceIn(0f, 1f)
+            val g = Motion.Spring.transform(t)
             listOf(a[i] to colors.series1, b[i] to colors.series2).forEachIndexed { k, (v, c) ->
-                val h = (plotH * (v / maxValue)).toFloat().coerceAtLeast(0f)
+                val h = (plotH * (v / maxValue)).toFloat().coerceAtLeast(0f) * g
                 val x = if (k == 0) center - gap / 2 - bar else center + gap / 2
                 drawColumn(x, bottom, bar, h, c)
             }
@@ -155,6 +163,8 @@ internal fun LineChart(
         val step = (width - left) / (values.size - 1).coerceAtLeast(1)
         onSelect(((x - left) / step).let { kotlin.math.round(it).toInt() }.coerceIn(0, values.lastIndex))
     }
+    // The line traces itself left to right.
+    val trace = rememberEntrance(key = values, durationMillis = Motion.LONG, easing = Motion.Dial)
     Canvas(
         modifier
             .fillMaxWidth()
@@ -177,8 +187,11 @@ internal fun LineChart(
             lineTo(pt(0).x, bottom)
             close()
         }
-        drawPath(area, colors.series1.copy(alpha = 0.10f))
-        drawPath(line, colors.series1, style = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round))
+        clipRect(right = left + (right - left) * trace + 4.dp.toPx()) {
+            drawPath(area, colors.series1.copy(alpha = 0.10f))
+            drawPath(line, colors.series1, style = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round))
+        }
+        if (trace < 1f) return@Canvas
         val focus = selected ?: values.lastIndex
         val p = pt(focus)
         if (selected != null) drawLine(colors.border, Offset(p.x, top), Offset(p.x, bottom), strokeWidth = 1.dp.toPx())

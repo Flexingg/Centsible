@@ -1,5 +1,6 @@
 package app.centsible.feature.reports
 
+import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -143,7 +144,7 @@ fun NetWorthScreen(state: NetWorthUiState, onBack: () -> Unit = {}, onRange: (In
                     item {
                         CentsibleCard(contentPadding = PaddingValues(20.dp)) {
                             StatLabel(if (state.selected == null) "Net worth" else monthLabel(point.month))
-                            MoneyText(point.netWorth, style = MaterialTheme.typography.displaySmall)
+                            MoneyText(point.netWorth, style = MaterialTheme.typography.displaySmall, animate = true)
                             val first = nw.points.first().netWorth
                             val prev = nw.points.getOrNull(index - 1)?.netWorth
                             Row(horizontalArrangement = Arrangement.spacedBy(16.dp), modifier = Modifier.padding(top = 4.dp)) {
@@ -249,6 +250,7 @@ private fun AccountGroup(title: String, accounts: List<NetWorthAccount>, index: 
 private fun Sparkline(values: List<Money>, modifier: Modifier) {
     val color = CentsibleTheme.colors.series1
     if (values.size < 2) return
+    val trace = app.centsible.core.designsystem.motion.rememberEntrance(durationMillis = app.centsible.core.designsystem.motion.Motion.LONG, easing = app.centsible.core.designsystem.motion.Motion.Dial)
     Canvas(modifier) {
         val lo = values.minOf { it.minor }.toFloat()
         val hi = values.maxOf { it.minor }.toFloat()
@@ -259,6 +261,8 @@ private fun Sparkline(values: List<Money>, modifier: Modifier) {
             val p = Offset(step * i, size.height - (v.minor - lo) / span * size.height)
             if (i == 0) path.moveTo(p.x, p.y) else path.lineTo(p.x, p.y)
         }
-        drawPath(path, color, style = Stroke(1.5.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round))
+        clipRect(right = size.width * trace + 2.dp.toPx()) {
+            drawPath(path, color, style = Stroke(1.5.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round))
+        }
     }
 }

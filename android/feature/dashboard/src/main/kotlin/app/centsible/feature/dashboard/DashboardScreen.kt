@@ -26,11 +26,12 @@ import java.time.LocalTime
 @Composable
 fun DashboardRoute(onNavigate: (Destination) -> Unit, viewModel: DashboardViewModel = hiltViewModel()) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    DashboardScreen(state, onNavigate, onRetry = { viewModel.refresh() })
+    DashboardScreen(state, onNavigate, onRetry = { viewModel.refresh() }, onRefresh = viewModel::pullToRefresh)
 }
 
 @Composable
-fun DashboardScreen(state: DashboardUiState, onNavigate: (Destination) -> Unit, onRetry: () -> Unit, now: LocalTime = LocalTime.now()) {
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+fun DashboardScreen(state: DashboardUiState, onNavigate: (Destination) -> Unit, onRetry: () -> Unit, now: LocalTime = LocalTime.now(), onRefresh: () -> Unit = onRetry) {
     val colors = CentsibleTheme.colors
     Column(Modifier.fillMaxSize().background(colors.canvas)) {
         val greeting = when (now.hour) { in 5..11 -> "Good morning"; in 12..17 -> "Good afternoon"; else -> "Good evening" }
@@ -44,11 +45,21 @@ fun DashboardScreen(state: DashboardUiState, onNavigate: (Destination) -> Unit, 
             is Loadable.Failed -> MessageState("Couldn't reach your budget", data.message, emoji = "🔌", actionLabel = "Try again", onAction = onRetry)
             is Loadable.Ready -> {
                 val context = data.value.copy(navigate = onNavigate)
-                LazyColumn(
-                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 96.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                val pull = androidx.compose.material3.pulltorefresh.rememberPullToRefreshState()
+                androidx.compose.material3.pulltorefresh.PullToRefreshBox(
+                    isRefreshing = state.refreshing,
+                    onRefresh = onRefresh,
+                    state = pull,
+                    indicator = {
+                        app.centsible.core.designsystem.component.DialPullIndicator(pull, state.refreshing, Modifier.align(androidx.compose.ui.Alignment.TopCenter))
+                    },
                 ) {
-                    items(state.widgets, key = { it.id }) { it.Content(context) }
+                    LazyColumn(
+                        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 96.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        items(state.widgets, key = { it.id }) { it.Content(context) }
+                    }
                 }
             }
         }

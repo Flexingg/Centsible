@@ -40,7 +40,13 @@ val CentsibleTypography = Typography(
 val MoneyStyle = TextStyle(fontFeatureSettings = TABULAR)
 
 @Composable
-fun CentsibleTheme(darkTheme: Boolean = isSystemInDarkTheme(), content: @Composable () -> Unit) {
+fun CentsibleTheme(
+    darkTheme: Boolean = isSystemInDarkTheme(),
+    /** null: follow "Remove animations" in the phone's accessibility settings. */
+    reducedMotion: Boolean? = null,
+    content: @Composable () -> Unit,
+) {
+    val reduced = reducedMotion ?: app.centsible.core.designsystem.motion.rememberReducedMotionSetting()
     val colors = if (darkTheme) DarkCentsibleColors else LightCentsibleColors
     val scheme = if (darkTheme) {
         darkColorScheme(
@@ -81,7 +87,7 @@ fun CentsibleTheme(darkTheme: Boolean = isSystemInDarkTheme(), content: @Composa
             error = colors.negative,
         )
     }
-    CompositionLocalProvider(LocalCentsibleColors provides colors) {
+    CompositionLocalProvider(LocalCentsibleColors provides colors, app.centsible.core.designsystem.motion.LocalReducedMotion provides reduced) {
         MaterialTheme(colorScheme = scheme, typography = CentsibleTypography, content = content)
     }
 }

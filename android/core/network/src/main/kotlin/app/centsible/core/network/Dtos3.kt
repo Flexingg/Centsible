@@ -72,4 +72,7 @@ import kotlinx.serialization.Serializable
     val events: List<ForecastEventDto> = emptyList(),
     val days: List<ForecastDayDto> = emptyList(),
     val lowest: ForecastLowDto,
+    /** Older bridges don't send it. */
+    val paid: List<PaidBillDto> = emptyList(),
 )
+@Serializable data class PaidBillDto(val date: String, val scheduleId: String, val name: String, val amount: Long)

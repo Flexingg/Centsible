@@ -23,7 +23,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
@@ -252,7 +251,7 @@ private fun ServerCard(s: ServerStatus, state: ServerUiState, actions: ServerAct
         HorizontalDivider(Modifier.padding(vertical = 8.dp), color = colors.border)
         when {
             state.updatingFrom != null -> Row(verticalAlignment = Alignment.CenterVertically) {
-                CircularProgressIndicator(Modifier.width(20.dp).height(20.dp), strokeWidth = 2.dp, color = colors.accent)
+                app.centsible.core.designsystem.component.DialSpinner(size = 20.dp)
                 Spacer(Modifier.width(12.dp))
                 Text("Updating… the server restarts, so this takes a minute or two.", style = MaterialTheme.typography.bodyMedium)
             }
@@ -334,8 +333,18 @@ private fun BackupsCard(b: Loadable<BackupOverview>, state: ServerUiState, actio
                     modifier = Modifier.padding(top = 8.dp),
                 )
                 o.lastError?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = colors.warning) }
-                Button(onClick = actions.backUpNow, enabled = !state.busy, modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
-                    Text(if (state.busy) "Working…" else "Back up now")
+                Button(onClick = { if (state.backedUp == null) actions.backUpNow() }, enabled = !state.busy, modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
+                    androidx.compose.animation.AnimatedContent(state.backedUp, label = "backup") { done ->
+                        if (done != null) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                app.centsible.core.designsystem.component.AnimatedCheck(size = 20.dp, key = done, description = null)
+                                Spacer(Modifier.width(8.dp))
+                                Text("Backed up")
+                            }
+                        } else {
+                            Text(if (state.busy) "Working…" else "Back up now")
+                        }
+                    }
                 }
                 o.items.forEachIndexed { i, item ->
                     if (i == 0) Spacer(Modifier.height(4.dp))

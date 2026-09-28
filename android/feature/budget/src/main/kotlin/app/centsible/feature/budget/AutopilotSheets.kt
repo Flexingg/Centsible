@@ -1,5 +1,8 @@
 package app.centsible.feature.budget
 
+import app.centsible.core.designsystem.motion.Motion
+import app.centsible.core.designsystem.motion.rememberEntrance
+import app.centsible.core.designsystem.motion.staggeredEntrance
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -168,12 +171,15 @@ fun CoverSheet(state: BudgetUiState, actions: BudgetPlanActions) {
                     )
                     plan.coverMoves.forEachIndexed { i, m ->
                         if (i > 0) HorizontalDivider(color = colors.border)
-                        Row(Modifier.fillMaxWidth().padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Column(Modifier.weight(1f)) {
-                                Text(m.toName, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                Text("from ${m.fromName}", style = MaterialTheme.typography.bodySmall, color = colors.textSecondary)
+                        Column(Modifier.fillMaxWidth().padding(vertical = 10.dp).staggeredEntrance(i)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Column(Modifier.weight(1f)) {
+                                    Text(m.toName, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                    Text("from ${m.fromName}", style = MaterialTheme.typography.bodySmall, color = colors.textSecondary)
+                                }
+                                MoneyText(m.amount, style = MaterialTheme.typography.bodyLarge, animate = true)
                             }
-                            MoneyText(m.amount, style = MaterialTheme.typography.bodyLarge)
+                            MoneyFlow(i)
                         }
                     }
                     if (!plan.uncovered.isZero) {
@@ -189,5 +195,19 @@ fun CoverSheet(state: BudgetUiState, actions: BudgetPlanActions) {
             }
             Spacer(Modifier.height(16.dp))
         }
+    }
+}
+
+/** The money moving: a coin that travels from the source into the overspent category, then settles. */
+@Composable
+private fun MoneyFlow(index: Int) {
+    val colors = CentsibleTheme.colors
+    val t = rememberEntrance(delayMillis = 200 + index * Motion.STAGGER * 2, durationMillis = Motion.LONG, easing = Motion.Dial)
+    androidx.compose.foundation.Canvas(Modifier.fillMaxWidth().height(12.dp).padding(top = 6.dp)) {
+        val y = size.height / 2
+        val w = 2.dp.toPx()
+        drawLine(colors.border, androidx.compose.ui.geometry.Offset(0f, y), androidx.compose.ui.geometry.Offset(size.width, y), strokeWidth = w, cap = androidx.compose.ui.graphics.StrokeCap.Round)
+        drawLine(colors.positive, androidx.compose.ui.geometry.Offset(0f, y), androidx.compose.ui.geometry.Offset(size.width * t, y), strokeWidth = w, cap = androidx.compose.ui.graphics.StrokeCap.Round)
+        drawCircle(colors.positive, radius = 3.dp.toPx(), center = androidx.compose.ui.geometry.Offset(size.width * t, y))
     }
 }

@@ -27,6 +27,8 @@ data class DashboardUiState(
     /** Context with a no-op navigate; the screen supplies the real one. */
     val data: Loadable<DashboardContext> = Loadable.Loading,
     val widgets: List<DashboardWidget> = emptyList(),
+    /** A pull-to-refresh is running. */
+    val refreshing: Boolean = false,
 )
 
 @HiltViewModel
@@ -43,6 +45,11 @@ class DashboardViewModel @Inject constructor(
     init {
         refresh()
         viewModelScope.launch { changes.changes.collect { refresh() } }
+    }
+
+    fun pullToRefresh() {
+        state.value = state.value.copy(refreshing = true)
+        refresh()
     }
 
     fun refresh() = viewModelScope.launch {

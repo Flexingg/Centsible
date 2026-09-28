@@ -152,7 +152,7 @@ private fun SummaryCard(upcoming: List<Schedule>) {
     val income = upcoming.filter { !it.amount.isNegative }
     CentsibleCard(contentPadding = PaddingValues(20.dp)) {
         StatLabel("Due in the next 30 days")
-        MoneyText(bills.map { it.amount }.sum().abs(), style = MaterialTheme.typography.displaySmall, showCents = false)
+        MoneyText(bills.map { it.amount }.sum().abs(), style = MaterialTheme.typography.displaySmall, showCents = false, animate = true)
         Text(
             "${bills.size} bill${if (bills.size == 1) "" else "s"}" +
                 if (income.isNotEmpty()) " · ${MoneyFormat.format(income.map { it.amount }.sum(), showCents = false)} coming in" else "",

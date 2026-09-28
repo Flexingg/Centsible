@@ -2478,7 +2478,7 @@ components:
         line: { type: string, description: The note line it came from }
     Forecast:
       type: object
-      required: [from, to, accountIds, startingBalance, typicalDaily, events, days, lowest]
+      required: [from, to, accountIds, startingBalance, typicalDaily, events, paid, days, lowest]
       properties:
         from: { $ref: '#/components/schemas/Date' }
         to: { $ref: '#/components/schemas/Date' }
@@ -2500,6 +2500,17 @@ components:
               amount: { $ref: '#/components/schemas/Money' }
               internalTransfer: { type: boolean, description: Between two forecast accounts, so the total doesn't change }
               overdue: { type: boolean }
+        paid:
+          type: array
+          description: Scheduled bills already paid this month, before today (transactions linked to a schedule). The bill calendar ticks these off.
+          items:
+            type: object
+            required: [date, scheduleId, name, amount]
+            properties:
+              date: { $ref: '#/components/schemas/Date' }
+              scheduleId: { type: string }
+              name: { type: string }
+              amount: { $ref: '#/components/schemas/Money' }
         days:
           type: array
           items:

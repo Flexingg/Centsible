@@ -43,6 +43,7 @@ import app.centsible.core.designsystem.component.MoneyFormat
 import app.centsible.core.designsystem.component.MoneyText
 import app.centsible.core.designsystem.component.MonthSwitcher
 import app.centsible.core.designsystem.component.StatLabel
+import app.centsible.core.designsystem.motion.staggeredEntrance
 import app.centsible.core.designsystem.theme.CentsibleTheme
 import app.centsible.core.model.CashFlowMonth
 import app.centsible.core.model.Money
@@ -216,11 +217,12 @@ private fun SpendingTab(state: ReportsUiState, actions: ReportsActions) {
         Loaded(state.spending, actions.retry) { report: SpendingReport ->
             CentsibleCard {
                 StatLabel("Spent")
-                MoneyText(report.total.abs(), style = MaterialTheme.typography.displaySmall, showCents = false)
+                MoneyText(report.total.abs(), style = MaterialTheme.typography.displaySmall, showCents = false, animate = true)
                 Spacer(Modifier.height(12.dp))
                 val max = report.categories.maxOfOrNull { -it.amount.minor }?.coerceAtLeast(1) ?: 1
-                report.categories.filter { it.amount.isNegative }.forEach { c ->
-                    Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                report.categories.filter { it.amount.isNegative }.forEachIndexed { i, c ->
+                    val grow = app.centsible.core.designsystem.motion.rememberEntrance(key = report, delayMillis = i * app.centsible.core.designsystem.motion.Motion.STAGGER, durationMillis = app.centsible.core.designsystem.motion.Motion.LONG, easing = app.centsible.core.designsystem.motion.Motion.Spring)
+                    Row(Modifier.fillMaxWidth().padding(vertical = 8.dp).staggeredEntrance(i, key = report), verticalAlignment = Alignment.CenterVertically) {
                         CategoryAvatar(c.name, size = 30.dp)
                         Spacer(Modifier.width(10.dp))
                         Column(Modifier.weight(1f)) {
@@ -232,7 +234,7 @@ private fun SpendingTab(state: ReportsUiState, actions: ReportsActions) {
                             val share = (-c.amount.minor).toFloat() / max
                             Box(Modifier.fillMaxWidth().height(8.dp)) {
                                 Box(
-                                    Modifier.fillMaxWidth(share.coerceIn(0.02f, 1f)).fillMaxHeight()
+                                    Modifier.fillMaxWidth((share.coerceIn(0.02f, 1f) * grow).coerceIn(0.001f, 1.05f)).fillMaxHeight()
                                         .background(colors.series1, RoundedCornerShape(topEnd = 4.dp, bottomEnd = 4.dp)),
                                 )
                             }
@@ -255,7 +257,7 @@ private fun NetWorthTab(state: ReportsUiState, actions: ReportsActions) {
             val change = points.last().netWorth - points.first().netWorth
             CentsibleCard(contentPadding = PaddingValues(20.dp)) {
                 StatLabel(if (state.selectedPoint != null) focus.month.long() else "Net worth")
-                MoneyText(focus.netWorth, style = MaterialTheme.typography.displaySmall, showCents = false)
+                MoneyText(focus.netWorth, style = MaterialTheme.typography.displaySmall, showCents = false, animate = true)
                 Text(
                     "${if (change.isNegative) "▼" else "▲"} ${MoneyFormat.format(change.abs(), false)} over ${points.size} months",
                     style = MaterialTheme.typography.bodyMedium,

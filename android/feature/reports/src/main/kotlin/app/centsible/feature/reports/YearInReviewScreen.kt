@@ -1,5 +1,14 @@
 package app.centsible.feature.reports
 
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.runtime.key
+import androidx.compose.ui.composed
+import androidx.compose.ui.graphics.graphicsLayer
+import app.centsible.core.designsystem.motion.Motion
+import app.centsible.core.designsystem.motion.animateMinorUnits
+import app.centsible.core.designsystem.motion.reducedMotion
+import app.centsible.core.designsystem.motion.rememberEntrance
 import android.content.Context
 import android.content.Intent
 import androidx.compose.foundation.background
@@ -180,7 +189,10 @@ private fun Story(r: YearInReview, onClose: () -> Unit, onPeriod: (ReviewPeriod,
                     .statusBarsPadding()
                     .navigationBarsPadding()
                     .padding(start = 28.dp, end = 28.dp, top = 72.dp, bottom = 40.dp),
-            ) { page.content(r) }
+            ) {
+                // Each page's lines rise in (and numbers count up) as it becomes the current one.
+                CompositionLocalProvider(LocalPageActive provides (i == pager.currentPage)) { page.content(r) }
+            }
         }
         Column(Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 12.dp, vertical = 8.dp)) {
             Progress(pager, list.size)
@@ -220,17 +232,48 @@ private suspend fun share(context: Context, layer: GraphicsLayer, label: String)
 
 // ── Page content ─────────────────────────────────────────────────────────────
 
+private val LocalPageActive = compositionLocalOf { true }
+
+/** Rises and fades in, [order] beats after the page becomes current; hidden until then. */
+private fun Modifier.rise(order: Int): Modifier = composed {
+    val active = LocalPageActive.current
+    if (reducedMotion) return@composed Modifier
+    val t = rememberEntrance(key = active, delayMillis = 120 + order * 110, durationMillis = Motion.MEDIUM + 100)
+    graphicsLayer {
+        alpha = if (active) t else 0f
+        translationY = (1f - t) * 28.dp.toPx()
+    }
+}
+
+/** 0 to 1 as the page becomes current (bars growing, for one). */
 @Composable
-private fun Kicker(text: String) = Text(text.uppercase(), color = INK_SOFT, style = MaterialTheme.typography.labelLarge, letterSpacing = 2.sp)
+private fun pageGrowth(order: Int): Float {
+    val active = LocalPageActive.current
+    val t = rememberEntrance(key = active, delayMillis = 120 + order * 110, durationMillis = Motion.LONG, easing = Motion.Spring)
+    return if (active || reducedMotion) t else 0f
+}
 
 @Composable
-private fun Huge(text: String, size: Int = 56) = Text(
+private fun Kicker(text: String, modifier: Modifier = Modifier.rise(0)) = Text(text.uppercase(), color = INK_SOFT, style = MaterialTheme.typography.labelLarge, letterSpacing = 2.sp, modifier = modifier)
+
+@Composable
+private fun Huge(text: String, size: Int = 56, modifier: Modifier = Modifier.rise(1)) = Text(
     text, color = INK, fontSize = size.sp, lineHeight = (size * 1.05).sp, fontWeight = FontWeight.Black,
-    modifier = Modifier.semantics { heading() },
+    modifier = modifier.semantics { heading() },
 )
 
+/** A big number that counts up each time its page comes into view. */
 @Composable
-private fun Body(text: String, modifier: Modifier = Modifier) = Text(text, color = INK_SOFT, style = MaterialTheme.typography.titleMedium, modifier = modifier)
+private fun HugeCount(target: Long, size: Int = 56, modifier: Modifier = Modifier.rise(1), format: (Long) -> String) {
+    val active = LocalPageActive.current || reducedMotion
+    key(active) {
+        val v = if (active) animateMinorUnits(target, durationMillis = Motion.LONG + 300) else 0L
+        Huge(format(v), size, modifier)
+    }
+}
+
+@Composable
+private fun Body(text: String, modifier: Modifier = Modifier.rise(2)) = Text(text, color = INK_SOFT, style = MaterialTheme.typography.titleMedium, modifier = modifier)
 
 private fun money(m: Money) = MoneyFormat.format(m).substringBeforeLast('.')
 private val DAY = DateTimeFormatter.ofPattern("MMMM d")
@@ -275,7 +318,7 @@ private fun IntroPage(r: YearInReview, onPeriod: (ReviewPeriod, String?) -> Unit
 private fun SpentPage(r: YearInReview) {
     Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.Center) {
         Kicker("You spent")
-        Huge(money(r.spending))
+        HugeCount(r.spending.minor) { money(Money(it)) }
         Spacer(Modifier.height(16.dp))
         Body("across ${"%,d".format(r.purchases)} purchases, about ${money(r.dailyAverage)} a day.")
         val prev = r.previousPeriod
@@ -288,6 +331,7 @@ private fun SpentPage(r: YearInReview) {
                     else -> "Exactly the same as ${prev.label}. Steady."
                 },
                 color = INK, style = MaterialTheme.typography.headlineSmall,
+                modifier = Modifier.rise(3),
             )
         }
     }
@@ -303,7 +347,8 @@ private fun CategoriesPage(r: YearInReview) {
         Spacer(Modifier.height(32.dp))
         val max = r.topCategories.maxOf { it.amount.minor }.coerceAtLeast(1)
         r.topCategories.forEachIndexed { i, c ->
-            Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+            val grow = pageGrowth(3 + i)
+            Row(Modifier.fillMaxWidth().padding(vertical = 6.dp).rise(3 + i), verticalAlignment = Alignment.CenterVertically) {
                 Text("${i + 1}", color = INK, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, modifier = Modifier.width(28.dp))
                 Column(Modifier.weight(1f)) {
                     Row {
@@ -311,7 +356,7 @@ private fun CategoriesPage(r: YearInReview) {
                         Text(money(c.amount), color = INK_SOFT, style = MaterialTheme.typography.titleMedium)
                     }
                     Box(Modifier.fillMaxWidth().height(6.dp).padding(top = 2.dp).background(Color(0x33FFFFFF), RoundedCornerShape(3.dp))) {
-                        Box(Modifier.fillMaxWidth(c.amount.minor.toFloat() / max).fillMaxHeight().background(INK, RoundedCornerShape(3.dp)))
+                        Box(Modifier.fillMaxWidth((c.amount.minor.toFloat() / max * grow).coerceIn(0.001f, 1f)).fillMaxHeight().background(INK, RoundedCornerShape(3.dp)))
                     }
                 }
             }
@@ -325,7 +370,7 @@ private fun MerchantsPage(r: YearInReview) {
         Kicker("Your top merchants")
         Spacer(Modifier.height(16.dp))
         r.topMerchants.forEachIndexed { i, m ->
-            Row(Modifier.fillMaxWidth().padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(Modifier.fillMaxWidth().padding(vertical = 10.dp).rise(1 + i), verticalAlignment = Alignment.CenterVertically) {
                 Text("${i + 1}", color = INK, fontSize = if (i == 0) 44.sp else 30.sp, fontWeight = FontWeight.Black, modifier = Modifier.width(56.dp))
                 Column(Modifier.weight(1f)) {
                     Text(m.name, color = INK, fontSize = if (i == 0) 26.sp else 20.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -343,10 +388,10 @@ private fun VisitedPage(r: YearInReview) {
     Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.Center) {
         Kicker("Your regular spot")
         Body("You went to")
-        Huge(m.name, 48)
-        Huge("${m.visits} times", 40)
+        Huge(m.name, 48, Modifier.rise(2))
+        HugeCount(m.visits.toLong(), 40, Modifier.rise(3)) { "$it times" }
         Spacer(Modifier.height(16.dp))
-        Body("That's about once every ${(days / m.visits.toFloat()).roundToInt().coerceAtLeast(1)} days, ${money(m.amount)} in all.")
+        Body(modifier = Modifier.rise(4), text = "That's about once every ${(days / m.visits.toFloat()).roundToInt().coerceAtLeast(1)} days, ${money(m.amount)} in all.")
     }
 }
 
@@ -355,10 +400,10 @@ private fun BiggestPage(r: YearInReview) {
     val b = r.biggestPurchase ?: return
     Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.Center) {
         Kicker("Your biggest purchase")
-        Huge(money(b.amount))
+        HugeCount(b.amount.minor) { money(Money(it)) }
         Spacer(Modifier.height(12.dp))
-        Text(b.payeeName ?: "A single purchase", color = INK, style = MaterialTheme.typography.headlineSmall)
-        Body(listOfNotNull(LocalDate.parse(b.date).format(DAY), b.categoryName).joinToString(" · "))
+        Text(b.payeeName ?: "A single purchase", color = INK, style = MaterialTheme.typography.headlineSmall, modifier = Modifier.rise(2))
+        Body(modifier = Modifier.rise(3), text = listOfNotNull(LocalDate.parse(b.date).format(DAY), b.categoryName).joinToString(" · "))
     }
 }
 
@@ -386,6 +431,7 @@ private fun BucketsPage(r: YearInReview) {
         Huge(bucketName(r, big), if (r.period == ReviewPeriod.Quarter) 36 else 48)
         Body("was your biggest $unit: ${money(big.spending)}.")
         Spacer(Modifier.height(28.dp))
+        val grow = pageGrowth(3)
         Row(
             Modifier.fillMaxWidth().height(160.dp).clearAndSetSemantics {
                 contentDescription = r.buckets.filter { it.start <= today }.joinToString { "${bucketName(r, it)} ${money(it.spending)}" }
@@ -395,7 +441,10 @@ private fun BucketsPage(r: YearInReview) {
         ) {
             r.buckets.forEachIndexed { i, b ->
                 Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
-                    val h = (b.spending.minor.coerceAtLeast(0).toFloat() / max).coerceIn(0.02f, 1f)
+                    // Bars grow left to right, a beat apart.
+                    val stagger = (i.toFloat() / r.buckets.size) * 0.5f
+                    val g = ((grow - stagger) / 0.5f).coerceIn(0f, 1.1f)
+                    val h = (b.spending.minor.coerceAtLeast(0).toFloat() / max).coerceIn(0.02f, 1f) * g
                     Box(Modifier.fillMaxWidth().height((130 * h).dp).background(if (b.key == big.key) INK else Color(0x66FFFFFF), RoundedCornerShape(topStart = 3.dp, topEnd = 3.dp)))
                     // A month's 30 days only label every fifth.
                     val label = when (r.period) {
@@ -410,7 +459,7 @@ private fun BucketsPage(r: YearInReview) {
         }
         if (small != null && small != big) {
             Spacer(Modifier.height(20.dp))
-            Body("Most frugal: ${bucketName(r, small)}, at ${money(small.spending)}.")
+            Body(modifier = Modifier.rise(4), text = "Most frugal: ${bucketName(r, small)}, at ${money(small.spending)}.")
         }
     }
 }
@@ -420,12 +469,12 @@ private fun NoSpendPage(r: YearInReview) {
     val s = r.longestNoSpendStreak
     Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.Center) {
         Kicker("No-spend days")
-        Huge("${r.noSpendDays}", 96)
+        HugeCount(r.noSpendDays.toLong(), 96) { "$it" }
         Body("days you didn't buy a thing.")
         if (s.days >= 2 && s.start != null && s.end != null) {
             Spacer(Modifier.height(24.dp))
-            Text("Longest streak: ${s.days} days", color = INK, style = MaterialTheme.typography.headlineSmall)
-            Body("${LocalDate.parse(s.start).format(DAY)} to ${LocalDate.parse(s.end).format(DAY)}")
+            Text("Longest streak: ${s.days} days", color = INK, style = MaterialTheme.typography.headlineSmall, modifier = Modifier.rise(3))
+            Body(modifier = Modifier.rise(4), text = "${LocalDate.parse(s.start).format(DAY)} to ${LocalDate.parse(s.end).format(DAY)}")
         }
     }
 }
@@ -434,18 +483,18 @@ private fun NoSpendPage(r: YearInReview) {
 private fun SavedPage(r: YearInReview) {
     Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.Center) {
         Kicker("You brought in")
-        Huge(money(r.income), 48)
+        HugeCount(r.income.minor, 48) { money(Money(it)) }
         Spacer(Modifier.height(16.dp))
         if (r.saved.isNegative) {
             Body("and spent ${money(r.saved.abs())} more than that. Next ${r.period.label.lowercase()}'s a fresh start.")
         } else {
             Body("and kept")
-            Huge(money(r.saved), 48)
-            r.savingsRate?.let { Body("That's $it% of what came in. 💪") }
+            HugeCount(r.saved.minor, 48, Modifier.rise(3)) { money(Money(it)) }
+            r.savingsRate?.let { Body("That's $it% of what came in. 💪", Modifier.rise(4)) }
         }
         if (r.newMerchants > 0) {
             Spacer(Modifier.height(28.dp))
-            Text("You tried ${r.newMerchants} new place${if (r.newMerchants == 1) "" else "s"} too.", color = INK, style = MaterialTheme.typography.titleLarge)
+            Text("You tried ${r.newMerchants} new place${if (r.newMerchants == 1) "" else "s"} too.", color = INK, style = MaterialTheme.typography.titleLarge, modifier = Modifier.rise(5))
         }
     }
 }
@@ -455,20 +504,20 @@ private fun SummaryPage(r: YearInReview) {
     Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.Center) {
         Kicker("${r.label} wrapped")
         Spacer(Modifier.height(20.dp))
-        SummaryRow("Spent", money(r.spending))
-        SummaryRow("Brought in", money(r.income))
-        SummaryRow(if (r.saved.isNegative) "Overspent" else "Kept", money(r.saved.abs()))
-        r.topCategories.firstOrNull()?.let { SummaryRow("Top category", it.name) }
-        r.topMerchants.firstOrNull()?.let { SummaryRow("Top merchant", it.name) }
-        SummaryRow("No-spend days", "${r.noSpendDays}")
+        SummaryRow("Spent", money(r.spending), 1)
+        SummaryRow("Brought in", money(r.income), 2)
+        SummaryRow(if (r.saved.isNegative) "Overspent" else "Kept", money(r.saved.abs()), 3)
+        r.topCategories.firstOrNull()?.let { SummaryRow("Top category", it.name, 4) }
+        r.topMerchants.firstOrNull()?.let { SummaryRow("Top merchant", it.name, 5) }
+        SummaryRow("No-spend days", "${r.noSpendDays}", 6)
         Spacer(Modifier.height(28.dp))
-        Body("Tap share to send this card.")
+        Body("Tap share to send this card.", Modifier.rise(7))
     }
 }
 
 @Composable
-private fun SummaryRow(label: String, value: String) {
-    Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+private fun SummaryRow(label: String, value: String, order: Int) {
+    Row(Modifier.fillMaxWidth().padding(vertical = 8.dp).rise(order), verticalAlignment = Alignment.CenterVertically) {
         Text(label, color = INK_SOFT, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
         Text(value, color = INK, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }

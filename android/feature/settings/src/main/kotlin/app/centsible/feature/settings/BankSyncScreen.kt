@@ -23,7 +23,6 @@ import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -211,7 +210,7 @@ private fun SimpleFinCard(o: BankSyncOverview, state: BankSyncUiState, actions: 
             modifier = Modifier.fillMaxWidth(),
         )
         Button(onClick = actions.connect, enabled = state.setupToken.isNotBlank() && !state.connecting, modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
-            if (state.connecting) CircularProgressIndicator(Modifier.height(18.dp), strokeWidth = 2.dp, color = colors.card) else Text("Connect")
+            if (state.connecting) app.centsible.core.designsystem.component.DialSpinner(size = 20.dp, track = colors.card.copy(alpha = 0.3f)) else Text("Connect")
         }
     }
 }
@@ -270,6 +269,7 @@ private fun SyncCard(o: BankSyncOverview, state: BankSyncUiState, actions: BankS
     val colors = CentsibleTheme.colors
     SectionCard("Sync") {
         Button(onClick = actions.syncAll, enabled = state.canEdit && !state.syncing, modifier = Modifier.fillMaxWidth()) {
+            if (state.syncing) { app.centsible.core.designsystem.component.DialSpinner(size = 18.dp); androidx.compose.foundation.layout.Spacer(Modifier.width(8.dp)) }
             Text(if (state.syncing) "Syncing…" else "Sync all accounts now")
         }
         Text("One SimpleFIN request covers every SimpleFIN account.", style = MaterialTheme.typography.bodySmall, color = colors.textTertiary, modifier = Modifier.padding(top = 4.dp))

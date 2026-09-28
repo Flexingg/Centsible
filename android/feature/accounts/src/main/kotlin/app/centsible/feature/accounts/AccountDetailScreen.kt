@@ -1,5 +1,6 @@
 package app.centsible.feature.accounts
 
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -7,6 +8,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
@@ -146,7 +148,7 @@ fun AccountDetailScreen(
                     item {
                         CentsibleCard(contentPadding = PaddingValues(20.dp)) {
                             StatLabel(if (d.account.closed) "Closed · final balance" else "Balance")
-                            MoneyText(d.account.balance, style = MaterialTheme.typography.displaySmall, color = if (d.account.balance.isNegative) colors.negative else colors.textPrimary)
+                            MoneyText(d.account.balance, style = MaterialTheme.typography.displaySmall, color = if (d.account.balance.isNegative) colors.negative else colors.textPrimary, animate = true)
                             Text(
                                 listOf(d.account.kind().title, if (d.account.offBudget) "Tracking only" else "On budget").joinToString(" · "),
                                 style = MaterialTheme.typography.bodySmall,
@@ -169,6 +171,7 @@ fun AccountDetailScreen(
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 if (state.canSync && d.account.syncSource != null) {
                                     androidx.compose.material3.FilledTonalButton(onClick = actions.sync, enabled = !state.syncing, modifier = Modifier.weight(1f)) {
+                                        if (state.syncing) { app.centsible.core.designsystem.component.DialSpinner(size = 18.dp); androidx.compose.foundation.layout.Spacer(Modifier.width(8.dp)) }
                                         Text(if (state.syncing) "Syncing…" else "Sync now")
                                     }
                                 }
@@ -182,7 +185,7 @@ fun AccountDetailScreen(
                         }
                     }
                     item {
-                        CentsibleCard(contentPadding = PaddingValues(0.dp)) {
+                        CentsibleCard(Modifier.animateContentSize(androidx.compose.animation.core.tween(app.centsible.core.designsystem.motion.Motion.MEDIUM)), contentPadding = PaddingValues(0.dp)) {
                             if (d.transactions.isEmpty()) {
                                 Text("No transactions yet", style = MaterialTheme.typography.bodyMedium, color = colors.textTertiary, modifier = Modifier.padding(16.dp))
                             }

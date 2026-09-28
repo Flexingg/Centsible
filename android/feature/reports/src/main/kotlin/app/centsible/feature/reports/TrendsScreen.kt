@@ -159,7 +159,7 @@ private fun PaceCard(i: Insights) {
     val over = i.typical.minor > 0 && i.projected.minor > i.typical.minor * 11 / 10
     CentsibleCard(contentPadding = PaddingValues(20.dp)) {
         StatLabel(if (i.complete) "Spent" else "Spent so far")
-        MoneyText(i.spent, style = MaterialTheme.typography.displaySmall)
+        MoneyText(i.spent, style = MaterialTheme.typography.displaySmall, animate = true)
         val sentence = when {
             i.typical.isZero -> "Not enough history yet to compare with."
             i.complete -> "Against about ${MoneyFormat.format(i.typical)} in a usual month."

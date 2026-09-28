@@ -249,6 +249,31 @@ export class PlanOps {
       }
       events.sort((a, b) => a.date.localeCompare(b.date) || a.amount - b.amount);
 
+      // Bills already paid this month (transactions linked to a schedule), so the calendar can tick them off.
+      const monthStart = `${from.slice(0, 8)}01`;
+      const scheduleName = new Map(((await api.getSchedules()) as unknown as Raw[]).map((s) => [String(s.id), typeof s.name === 'string' && s.name ? s.name : null]));
+      const paid: PaidBill[] = [];
+      if (monthStart < from) {
+        const { data } = (await api.aqlQuery(
+          api
+            .q('transactions')
+            .filter({ schedule: { $ne: null }, ...dateRange(monthStart, from, false) })
+            .select(['date', 'schedule', 'amount', 'payee', 'account']),
+        )) as { data: Raw[] };
+        for (const r of data) {
+          const account = typeof r.account === 'string' ? r.account : null;
+          if (account && !ids.has(account)) continue;
+          const p = typeof r.payee === 'string' ? payee.get(r.payee) : undefined;
+          paid.push({
+            date: String(r.date),
+            scheduleId: String(r.schedule),
+            name: scheduleName.get(String(r.schedule)) || p?.name || 'Scheduled',
+            amount: num(r.amount),
+          });
+        }
+        paid.sort((a, b) => a.date.localeCompare(b.date) || a.amount - b.amount);
+      }
+
       let typicalDaily = 0;
       if (opts.includeTypical && ids.size) {
         const since = addDays(from, -90);
@@ -273,10 +298,12 @@ export class PlanOps {
         days.push({ date, balance, scheduled, typical });
         if (balance < lowest.balance) lowest = { date, balance };
       }
-      return { from, to, accountIds: [...ids], startingBalance, typicalDaily, events, days, lowest };
+      return { from, to, accountIds: [...ids], startingBalance, typicalDaily, events, paid, days, lowest };
     });
   }
 }
+
+type PaidBill = { date: string; scheduleId: string; name: string; amount: number };
 
 type ForecastEvent = {
   date: string;

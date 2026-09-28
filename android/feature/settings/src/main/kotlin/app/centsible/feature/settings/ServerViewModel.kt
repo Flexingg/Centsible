@@ -42,6 +42,8 @@ data class ServerUiState(
     val confirmRestore: Pair<Backup, BackupBudget>? = null,
     val busy: Boolean = false,
     val message: String? = null,
+    /** Set for a few seconds after a manual backup succeeds (the button shows a checkmark). */
+    val backedUp: Long? = null,
 ) {
     val appUpdate get() = (status as? Loadable.Ready)?.value?.app?.takeIf { (it.versionCode ?: 0) > installedCode && it.apkUrl != null }
 }
@@ -122,9 +124,15 @@ class ServerViewModel @Inject constructor(
         state.update { it.copy(backups = Loadable.Ready(o)) }
     }
 
-    fun backUpNow() = act("Backed up") {
+    fun backUpNow() = act(null) {
         server.backUpNow()
         loadBackups()
+        val at = System.currentTimeMillis()
+        state.update { it.copy(backedUp = at) }
+        viewModelScope.launch {
+            delay(2_500)
+            state.update { if (it.backedUp == at) it.copy(backedUp = null) else it }
+        }
     }
 
     fun openBackup(b: Backup?) = state.update { it.copy(openBackup = b) }

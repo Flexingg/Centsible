@@ -19,7 +19,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.QrCodeScanner
 import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -148,7 +147,7 @@ private fun AddressStep(state: OnboardingUiState, actions: OnboardingActions) {
         }
         Spacer(Modifier.height(8.dp))
         Button(onClick = actions.next, enabled = state.canContinue, modifier = Modifier.fillMaxWidth()) {
-            if (state.busy) CircularProgressIndicator(Modifier.height(18.dp), strokeWidth = 2.dp, color = colors.card) else Text("Continue")
+            if (state.busy) app.centsible.core.designsystem.component.DialSpinner(size = 20.dp, track = colors.card.copy(alpha = 0.3f)) else Text("Continue")
         }
     }
 
@@ -225,7 +224,7 @@ private fun SetupStep(state: OnboardingUiState, actions: OnboardingActions) {
     ActualCard(state, actions)
 
     Button(onClick = actions.claim, enabled = state.canClaim, modifier = Modifier.fillMaxWidth()) {
-        if (state.busy) CircularProgressIndicator(Modifier.height(18.dp), strokeWidth = 2.dp, color = colors.card) else Text("Set up")
+        if (state.busy) app.centsible.core.designsystem.component.DialSpinner(size = 20.dp, track = colors.card.copy(alpha = 0.3f)) else Text("Set up")
     }
 }
 
@@ -313,7 +312,7 @@ private fun JoinStep(state: OnboardingUiState, actions: OnboardingActions) {
         OutlinedTextField(state.deviceName, { v -> actions.edit { it.copy(deviceName = v) } }, label = { Text("This phone's name") }, singleLine = true, modifier = Modifier.fillMaxWidth())
         Spacer(Modifier.height(8.dp))
         Button(onClick = actions.join, enabled = state.canJoin, modifier = Modifier.fillMaxWidth()) {
-            if (state.busy) CircularProgressIndicator(Modifier.height(18.dp), strokeWidth = 2.dp, color = colors.card) else Text("Join")
+            if (state.busy) app.centsible.core.designsystem.component.DialSpinner(size = 20.dp, track = colors.card.copy(alpha = 0.3f)) else Text("Join")
         }
     }
 }

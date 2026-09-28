@@ -105,7 +105,7 @@ private fun CategoryDetails(
     }
     Spacer(Modifier.height(20.dp))
     StatLabel(if (category.isOverspent) "Overspent" else "Available")
-    MoneyText(category.balance.abs(), style = MaterialTheme.typography.displaySmall, color = if (category.isOverspent) colors.negative else colors.textPrimary)
+    MoneyText(category.balance.abs(), style = MaterialTheme.typography.displaySmall, color = if (category.isOverspent) colors.negative else colors.textPrimary, animate = true)
     Spacer(Modifier.height(12.dp))
     BudgetProgressBar(category.progress, category.isOverspent, height = 8.dp)
     Spacer(Modifier.height(16.dp))

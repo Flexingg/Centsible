@@ -3,6 +3,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { mkdirSync, rmSync } from 'node:fs';
 import type { FastifyInstance } from 'fastify';
+import * as api from '@actual-app/api';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { ActualHost } from '../../src/actual/host.js';
 import { HouseholdStore } from '../../src/auth/store.js';
@@ -177,6 +178,23 @@ describe('forecast', () => {
     expect(f.typicalDaily).not.toBe(0);
     expect(f.days[0].typical).toBe(0);
     expect(f.days[1].typical).toBe(f.typicalDaily);
+  });
+
+  it('lists bills already paid this month', async () => {
+    const today = dayFromNow(0);
+    if (today.endsWith('-01')) return; // nothing before today this month
+    const first = `${today.slice(0, 8)}01`;
+    const sched = (await call('POST', '/schedules', '/schedules', owner, {
+      name: 'Water', payeeName: 'Water Co', accountId: actual.accounts.checking, amount: -3100, amountOp: 'is',
+      recurrence: { frequency: 'monthly', interval: 1, start: first },
+    })).body;
+    const id = randomUUID();
+    await call('POST', '/transactions', '/transactions', owner, { id, accountId: actual.accounts.checking, date: first, amount: -3100, payeeName: 'Water Co' });
+    // Linking to a schedule is what Actual does when it matches a payment; do it directly here.
+    await host.withBudget(b, 'write', async () => { await api.updateTransaction(id, { schedule: sched.id } as never); });
+    const f = (await call('GET', '/forecast?days=30&includeTypical=false', '/forecast', viewer)).body;
+    expect(f.paid).toContainEqual({ date: first, scheduleId: sched.id, name: 'Water', amount: -3100 });
+    expect(f.paid.every((p: any) => p.date < today)).toBe(true);
   });
 
   it('follows the chosen accounts', async () => {

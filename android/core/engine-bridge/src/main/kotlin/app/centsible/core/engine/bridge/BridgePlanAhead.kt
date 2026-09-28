@@ -66,6 +66,7 @@ class BridgePlanAhead(private val api: PlanningApi, private val onWrite: () -> U
             dto.events.map { ForecastEvent(it.date, it.scheduleId, it.name, it.accountName, Money(it.amount), it.internalTransfer, it.overdue) },
             dto.days.map { ForecastDay(it.date, Money(it.balance), Money(it.scheduled), Money(it.typical)) },
             ForecastDay(dto.lowest.date, Money(dto.lowest.balance)),
+            dto.paid.map { app.centsible.core.model.PaidBill(it.date, it.scheduleId, it.name, Money(it.amount)) },
         )
     }
 }

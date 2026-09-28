@@ -272,6 +272,7 @@ private fun SummaryCard(month: BudgetMonth, canHold: Boolean = false, onHold: ()
                 month.toBudget.isZero -> colors.textPrimary
                 else -> colors.positive
             },
+            animate = true,
         )
         if (month.toBudget.isZero) {
             Text("Every dollar has a job 🎉", style = MaterialTheme.typography.bodySmall, color = colors.textSecondary)

@@ -96,7 +96,10 @@ class PlanAheadScreenshotTest {
             ForecastDay(date, Money(balance), Money(scheduled), Money(if (i == 0) 0 else typical))
         }
         val low = days.minBy { it.balance.minor }
-        Forecast(today.toString(), today.plusDays(90).toString(), listOf(AccountId("a")), Money(212_000), Money(typical), events, days, low)
+        val paid = listOf(1 to "Rent", 5 to "Car loan", 20 to "Phone").map { (day, name) ->
+            app.centsible.core.model.PaidBill(today.withDayOfMonth(day).toString(), name, name, Money(-10_000))
+        }
+        Forecast(today.toString(), today.plusDays(90).toString(), listOf(AccountId("a")), Money(212_000), Money(typical), events, days, low, paid)
     }
 
     @Test fun forecast() {
@@ -130,6 +133,17 @@ class PlanAheadScreenshotTest {
             }
         }
         compose.onRoot().captureRoboImage("screenshots/bill_calendar_day.png")
+        app.centsible.core.uitesting.A11y.assertOk(compose)
+    }
+
+    @Config(qualifiers = "w411dp-h1100dp-xxhdpi")
+    @Test fun bill_calendar_this_month() {
+        compose.setContent {
+            CentsibleTheme(darkTheme = false) {
+                BillCalendarScreen(ForecastUiState(today = today, data = Loadable.Ready(forecast), calendarMonth = YearMonth("2026-09")), CalendarActions())
+            }
+        }
+        compose.onRoot().captureRoboImage("screenshots/bill_calendar_this_month.png")
         app.centsible.core.uitesting.A11y.assertOk(compose)
     }
 }

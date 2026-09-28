@@ -74,8 +74,11 @@ data class Forecast(
     val events: List<ForecastEvent>,
     val days: List<ForecastDay>,
     val lowest: ForecastDay,
+    /** Scheduled bills already paid this month, before today. */
+    val paid: List<PaidBill> = emptyList(),
 ) {
     fun eventsOn(date: String) = events.filter { it.date == date }
+    fun paidOn(date: String) = paid.filter { it.date == date }
     fun day(date: String) = days.firstOrNull { it.date == date }
 }
 
@@ -88,5 +91,7 @@ data class ForecastEvent(
     val internalTransfer: Boolean,
     val overdue: Boolean,
 )
+
+data class PaidBill(val date: String, val scheduleId: String, val name: String, val amount: Money)
 
 data class ForecastDay(val date: String, val balance: Money, val scheduled: Money = Money.Zero, val typical: Money = Money.Zero)

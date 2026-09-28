@@ -44,6 +44,8 @@ data class TransactionsData(
     val nextCursor: String?,
     val loadingMore: Boolean = false,
     val accounts: List<Account> = emptyList(),
+    /** Rows that arrived since the last load (a transaction just saved), so they can land in. */
+    val fresh: Set<String> = emptySet(),
 )
 
 data class TransactionsUiState(
@@ -61,6 +63,7 @@ class TransactionsViewModel @Inject constructor(
     private val state = MutableStateFlow(TransactionsUiState(filters = TransactionFilters(search = savedState.get<String>(ARG_QUERY).orEmpty())))
     val uiState: StateFlow<TransactionsUiState> = state.asStateFlow()
     private var loadJob: Job? = null
+    private var shownFilters: TransactionFilters? = null
 
     init {
         refresh()
@@ -82,6 +85,7 @@ class TransactionsViewModel @Inject constructor(
         loadJob = viewModelScope.launch {
             if (debounceMs > 0) delay(debounceMs)
             val filters = state.value.filters
+            val before = state.value.data.valueOrNull?.takeIf { filters == shownFilters }?.items?.map { it.id.raw }?.toSet()
             runCatching {
                 val budget = selectedBudget()
                 val page = async { engine.transactions(budget, filters.toQuery(PAGE)) }
@@ -89,9 +93,10 @@ class TransactionsViewModel @Inject constructor(
                 val accounts = async { engine.accounts(budget) }
                 val p = page.await()
                 val a = accounts.await()
-                TransactionsData(p.items, cats.await(), a.associate { it.id.raw to it.name }, p.nextCursor, accounts = a)
+                val fresh = before?.let { seen -> p.items.map { it.id.raw }.filterNot { it in seen }.toSet() }.orEmpty()
+                TransactionsData(p.items, cats.await(), a.associate { it.id.raw to it.name }, p.nextCursor, accounts = a, fresh = fresh)
             }
-                .onSuccess { d -> state.update { it.copy(data = Loadable.Ready(d)) } }
+                .onSuccess { d -> shownFilters = filters; state.update { it.copy(data = Loadable.Ready(d)) } }
                 .onFailure { e -> if (e !is kotlinx.coroutines.CancellationException) state.update { it.copy(data = Loadable.Failed(e.userMessage())) } }
         }
     }

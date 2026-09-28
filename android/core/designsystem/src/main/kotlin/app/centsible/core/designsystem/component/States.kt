@@ -5,7 +5,9 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
@@ -18,8 +20,18 @@ import app.centsible.core.designsystem.theme.CentsibleTheme
 
 @Composable
 fun LoadingState(modifier: Modifier = Modifier) {
-    Box(modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        CircularProgressIndicator(color = CentsibleTheme.colors.accent)
+    // The icon's ring turning over a few shimmering cards shaped like what's coming.
+    val colors = CentsibleTheme.colors
+    val shimmer = app.centsible.core.designsystem.motion.rememberShimmer()
+    val placeholder = androidx.compose.ui.graphics.lerp(colors.track, colors.card, shimmer * 0.6f)
+    Column(modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        listOf(132, 92, 92).forEach { h ->
+            Box(
+                Modifier.fillMaxWidth().height(h.dp)
+                    .background(placeholder, androidx.compose.foundation.shape.RoundedCornerShape(20.dp)),
+            )
+        }
+        Box(Modifier.fillMaxWidth().padding(top = 12.dp), contentAlignment = Alignment.Center) { DialSpinner() }
     }
 }
 

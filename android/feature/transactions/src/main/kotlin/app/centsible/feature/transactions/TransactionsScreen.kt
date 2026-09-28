@@ -1,5 +1,11 @@
 package app.centsible.feature.transactions
 
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.layout.Column
+import androidx.compose.runtime.key
+import app.centsible.core.designsystem.motion.Motion
+import app.centsible.core.designsystem.motion.landing
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -124,11 +130,18 @@ fun TransactionsScreen(
                 ) {
                     byDate.forEach { (date, txs) ->
                         item(key = date) {
-                            Text(dayLabel(date, today), style = MaterialTheme.typography.labelMedium, color = colors.textSecondary, modifier = Modifier.padding(start = 4.dp, bottom = 6.dp))
-                            CentsibleCard(contentPadding = PaddingValues(0.dp)) {
-                                txs.forEachIndexed { i, t ->
-                                    if (i > 0) HorizontalDivider(Modifier.padding(start = 64.dp), color = colors.border)
-                                    TransactionRow(t, d.categoryNames, d.accountNames, onClick = { onOpen(t.id) })
+                            // A saved transaction lands in its day; a deleted one's card closes up.
+                            Column(Modifier.animateItem()) {
+                                Text(dayLabel(date, today), style = MaterialTheme.typography.labelMedium, color = colors.textSecondary, modifier = Modifier.padding(start = 4.dp, bottom = 6.dp))
+                                CentsibleCard(Modifier.animateContentSize(tween(Motion.MEDIUM, easing = Motion.EaseInOut)), contentPadding = PaddingValues(0.dp)) {
+                                    txs.forEachIndexed { i, t ->
+                                        key(t.id.raw) {
+                                            Column(if (t.id.raw in d.fresh) Modifier.landing(t.id.raw) else Modifier) {
+                                                if (i > 0) HorizontalDivider(Modifier.padding(start = 64.dp), color = colors.border)
+                                                TransactionRow(t, d.categoryNames, d.accountNames, onClick = { onOpen(t.id) })
+                                            }
+                                        }
+                                    }
                                 }
                             }
                         }

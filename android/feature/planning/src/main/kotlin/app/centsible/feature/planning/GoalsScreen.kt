@@ -68,6 +68,7 @@ import app.centsible.core.designsystem.component.Loadable
 import app.centsible.core.designsystem.component.LoadingState
 import app.centsible.core.designsystem.component.MessageState
 import app.centsible.core.designsystem.component.MoneyFormat
+import app.centsible.core.designsystem.component.ProgressRing
 import app.centsible.core.designsystem.component.MoneyInput
 import app.centsible.core.designsystem.component.StatLabel
 import app.centsible.core.designsystem.theme.CentsibleTheme
@@ -215,22 +216,6 @@ internal fun describe(goal: Goal): Pair<String, Int> = when (goal.status) {
 }
 
 internal fun monthName(m: YearMonth): String = "${java.time.Month.of(m.month).getDisplayName(TextStyle.SHORT, Locale.getDefault())} ${m.year}"
-
-@Composable
-internal fun ProgressRing(progress: Float, size: Dp, stroke: Dp, color: androidx.compose.ui.graphics.Color = CentsibleTheme.colors.accent) {
-    val track = CentsibleTheme.colors.border
-    val pct = (progress.coerceIn(0f, 1f) * 100).toInt()
-    Box(Modifier.size(size).clearAndSetSemantics { contentDescription = "$pct percent" }, contentAlignment = Alignment.Center) {
-        Canvas(Modifier.size(size)) {
-            val w = stroke.toPx()
-            val arc = Size(this.size.width - w, this.size.height - w)
-            val topLeft = Offset(w / 2, w / 2)
-            drawArc(track, 0f, 360f, false, topLeft, arc, style = Stroke(w))
-            drawArc(color, -90f, 360f * progress.coerceIn(0f, 1f), false, topLeft, arc, style = Stroke(w, cap = StrokeCap.Round))
-        }
-        Text("$pct%", style = MaterialTheme.typography.labelMedium)
-    }
-}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

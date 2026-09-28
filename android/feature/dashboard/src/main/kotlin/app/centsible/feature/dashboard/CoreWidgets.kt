@@ -50,7 +50,7 @@ class NetWorthWidget @Inject constructor() : DashboardWidget {
         val debts = open.filter { it.balance.isNegative }.map { it.balance }.sum()
         CentsibleCard(onClick = { context.navigate(Destination.NetWorth) }, contentPadding = PaddingValues(20.dp)) {
             StatLabel("Net worth")
-            MoneyText(assets + debts, style = MaterialTheme.typography.displaySmall, showCents = false)
+            MoneyText(assets + debts, style = MaterialTheme.typography.displaySmall, showCents = false, animate = true)
             Spacer(Modifier.height(12.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
                 Column2("Assets") { MoneyText(assets, style = MaterialTheme.typography.titleSmall, showCents = false, color = CentsibleTheme.colors.positive) }
@@ -74,7 +74,7 @@ class BudgetSummaryWidget @Inject constructor() : DashboardWidget {
             val spent = month.totalSpent.abs()
             val share = if (month.totalBudgeted.minor > 0) spent.minor.toFloat() / month.totalBudgeted.minor else 0f
             Row(verticalAlignment = Alignment.Bottom) {
-                MoneyText(spent, style = MaterialTheme.typography.headlineSmall, showCents = false)
+                MoneyText(spent, style = MaterialTheme.typography.headlineSmall, showCents = false, animate = true)
                 Text(
                     "  spent of ${MoneyFormat.format(month.totalBudgeted, showCents = false)}",
                     style = MaterialTheme.typography.bodyMedium,
@@ -149,6 +149,7 @@ private fun Column2(label: String, value: @Composable () -> Unit) {
 @Module
 @InstallIn(SingletonComponent::class)
 abstract class CoreWidgetsModule {
+    @Binds @IntoSet abstract fun dial(w: BudgetDialWidget): DashboardWidget
     @Binds @IntoSet abstract fun netWorth(w: NetWorthWidget): DashboardWidget
     @Binds @IntoSet abstract fun budget(w: BudgetSummaryWidget): DashboardWidget
     @Binds @IntoSet abstract fun recent(w: RecentTransactionsWidget): DashboardWidget

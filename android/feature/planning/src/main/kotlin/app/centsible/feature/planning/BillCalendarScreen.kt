@@ -43,6 +43,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import app.centsible.core.designsystem.component.AnimatedCheck
 import app.centsible.core.designsystem.component.CentsibleCard
 import app.centsible.core.designsystem.component.Loadable
 import app.centsible.core.designsystem.component.LoadingState
@@ -222,10 +223,12 @@ private fun DayCell(date: LocalDate, f: Forecast, isSelected: Boolean, isToday: 
     val colors = CentsibleTheme.colors
     val iso = date.toString()
     val events = f.eventsOn(iso).filter { !it.internalTransfer }
+    val paid = f.paidOn(iso)
     val balance = f.day(iso)?.balance
     val low = balance?.isNegative == true
     val label = buildString {
         append(date.format(LONG))
+        if (paid.isNotEmpty()) append(", paid: ${paid.joinToString { "${it.name} ${MoneyFormat.format(it.amount.abs())}" }}")
         if (events.isNotEmpty()) append(", ${events.size} scheduled: ${events.joinToString { "${it.name} ${MoneyFormat.format(it.amount)}" }}")
         if (balance != null) append(", projected balance ${MoneyFormat.format(balance)}")
     }
@@ -248,6 +251,8 @@ private fun DayCell(date: LocalDate, f: Forecast, isSelected: Boolean, isToday: 
             color = if (past) colors.textTertiary else colors.textPrimary,
         )
         Spacer(Modifier.height(4.dp))
+        // Bills already paid tick themselves off, one day after another.
+        if (paid.isNotEmpty()) AnimatedCheck(size = 14.dp, key = iso, delayMillis = date.dayOfMonth * 40, description = null)
         Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
             events.take(3).forEach { e ->
                 Box(Modifier.size(6.dp).background(if (e.amount.isNegative) colors.warning else colors.positive, CircleShape))

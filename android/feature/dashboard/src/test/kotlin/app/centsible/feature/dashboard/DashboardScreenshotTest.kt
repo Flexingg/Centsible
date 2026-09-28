@@ -19,6 +19,8 @@ import app.centsible.core.model.MemberId
 import app.centsible.core.model.Role
 import app.centsible.core.testing.FakeBudgetEngine
 import java.time.LocalTime
+import androidx.compose.foundation.layout.padding
+import androidx.compose.ui.unit.dp
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -41,13 +43,14 @@ class DashboardScreenshotTest {
         recentTransactions = SampleHousehold.transactions,
         categoryNames = SampleHousehold.budgetMonth.groups.flatMap { it.categories }.associate { it.id.raw to it.name },
         navigate = {},
+        today = java.time.LocalDate.of(SampleHousehold.budgetMonth.month.year, SampleHousehold.budgetMonth.month.month, 18),
     )
 
     @Test fun dashboard_light() {
         compose.setContent {
             CentsibleTheme(darkTheme = false) {
                 DashboardScreen(
-                    DashboardUiState("Jo", Loadable.Ready(context), listOf(NetWorthWidget(), BudgetSummaryWidget(), RecentTransactionsWidget())),
+                    DashboardUiState("Jo", Loadable.Ready(context), listOf(BudgetDialWidget(), NetWorthWidget(), BudgetSummaryWidget(), RecentTransactionsWidget())),
                     onNavigate = {}, onRetry = {}, now = LocalTime.of(9, 0),
                 )
             }
@@ -79,13 +82,23 @@ class DashboardScreenshotTest {
                     },
                 ) {
                     DashboardScreen(
-                        DashboardUiState("Jo", Loadable.Ready(context), listOf(NetWorthWidget(), BudgetSummaryWidget(), RecentTransactionsWidget())),
+                        DashboardUiState("Jo", Loadable.Ready(context), listOf(BudgetDialWidget(), NetWorthWidget(), BudgetSummaryWidget(), RecentTransactionsWidget())),
                         onNavigate = {}, onRetry = {}, now = LocalTime.of(9, 0),
                     )
                 }
             }
         }
         compose.onRoot().captureRoboImage("screenshots/dashboard_tablet.png")
+        app.centsible.core.uitesting.A11y.assertOk(compose)
+    }
+
+    @Test fun budget_dial_dark() {
+        compose.setContent {
+            CentsibleTheme(darkTheme = true) {
+                androidx.compose.foundation.layout.Box(androidx.compose.ui.Modifier.padding(16.dp)) { BudgetDialWidget().Content(context) }
+            }
+        }
+        compose.onRoot().captureRoboImage("screenshots/budget_dial_dark.png")
         app.centsible.core.uitesting.A11y.assertOk(compose)
     }
 }

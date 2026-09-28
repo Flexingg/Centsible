@@ -151,7 +151,7 @@ fun NetWorthCard(summary: AccountsSummary) {
     val colors = CentsibleTheme.colors
     CentsibleCard(contentPadding = PaddingValues(20.dp)) {
         StatLabel("Net worth")
-        MoneyText(summary.netWorth, style = MaterialTheme.typography.displaySmall, showCents = false)
+        MoneyText(summary.netWorth, style = MaterialTheme.typography.displaySmall, showCents = false, animate = true)
         Spacer(Modifier.height(16.dp))
         val total = (summary.assets.minor - summary.liabilities.minor).coerceAtLeast(1)
         val assetShare = summary.assets.minor.toFloat() / total
