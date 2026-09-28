@@ -1,0 +1,33 @@
+{
+  "intervalHours": 24,
+  "keep": 14,
+  "intervals": [
+    0,
+    6,
+    12,
+    24,
+    168
+  ],
+  "lastRunAt": "2026-09-28T21:39:37.437Z",
+  "lastError": null,
+  "nextRunAt": "2026-09-29T21:39:37.437Z",
+  "totalSize": 107071,
+  "items": [
+    {
+      "id": "20260928T213937Z",
+      "createdAt": "2026-09-28T21:39:37.437Z",
+      "trigger": "manual",
+      "size": 107071,
+      "budgets": [
+        {
+          "budgetId": "09d8609a-a45d-46a1-a269-faf414913c55",
+          "name": "Household",
+          "file": "household-09d8609a.zip",
+          "size": 24827
+        }
+      ],
+      "skipped": [],
+      "household": true
+    }
+  ]
+}

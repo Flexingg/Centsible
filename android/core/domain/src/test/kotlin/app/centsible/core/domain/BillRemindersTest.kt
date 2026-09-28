@@ -59,4 +59,24 @@ class BillRemindersTest {
         org.junit.Assert.assertEquals(sent, BillReminders.prune(sent, today.plusDays(30)))
         org.junit.Assert.assertEquals(emptySet<String>(), BillReminders.prune(sent, today.plusDays(46)))
     }
+
+    @Test fun `a review is ready in the three days after its period ends`() {
+        val monday = java.time.LocalDate.of(2026, 9, 28) // a Monday
+        org.junit.Assert.assertEquals(
+            listOf("week" to java.time.LocalDate.of(2026, 9, 21)),
+            BillReminders.wrappedPeriods(monday, setOf("week", "month")),
+        )
+        val oct1 = java.time.LocalDate.of(2026, 10, 1)
+        org.junit.Assert.assertEquals(
+            setOf("month" to java.time.LocalDate.of(2026, 9, 1), "quarter" to java.time.LocalDate.of(2026, 7, 1)),
+            BillReminders.wrappedPeriods(oct1, setOf("month", "quarter", "year")).toSet(),
+        )
+        org.junit.Assert.assertEquals(
+            listOf("year" to java.time.LocalDate.of(2026, 1, 1)),
+            BillReminders.wrappedPeriods(java.time.LocalDate.of(2027, 1, 2), setOf("year")),
+        )
+        org.junit.Assert.assertEquals(emptyList<Pair<String, java.time.LocalDate>>(), BillReminders.wrappedPeriods(java.time.LocalDate.of(2026, 10, 9), setOf("month")))
+        val key = BillReminders.reviewKey("month", java.time.LocalDate.of(2026, 9, 1), oct1)
+        org.junit.Assert.assertTrue(BillReminders.reviewSent(setOf(key), "month", java.time.LocalDate.of(2026, 9, 1)))
+    }
 }

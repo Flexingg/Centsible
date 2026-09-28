@@ -2,7 +2,8 @@
 #
 # Only this file and .env are needed (both are attached to every GitHub release):
 #   docker compose up -d && docker compose logs bridge   # shows the setup code
-# Update with: docker compose pull && docker compose up -d
+# Updates: tap Update in the app (Settings > Server), or run
+#   docker compose pull && docker compose up -d
 #
 # In the Cloudflare Zero Trust dashboard, give the tunnel two public hostnames:
 #   actual.example.com      -> http://actual:5006   (Actual web app, as today)
@@ -11,10 +12,14 @@
 # has a "Service Auth" policy, and put that service token in .env as CF_ACCESS_*.
 services:
   actual:
-    image: actualbudget/actual-server:26.9.0 # keep on the same YY.M as the bridge
+    # Actual's own image, republished in step with the bridge: ":latest" is always the
+    # Actual release the newest bridge is built and tested for.
+    image: ${ACTUAL_IMAGE:-ghcr.io/flexingg/centsible-actual:latest}
     restart: unless-stopped
     volumes:
       - ./actual-data:/data
+    labels:
+      com.centurylinklabs.watchtower.enable: "true"
 
   bridge:
     # Published by CI for amd64 and arm64. To build from a clone instead, replace this
@@ -26,8 +31,12 @@ services:
     environment:
       ACTUAL_SERVER_URL: http://actual:5006
       BRIDGE_TRUST_PROXY: "true"
+      UPDATER_URL: http://updater:8080
+      UPDATER_TOKEN: ${UPDATER_TOKEN:-centsible-updater}
     volumes:
-      - ./bridge-data:/data
+      - ./bridge-data:/data # also holds backups (bridge-data/backups)
+    labels:
+      com.centurylinklabs.watchtower.enable: "true"
 
   cloudflared:
     image: cloudflare/cloudflared:latest
@@ -36,3 +45,20 @@ services:
     environment:
       TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN}
     depends_on: [actual, bridge]
+    labels:
+      com.centurylinklabs.watchtower.enable: "true"
+
+  # One-tap updates from the app. Watchtower (the maintained fork) only acts when the
+  # bridge asks, with the token, and only on the containers labeled above. It holds the
+  # Docker socket so the bridge never has to. Its port isn't published outside this
+  # network. Remove this service to update by hand instead.
+  updater:
+    image: nickfedor/watchtower:latest
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      WATCHTOWER_HTTP_API_UPDATE: "true"
+      WATCHTOWER_HTTP_API_TOKEN: ${UPDATER_TOKEN:-centsible-updater}
+      WATCHTOWER_LABEL_ENABLE: "true"
+      WATCHTOWER_CLEANUP: "true"

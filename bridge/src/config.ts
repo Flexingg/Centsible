@@ -25,6 +25,10 @@ export type BridgeConfig = {
   accessTokenTtlSec: number;
   refreshTokenTtlSec: number;
   logLevel: string;
+  /** The optional updater container (Watchtower's HTTP API) that one-tap updates go through. */
+  updater?: { url: string; token: string };
+  /** Where releases (bridge image tags and the app's APK) are published. */
+  releasesRepo?: string;
 };
 
 function required(env: NodeJS.ProcessEnv, key: string): string {
@@ -73,5 +77,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): BridgeConfig {
     accessTokenTtlSec: Number(env.BRIDGE_ACCESS_TTL_SEC ?? 3600),
     refreshTokenTtlSec: Number(env.BRIDGE_REFRESH_TTL_SEC ?? 90 * 24 * 3600),
     logLevel: env.LOG_LEVEL ?? 'info',
+    updater: env.UPDATER_URL && env.UPDATER_TOKEN ? { url: env.UPDATER_URL, token: env.UPDATER_TOKEN } : undefined,
+    releasesRepo: env.BRIDGE_RELEASES_REPO || 'Flexingg/Centsible',
   };
 }

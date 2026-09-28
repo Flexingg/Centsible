@@ -76,6 +76,8 @@ class PlanningApi(private val client: BridgeClient) {
     suspend fun dismissSubscription(budgetId: String, payeeId: String) {
         client.execute(HttpMethod.Post, "${b(budgetId)}/subscriptions/dismiss") { jsonBody(DismissDto(payeeId)) }
     }
+    suspend fun review(budgetId: String, period: String, date: String?): YearInReviewDto =
+        client.get("${b(budgetId)}/reports/review") { parameter("period", period); date?.let { parameter("date", it) } }
     suspend fun yearInReview(budgetId: String, year: Int?): YearInReviewDto = client.get("${b(budgetId)}/reports/year-in-review") { year?.let { parameter("year", it) } }
 
     // Reports

@@ -35,12 +35,14 @@ export class BankSyncScheduler {
     private readonly log: Logger,
     private readonly now: () => number = Date.now,
     private readonly backfill?: BankSyncBackfill,
+    private readonly backups?: { tick(): Promise<boolean> },
   ) {}
 
   start() {
     this.timer = setInterval(() => {
       void this.tick();
       void this.backfill?.tick(); // resumes a history import once SimpleFIN's quota frees up
+      void this.backups?.tick(); // scheduled backups
     }, 60_000);
     this.timer.unref();
   }

@@ -88,7 +88,9 @@ private object Routes {
     const val SUBSCRIPTIONS = "subscriptions"
     const val TRENDS = "trends"
     const val NET_WORTH = "net-worth"
-    const val YEAR_IN_REVIEW = "year-in-review"
+    const val YEAR_IN_REVIEW = "year-in-review?period={period}&date={date}"
+    fun review(period: String? = null, date: String? = null) = "year-in-review?period=${period.orEmpty()}&date=${date.orEmpty()}"
+    const val SERVER = "server"
     const val SEARCH = "transactions/search?${TransactionsViewModel.ARG_QUERY}={${TransactionsViewModel.ARG_QUERY}}"
 
     fun search(q: String) = "transactions/search?${TransactionsViewModel.ARG_QUERY}=" + java.net.URLEncoder.encode(q, "UTF-8")
@@ -127,6 +129,11 @@ private fun MainScaffold(
         when (openScreen) {
             OPEN_RECURRING -> nav.navigate(Routes.RECURRING) { launchSingleTop = true }
             OPEN_INSIGHTS -> nav.navigate(Routes.TRENDS) { launchSingleTop = true }
+            // "review:<period>:<first day>" from a review notification.
+            else -> if (openScreen?.startsWith("review:") == true) {
+                val (_, period, date) = openScreen.split(':') + listOf("", "")
+                nav.navigate(Routes.review(period, date)) { launchSingleTop = true }
+            }
         }
         if (openScreen != null) onOpened()
     }
@@ -174,24 +181,38 @@ private fun MainScaffold(
                             MoreItem.Subscriptions -> Routes.SUBSCRIPTIONS
                             MoreItem.Trends -> Routes.TRENDS
                             MoreItem.NetWorth -> Routes.NET_WORTH
-                            MoreItem.YearInReview -> Routes.YEAR_IN_REVIEW
+                            MoreItem.YearInReview -> Routes.review()
                             MoreItem.Reports -> Routes.REPORTS
                             MoreItem.Merchants -> Routes.MERCHANTS
                             MoreItem.Rules -> Routes.RULES
                             MoreItem.Tags -> Routes.TAGS
                             MoreItem.BankSync -> Routes.BANK_SYNC
+                            MoreItem.Server -> Routes.SERVER
                             MoreItem.Settings -> Routes.SETTINGS
                         },
                     )
                 })
             }
             composable(Routes.SETTINGS) { SettingsRoute(onOpenBankSync = { nav.navigate(Routes.BANK_SYNC) }) }
+            composable(Routes.SERVER) { app.centsible.feature.settings.ServerRoute(onBack = { nav.popBackStack() }) }
             composable(Routes.BANK_SYNC) { app.centsible.feature.settings.BankSyncRoute(onBack = { nav.popBackStack() }) }
             composable(Routes.RECURRING) { RecurringRoute(onBack = { nav.popBackStack() }, onFind = { nav.navigate(Routes.SUBSCRIPTIONS) { launchSingleTop = true } }) }
             composable(Routes.SUBSCRIPTIONS) { app.centsible.feature.planning.SubscriptionsRoute(onBack = { nav.popBackStack() }) }
             composable(Routes.TRENDS) { app.centsible.feature.reports.TrendsRoute(onBack = { nav.popBackStack() }) }
             composable(Routes.NET_WORTH) { app.centsible.feature.reports.NetWorthRoute(onBack = { nav.popBackStack() }) }
-            composable(Routes.YEAR_IN_REVIEW) { app.centsible.feature.reports.YearInReviewRoute(onClose = { nav.popBackStack() }) }
+            composable(
+                Routes.YEAR_IN_REVIEW,
+                arguments = listOf(
+                    navArgument("period") { type = NavType.StringType; defaultValue = "" },
+                    navArgument("date") { type = NavType.StringType; defaultValue = "" },
+                ),
+            ) { entry ->
+                app.centsible.feature.reports.YearInReviewRoute(
+                    onClose = { nav.popBackStack() },
+                    period = entry.arguments?.getString("period")?.ifEmpty { null },
+                    date = entry.arguments?.getString("date")?.ifEmpty { null },
+                )
+            }
             composable(Routes.GOALS) { app.centsible.feature.planning.GoalsRoute(onBack = { nav.popBackStack() }) }
             composable(Routes.CALENDAR) {
                 app.centsible.feature.planning.BillCalendarRoute(
@@ -261,7 +282,8 @@ private fun NavHostController.go(d: Destination) = when (d) {
     Destination.Reports -> navigate(Routes.REPORTS)
     Destination.NetWorth -> navigate(Routes.NET_WORTH)
     Destination.Trends -> navigate(Routes.TRENDS)
-    Destination.YearInReview -> navigate(Routes.YEAR_IN_REVIEW)
+    Destination.YearInReview -> navigate(Routes.review())
+    Destination.Server -> navigate(Routes.SERVER)
     is Destination.Account -> navigate(Routes.account(d.id))
     is Destination.Transaction -> navigate(Routes.transaction(d.id, d.account))
 }

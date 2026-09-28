@@ -1,4 +1,10 @@
 {
+  "period": "year",
+  "start": "2026-01-01",
+  "end": "2026-12-31",
+  "label": "2026",
+  "previousStart": "2025-01-01",
+  "nextStart": null,
   "year": 2026,
   "complete": false,
   "availableYears": [
@@ -33,48 +39,148 @@
   ],
   "topMerchants": [
     {
-      "payeeId": "bec7a998-f43c-465b-a45d-5f5e6d8049c4",
+      "payeeId": "6d725ed4-0c69-43d3-8a6d-064210ea63bb",
       "name": "Jeweler",
       "amount": 250000,
       "visits": 1
     },
     {
-      "payeeId": "c526dba4-ed88-4953-90a5-fe5ef4fb5dab",
+      "payeeId": "d0d70567-d41c-44d7-8b83-d676750f3dc7",
       "name": "Oak Street Apartments",
       "amount": 185000,
       "visits": 1
     },
     {
-      "payeeId": "d80c0da9-676d-4d6c-b901-99280870e348",
+      "payeeId": "4b57a3af-276a-45b1-9736-9672d5eb84d4",
       "name": "Grocer",
       "amount": 120000,
       "visits": 4
     },
     {
-      "payeeId": "3f5757dd-58f4-48f6-8a39-37d1411d90a1",
+      "payeeId": "ea488f53-d2c1-42c7-8c37-6a92083a4f33",
       "name": "Farmers Market",
       "amount": 20000,
       "visits": 1
     },
     {
-      "payeeId": "26b05bd5-1460-423e-a632-45a3c6594598",
+      "payeeId": "81e5195b-bff9-4818-9de8-e080eace80a8",
       "name": "Costco",
       "amount": 12834,
       "visits": 2
     }
   ],
   "mostVisited": {
-    "payeeId": "d80c0da9-676d-4d6c-b901-99280870e348",
+    "payeeId": "4b57a3af-276a-45b1-9736-9672d5eb84d4",
     "name": "Grocer",
     "amount": 120000,
     "visits": 4
   },
   "biggestPurchase": {
-    "transactionId": "6bf2e561-8d77-41f8-9df9-4cdaee3026a6",
+    "transactionId": "3533f527-b460-49ef-8cb5-d77acfcd88e9",
     "date": "2026-08-20",
     "payeeName": "Jeweler",
     "categoryName": "General",
     "amount": 250000
+  },
+  "buckets": [
+    {
+      "key": "2026-01",
+      "label": "Jan",
+      "start": "2026-01-01",
+      "spending": 0,
+      "income": 0
+    },
+    {
+      "key": "2026-02",
+      "label": "Feb",
+      "start": "2026-02-01",
+      "spending": 0,
+      "income": 0
+    },
+    {
+      "key": "2026-03",
+      "label": "Mar",
+      "start": "2026-03-01",
+      "spending": 0,
+      "income": 0
+    },
+    {
+      "key": "2026-04",
+      "label": "Apr",
+      "start": "2026-04-01",
+      "spending": 0,
+      "income": 0
+    },
+    {
+      "key": "2026-05",
+      "label": "May",
+      "start": "2026-05-01",
+      "spending": 30500,
+      "income": 0
+    },
+    {
+      "key": "2026-06",
+      "label": "Jun",
+      "start": "2026-06-01",
+      "spending": 32099,
+      "income": 0
+    },
+    {
+      "key": "2026-07",
+      "label": "Jul",
+      "start": "2026-07-01",
+      "spending": 32099,
+      "income": 0
+    },
+    {
+      "key": "2026-08",
+      "label": "Aug",
+      "start": "2026-08-01",
+      "spending": 305599,
+      "income": 0
+    },
+    {
+      "key": "2026-09",
+      "label": "Sep",
+      "start": "2026-09-01",
+      "spending": 204007,
+      "income": 610000
+    },
+    {
+      "key": "2026-10",
+      "label": "Oct",
+      "start": "2026-10-01",
+      "spending": 0,
+      "income": 0
+    },
+    {
+      "key": "2026-11",
+      "label": "Nov",
+      "start": "2026-11-01",
+      "spending": 0,
+      "income": 0
+    },
+    {
+      "key": "2026-12",
+      "label": "Dec",
+      "start": "2026-12-01",
+      "spending": 0,
+      "income": 0
+    }
+  ],
+  "biggestBucket": {
+    "key": "2026-08",
+    "label": "Aug",
+    "start": "2026-08-01",
+    "spending": 305599,
+    "income": 0
+  },
+  "smallestBucket": {
+    "key": "2026-05",
+    "label": "May",
+    "start": "2026-05-01",
+    "spending": 30500,
+    "income": 0
   },
   "months": [
     {
@@ -156,5 +262,6 @@
   },
   "newMerchants": 9,
   "merchantsVisited": 9,
+  "previousPeriod": null,
   "previousYear": null
 }

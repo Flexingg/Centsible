@@ -14,7 +14,8 @@ const apiEntry = require.resolve('@actual-app/api'); // <pkg>/dist/index.js
 export const ACTUAL_API_VERSION = readVersion(join(dirname(apiEntry), '..', 'package.json'));
 
 const here = dirname(fileURLToPath(import.meta.url)); // src/actual or dist/actual
-export const BRIDGE_VERSION = readVersion(join(here, '..', '..', 'package.json'));
+/** The release this build belongs to (0.2.<CI run>, set in the image), else package.json's version. */
+export const BRIDGE_VERSION = process.env.BRIDGE_RELEASE || readVersion(join(here, '..', '..', 'package.json'));
 export const CONTRACT_VERSION = '1.0.0';
 
 export type Compatibility = 'ok' | 'api_newer' | 'api_older' | 'unknown';

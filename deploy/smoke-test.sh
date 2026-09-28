@@ -45,4 +45,9 @@ wait_for curl -sf http://127.0.0.1:8787/v1/health
 budgets="$(api http://127.0.0.1:8787/v1/budgets -H "authorization: Bearer $token")"
 [ "$(echo "$budgets" | jq -r '.items[0].name')" = "Household" ] || fail "after restart: $budgets"
 [ "$(api http://127.0.0.1:8787/v1/setup | jq -r .needsOwner)" = "false" ] || fail "still unclaimed after restart"
+# Backups inside the real container: every budget as Actual's .zip, plus the household.
+backup="$(api -X POST http://127.0.0.1:8787/v1/server/backups -H "authorization: Bearer $token")"
+[ "$(echo "$backup" | jq -r '.budgets[0].name')" = "Household" ] || fail "backup: $backup"
+[ "$(echo "$backup" | jq -r .household)" = "true" ] || fail "backup without household: $backup"
+echo "backup: $(echo "$backup" | jq -c '{id, size}')"
 echo "smoke test passed"

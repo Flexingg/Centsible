@@ -132,16 +132,22 @@ jobs:
           context: bridge
           load: true
           tags: centsible-bridge:ci
+      - name: Paired Actual version
+        id: actual
+        run: echo "version=$(jq -r '.devDependencies["@actual-app/sync-server"]' bridge/package.json)" >> "$GITHUB_OUTPUT"
       - name: Smoke test with docker compose
-        run: BRIDGE_IMAGE=centsible-bridge:ci ./deploy/smoke-test.sh
+        # The republished Actual image appears only after this job, so test with Actual's own.
+        run: BRIDGE_IMAGE=centsible-bridge:ci ACTUAL_IMAGE=actualbudget/actual-server:${{ steps.actual.outputs.version }} ./deploy/smoke-test.sh
       - name: Publish?
         id: publish
         if: github.event_name == 'push'
         run: |
           if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
             echo "tags=ghcr.io/flexingg/centsible-bridge:${GITHUB_REF_NAME#v},ghcr.io/flexingg/centsible-bridge:latest" >> "$GITHUB_OUTPUT"
+            echo "release=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
           elif [[ "$GITHUB_REF" == refs/heads/main ]]; then
             echo "tags=ghcr.io/flexingg/centsible-bridge:0.2.${{ github.run_number }},ghcr.io/flexingg/centsible-bridge:latest" >> "$GITHUB_OUTPUT"
+            echo "release=0.2.${{ github.run_number }}" >> "$GITHUB_OUTPUT"
           fi
       - uses: docker/login-action@v4
         if: steps.publish.outputs.tags != ''
@@ -156,10 +162,22 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ steps.publish.outputs.tags }}
+          build-args: BRIDGE_RELEASE=${{ steps.publish.outputs.release }}
           labels: |
             org.opencontainers.image.source=https://github.com/Flexingg/Centsible
             org.opencontainers.image.description=Centsible bridge: the Android app's gateway to a self-hosted Actual Budget server
             org.opencontainers.image.licenses=GPL-3.0
+      - name: Publish the paired Actual image
+        # ghcr.io/flexingg/centsible-actual:latest is always the Actual release this bridge
+        # is built for, so one-tap updates move both together.
+        if: steps.publish.outputs.tags != ''
+        uses: docker/build-push-action@v7
+        with:
+          context: deploy/actual-image
+          platforms: linux/amd64,linux/arm64
+          push: true
+          build-args: ACTUAL_VERSION=${{ steps.actual.outputs.version }}
+          tags: ghcr.io/flexingg/centsible-actual:${{ steps.actual.outputs.version }},ghcr.io/flexingg/centsible-actual:latest
 
   release:
     # Every green push to main becomes a release with the APK attached, so a phone

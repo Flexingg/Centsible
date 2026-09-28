@@ -20,6 +20,6 @@ class CentsibleApplication : Application() {
         super.onCreate()
         BillReminderWorker.createChannel(this)
         // Re-register the daily check (a no-op if it's already queued).
-        CoroutineScope(SupervisorJob() + Dispatchers.Default).launch { reminderScheduler.apply(reminders.enabled.first() || reminders.alerts.first()) }
+        CoroutineScope(SupervisorJob() + Dispatchers.Default).launch { reminderScheduler.apply(reminders.enabled.first() || reminders.alerts.first() || reminders.reviews.first().isNotEmpty()) }
     }
 }

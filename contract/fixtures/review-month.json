@@ -1,0 +1,330 @@
+{
+  "period": "month",
+  "start": "2026-08-01",
+  "end": "2026-08-31",
+  "label": "August 2026",
+  "previousStart": "2026-07-01",
+  "nextStart": "2026-09-01",
+  "year": 2026,
+  "complete": true,
+  "availableYears": [
+    2026
+  ],
+  "empty": false,
+  "income": 0,
+  "spending": 305599,
+  "saved": -305599,
+  "savingsRate": null,
+  "purchases": 5,
+  "dailyAverage": 9858,
+  "topCategories": [
+    {
+      "categoryId": "af375fd4-d759-46b3-bffe-74a856151d57",
+      "name": "General",
+      "amount": 255599,
+      "share": 0.8363868991717904
+    },
+    {
+      "categoryId": "541836f1-e756-4473-a5d0-6c1d3f06c7fa",
+      "name": "Food",
+      "amount": 50000,
+      "share": 0.1636131008282095
+    }
+  ],
+  "topMerchants": [
+    {
+      "payeeId": "6d725ed4-0c69-43d3-8a6d-064210ea63bb",
+      "name": "Jeweler",
+      "amount": 250000,
+      "visits": 1
+    },
+    {
+      "payeeId": "4b57a3af-276a-45b1-9736-9672d5eb84d4",
+      "name": "Grocer",
+      "amount": 30000,
+      "visits": 1
+    },
+    {
+      "payeeId": "ea488f53-d2c1-42c7-8c37-6a92083a4f33",
+      "name": "Farmers Market",
+      "amount": 20000,
+      "visits": 1
+    },
+    {
+      "payeeId": "f1cdcc80-0792-4cfc-8411-4432956c0698",
+      "name": "Coffee Cart",
+      "amount": 4000,
+      "visits": 1
+    },
+    {
+      "payeeId": "9387afc6-1a0f-4aaf-ad14-33e8f4070640",
+      "name": "Netflix",
+      "amount": 1599,
+      "visits": 1
+    }
+  ],
+  "mostVisited": {
+    "payeeId": "6d725ed4-0c69-43d3-8a6d-064210ea63bb",
+    "name": "Jeweler",
+    "amount": 250000,
+    "visits": 1
+  },
+  "biggestPurchase": {
+    "transactionId": "3533f527-b460-49ef-8cb5-d77acfcd88e9",
+    "date": "2026-08-20",
+    "payeeName": "Jeweler",
+    "categoryName": "General",
+    "amount": 250000
+  },
+  "buckets": [
+    {
+      "key": "2026-08-01",
+      "label": "1",
+      "start": "2026-08-01",
+      "spending": 0,
+      "income": 0
+    },
+    {
+      "key": "2026-08-02",
+      "label": "2",
+      "start": "2026-08-02",
+      "spending": 0,
+      "income": 0
+    },
+    {
+      "key": "2026-08-03",
+      "label": "3",
+      "start": "2026-08-03",
+      "spending": 0,
+      "income": 0
+    },
+    {
+      "key": "2026-08-04",
+      "label": "4",
+      "start": "2026-08-04",
+      "spending": 0,
+      "income": 0
+    },
+    {
+      "key": "2026-08-05",
+      "label": "5",
+      "start": "2026-08-05",
+      "spending": 0,
+      "income": 0
+    },
+    {
+      "key": "2026-08-06",
+      "label": "6",
+      "start": "2026-08-06",
+      "spending": 0,
+      "income": 0
+    },
+    {
+      "key": "2026-08-07",
+      "label": "7",
+      "start": "2026-08-07",
+      "spending": 0,
+      "income": 0
+    },
+    {
+      "key": "2026-08-08",
+      "label": "8",
+      "start": "2026-08-08",
+      "spending": 0,
+      "income": 0
+    },
+    {
+      "key": "2026-08-09",
+      "label": "9",
+      "start": "2026-08-09",
+      "spending": 0,
+      "income": 0
+    },
+    {
+      "key": "2026-08-10",
+      "label": "10",
+      "start": "2026-08-10",
+      "spending": 30000,
+      "income": 0
+    },
+    {
+      "key": "2026-08-11",
+      "label": "11",
+      "start": "2026-08-11",
+      "spending": 0,
+      "income": 0
+    },
+    {
+      "key": "2026-08-12",
+      "label": "12",
+      "start": "2026-08-12",
+      "spending": 5599,
+      "income": 0
+    },
+    {
+      "key": "2026-08-13",
+      "label": "13",
+      "start": "2026-08-13",
+      "spending": 0,
+      "income": 0
+    },
+    {
+      "key": "2026-08-14",
+      "label": "14",
+      "start": "2026-08-14",
+      "spending": 0,
+      "income": 0
+    },
+    {
+      "key": "2026-08-15",
+      "label": "15",
+      "start": "2026-08-15",
+      "spending": 0,
+      "income": 0
+    },
+    {
+      "key": "2026-08-16",
+      "label": "16",
+      "start": "2026-08-16",
+      "spending": 0,
+      "income": 0
+    },
+    {
+      "key": "2026-08-17",
+      "label": "17",
+      "start": "2026-08-17",
+      "spending": 0,
+      "income": 0
+    },
+    {
+      "key": "2026-08-18",
+      "label": "18",
+      "start": "2026-08-18",
+      "spending": 20000,
+      "income": 0
+    },
+    {
+      "key": "2026-08-19",
+      "label": "19",
+      "start": "2026-08-19",
+      "spending": 0,
+      "income": 0
+    },
+    {
+      "key": "2026-08-20",
+      "label": "20",
+      "start": "2026-08-20",
+      "spending": 250000,
+      "income": 0
+    },
+    {
+      "key": "2026-08-21",
+      "label": "21",
+      "start": "2026-08-21",
+      "spending": 0,
+      "income": 0
+    },
+    {
+      "key": "2026-08-22",
+      "label": "22",
+      "start": "2026-08-22",
+      "spending": 0,
+      "income": 0
+    },
+    {
+      "key": "2026-08-23",
+      "label": "23",
+      "start": "2026-08-23",
+      "spending": 0,
+      "income": 0
+    },
+    {
+      "key": "2026-08-24",
+      "label": "24",
+      "start": "2026-08-24",
+      "spending": 0,
+      "income": 0
+    },
+    {
+      "key": "2026-08-25",
+      "label": "25",
+      "start": "2026-08-25",
+      "spending": 0,
+      "income": 0
+    },
+    {
+      "key": "2026-08-26",
+      "label": "26",
+      "start": "2026-08-26",
+      "spending": 0,
+      "income": 0
+    },
+    {
+      "key": "2026-08-27",
+      "label": "27",
+      "start": "2026-08-27",
+      "spending": 0,
+      "income": 0
+    },
+    {
+      "key": "2026-08-28",
+      "label": "28",
+      "start": "2026-08-28",
+      "spending": 0,
+      "income": 0
+    },
+    {
+      "key": "2026-08-29",
+      "label": "29",
+      "start": "2026-08-29",
+      "spending": 0,
+      "income": 0
+    },
+    {
+      "key": "2026-08-30",
+      "label": "30",
+      "start": "2026-08-30",
+      "spending": 0,
+      "income": 0
+    },
+    {
+      "key": "2026-08-31",
+      "label": "31",
+      "start": "2026-08-31",
+      "spending": 0,
+      "income": 0
+    }
+  ],
+  "biggestBucket": {
+    "key": "2026-08-20",
+    "label": "20",
+    "start": "2026-08-20",
+    "spending": 250000,
+    "income": 0
+  },
+  "smallestBucket": {
+    "key": "2026-08-12",
+    "label": "12",
+    "start": "2026-08-12",
+    "spending": 5599,
+    "income": 0
+  },
+  "months": [],
+  "biggestMonth": null,
+  "smallestMonth": null,
+  "noSpendDays": 27,
+  "longestNoSpendStreak": {
+    "days": 11,
+    "start": "2026-08-21",
+    "end": "2026-08-31"
+  },
+  "newMerchants": 2,
+  "merchantsVisited": 5,
+  "previousPeriod": {
+    "spending": 32099,
+    "income": 0,
+    "spendingChangePct": 852,
+    "label": "July 2026"
+  },
+  "previousYear": null
+}

@@ -49,7 +49,7 @@
       "scheduleId": null
     },
     {
-      "id": "unusual:1f88d70b-bca9-4eb4-b848-0b066a7c83bb",
+      "id": "unusual:c20d6c9a-319c-419b-ad57-9c670f255b98",
       "kind": "unusual-transaction",
       "severity": "warning",
       "title": "Bigger than usual at Coffee Cart",
@@ -57,11 +57,11 @@
       "amount": -4000,
       "date": "2026-08-12",
       "categoryId": "af375fd4-d759-46b3-bffe-74a856151d57",
-      "transactionId": "1f88d70b-bca9-4eb4-b848-0b066a7c83bb",
+      "transactionId": "c20d6c9a-319c-419b-ad57-9c670f255b98",
       "scheduleId": null
     },
     {
-      "id": "new:6bf2e561-8d77-41f8-9df9-4cdaee3026a6",
+      "id": "new:3533f527-b460-49ef-8cb5-d77acfcd88e9",
       "kind": "new-merchant",
       "severity": "info",
       "title": "First time at Jeweler",
@@ -69,7 +69,7 @@
       "amount": -250000,
       "date": "2026-08-20",
       "categoryId": "af375fd4-d759-46b3-bffe-74a856151d57",
-      "transactionId": "6bf2e561-8d77-41f8-9df9-4cdaee3026a6",
+      "transactionId": "3533f527-b460-49ef-8cb5-d77acfcd88e9",
       "scheduleId": null
     }
   ]

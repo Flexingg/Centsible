@@ -1,5 +1,6 @@
 package app.centsible.feature.settings
 
+import androidx.compose.foundation.horizontalScroll
 import app.centsible.core.designsystem.component.toggleRow
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -86,6 +87,7 @@ fun SettingsRoute(onOpenBankSync: () -> Unit = {}, viewModel: SettingsViewModel 
             setAppLock = viewModel::setAppLock,
             setReminders = { on -> if (on) askNotifications { viewModel.setReminders(true) } else viewModel.setReminders(false) },
             setAlerts = { on -> if (on) askNotifications { viewModel.setAlerts(true) } else viewModel.setAlerts(false) },
+            toggleReview = { p -> if (p !in state.reviews) askNotifications { viewModel.toggleReview(p) } else viewModel.toggleReview(p) },
             setReminderDays = viewModel::setReminderDays,
             openBankSync = onOpenBankSync,
         ),
@@ -110,6 +112,7 @@ data class SettingsActions(
     val setReminders: (Boolean) -> Unit = {},
     val setReminderDays: (Int) -> Unit = {},
     val setAlerts: (Boolean) -> Unit = {},
+    val toggleReview: (String) -> Unit = {},
     val openBankSync: () -> Unit = {},
 )
 
@@ -210,6 +213,20 @@ fun SettingsScreen(state: SettingsUiState, actions: SettingsActions, renderQr: B
                                     )
                                 }
                                 androidx.compose.material3.Switch(checked = state.alerts, onCheckedChange = null)
+                            }
+                            Text("Reviews", style = MaterialTheme.typography.bodyLarge, modifier = Modifier.padding(top = 12.dp))
+                            Text(
+                                "A notification when each period you pick wraps up, with its review.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = colors.textSecondary,
+                            )
+                            Row(
+                                Modifier.padding(top = 8.dp).horizontalScroll(androidx.compose.foundation.rememberScrollState()),
+                                horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp),
+                            ) {
+                                listOf("week" to "Weekly", "month" to "Monthly", "quarter" to "Quarterly", "year" to "Yearly").forEach { (p, label) ->
+                                    androidx.compose.material3.FilterChip(selected = p in state.reviews, onClick = { actions.toggleReview(p) }, label = { Text(label) })
+                                }
                             }
                         }
                     }

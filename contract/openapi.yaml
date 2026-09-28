@@ -232,6 +232,151 @@ paths:
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
 
+  /v1/server:
+    get:
+      tags: [server]
+      operationId: serverStatus
+      summary: Versions (bridge, Actual, the newest release with the app's APK), whether one-tap updates are set up, uptime and disk. Newest releases are checked on GitHub every few hours (refresh=true to check now).
+      parameters:
+        - { name: refresh, in: query, schema: { type: boolean } }
+      responses:
+        '200':
+          description: Status
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ServerStatus' }
+        '401': { $ref: '#/components/responses/Problem' }
+
+  /v1/server/update:
+    post:
+      tags: [server]
+      operationId: updateServer
+      summary: Owners. Asks the updater container to pull the newest bridge, Actual and tunnel images and restart them. The bridge restarts too; watch /v1/health for the new version.
+      responses:
+        '202':
+          description: Requested
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [requested]
+                properties:
+                  requested: { type: boolean }
+        '400': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '502': { $ref: '#/components/responses/Problem' }
+
+  /v1/server/backups:
+    get:
+      tags: [server]
+      operationId: listBackups
+      summary: Owners. Backup schedule and the backups kept (newest first).
+      responses:
+        '200':
+          description: Backups
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BackupOverview' }
+        '403': { $ref: '#/components/responses/Problem' }
+    post:
+      tags: [server]
+      operationId: backUpNow
+      summary: Owners. Back up every budget (Actual's own export) and the household database now.
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Backup' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+
+  /v1/server/backups/settings:
+    put:
+      tags: [server]
+      operationId: backupSettings
+      summary: Owners. How often to back up (0 = off) and how many backups to keep.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              minProperties: 1
+              additionalProperties: false
+              properties:
+                intervalHours: { type: integer, enum: [0, 6, 12, 24, 168] }
+                keep: { type: integer, minimum: 1, maximum: 60 }
+      responses:
+        '200':
+          description: Backups
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BackupOverview' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+
+  /v1/server/backups/{id}:
+    delete:
+      tags: [server]
+      operationId: deleteBackup
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        '204': { description: Deleted }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+
+  /v1/server/backups/{id}/files/{file}:
+    get:
+      tags: [server]
+      operationId: downloadBackupFile
+      summary: Owners. One file from a backup - a budget's .zip (importable in Actual's web app) or household.sqlite.
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+        - { name: file, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: The file
+          content:
+            application/zip:
+              schema: { type: string, format: binary }
+            application/octet-stream:
+              schema: { type: string, format: binary }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+
+  /v1/server/backups/{id}/restore:
+    post:
+      tags: [server]
+      operationId: restoreBackup
+      summary: Owners. Import a budget from a backup as a new budget, "<name> (restored <date>)". Nothing existing is changed.
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [budgetId]
+              additionalProperties: false
+              properties:
+                budgetId: { type: string, minLength: 1 }
+      responses:
+        '201':
+          description: Restored
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [budgetId, name]
+                properties:
+                  budgetId: { type: string }
+                  name: { type: string }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+
   /v1/budgets:
     get:
       tags: [budgets]
@@ -1218,6 +1363,24 @@ paths:
         '204': { description: Dismissed }
         '403': { $ref: '#/components/responses/Problem' }
 
+  /v1/budgets/{budgetId}/reports/review:
+    get:
+      tags: [insights]
+      operationId: periodReview
+      summary: A week's, month's, quarter's or year's story. Without a date, the most recently finished period (for a year - this one from November, otherwise last year).
+      parameters:
+        - $ref: '#/components/parameters/BudgetId'
+        - { name: period, in: query, required: true, schema: { type: string, enum: [week, month, quarter, year] } }
+        - { name: date, in: query, description: Any day in the period, schema: { $ref: '#/components/schemas/Date' } }
+      responses:
+        '200':
+          description: Review
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/YearInReview' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '423': { $ref: '#/components/responses/Problem' }
+
   /v1/budgets/{budgetId}/reports/year-in-review:
     get:
       tags: [insights]
@@ -1983,7 +2146,7 @@ components:
         status: { type: integer }
         code:
           type: string
-          description: Stable machine-readable code, e.g. `unauthorized`, `forbidden`, `not_found`, `validation`, `feature_unavailable`, `actual_unavailable`, `budget_encrypted`, `bank_sync_failed`, `conflict`, `rate_limited`
+          description: Stable machine-readable code, e.g. `unauthorized`, `forbidden`, `not_found`, `validation`, `feature_unavailable`, `actual_unavailable`, `budget_encrypted`, `bank_sync_failed`, `update_failed`, `conflict`, `rate_limited`
         detail: { type: string }
 
     Health:
@@ -2424,10 +2587,39 @@ components:
               date: { $ref: '#/components/schemas/Date' }
     YearInReview:
       type: object
-      required: [year, complete, availableYears, empty, income, spending, saved, savingsRate, purchases, dailyAverage, topCategories, topMerchants, mostVisited, biggestPurchase, months, biggestMonth, smallestMonth, noSpendDays, longestNoSpendStreak, newMerchants, merchantsVisited, previousYear]
+      description: A period's review (named for the year view, which came first).
+      required: [period, start, end, label, previousStart, nextStart, buckets, biggestBucket, smallestBucket, previousPeriod, year, complete, availableYears, empty, income, spending, saved, savingsRate, purchases, dailyAverage, topCategories, topMerchants, mostVisited, biggestPurchase, months, biggestMonth, smallestMonth, noSpendDays, longestNoSpendStreak, newMerchants, merchantsVisited, previousYear]
       properties:
+        period: { type: string, enum: [week, month, quarter, year] }
+        start: { $ref: '#/components/schemas/Date' }
+        end: { $ref: '#/components/schemas/Date' }
+        label: { type: string, description: 'e.g. "Week of Sep 21, 2026", "September 2026", "Q3 2026", "2026"' }
+        previousStart: { $ref: '#/components/schemas/Date' }
+        nextStart: { type: [string, 'null'], description: Null while the next period hasn't started }
+        buckets:
+          type: array
+          description: Days for a week or month, weeks for a quarter, months for a year
+          items: { $ref: '#/components/schemas/ReviewBucket' }
+        biggestBucket:
+          oneOf:
+            - type: 'null'
+            - $ref: '#/components/schemas/ReviewBucket'
+        smallestBucket:
+          oneOf:
+            - type: 'null'
+            - $ref: '#/components/schemas/ReviewBucket'
+        previousPeriod:
+          oneOf:
+            - type: 'null'
+            - type: object
+              required: [spending, income, spendingChangePct, label]
+              properties:
+                spending: { $ref: '#/components/schemas/Money' }
+                income: { $ref: '#/components/schemas/Money' }
+                spendingChangePct: { type: [integer, 'null'] }
+                label: { type: string }
         year: { type: integer }
-        complete: { type: boolean, description: False while the year is still going }
+        complete: { type: boolean, description: False while the period is still going }
         availableYears: { type: array, items: { type: integer } }
         empty: { type: boolean }
         income: { $ref: '#/components/schemas/Money' }
@@ -2490,6 +2682,15 @@ components:
                 spending: { $ref: '#/components/schemas/Money' }
                 income: { $ref: '#/components/schemas/Money' }
                 spendingChangePct: { type: [integer, 'null'] }
+    ReviewBucket:
+      type: object
+      required: [key, label, start, spending, income]
+      properties:
+        key: { type: string }
+        label: { type: string }
+        start: { $ref: '#/components/schemas/Date' }
+        spending: { $ref: '#/components/schemas/Money' }
+        income: { $ref: '#/components/schemas/Money' }
     MerchantTotal:
       type: object
       required: [payeeId, name, amount, visits]
@@ -2505,6 +2706,96 @@ components:
         month: { $ref: '#/components/schemas/Month' }
         spending: { $ref: '#/components/schemas/Money' }
         income: { $ref: '#/components/schemas/Money' }
+    ServerStatus:
+      type: object
+      required: [bridge, actual, app, updater, disk, checkedAt]
+      properties:
+        bridge:
+          type: object
+          required: [version, latest, updateAvailable, uptimeSeconds]
+          properties:
+            version: { type: string }
+            latest: { type: [string, 'null'] }
+            updateAvailable: { type: boolean }
+            uptimeSeconds: { type: integer }
+        actual:
+          type: object
+          required: [version, pairedVersion, compatibility, newestRelease, connected]
+          properties:
+            version: { type: [string, 'null'] }
+            pairedVersion: { type: string, description: The Actual release this bridge is built for (and that updates bring) }
+            compatibility: { type: string, enum: [ok, api_newer, api_older, unknown] }
+            newestRelease: { type: [string, 'null'], description: Actual's newest release; the bridge moves to it after testing }
+            connected: { type: boolean }
+        app:
+          oneOf:
+            - type: 'null'
+            - type: object
+              required: [version, versionCode, publishedAt, url, apkUrl, notes]
+              properties:
+                version: { type: string }
+                versionCode: { type: [integer, 'null'] }
+                publishedAt: { type: [string, 'null'] }
+                url: { type: string }
+                apkUrl: { type: [string, 'null'] }
+                notes: { type: [string, 'null'] }
+        updater:
+          type: object
+          required: [configured, lastRequestedAt, lastUpdatedFrom, lastResult]
+          properties:
+            configured: { type: boolean }
+            lastRequestedAt: { type: [string, 'null'] }
+            lastUpdatedFrom: { type: [string, 'null'] }
+            lastResult: { type: [string, 'null'] }
+        disk:
+          oneOf:
+            - type: 'null'
+            - type: object
+              required: [free, total]
+              properties:
+                free: { type: integer }
+                total: { type: integer }
+        checkedAt: { type: [string, 'null'] }
+    BackupOverview:
+      type: object
+      required: [intervalHours, keep, intervals, lastRunAt, lastError, nextRunAt, totalSize, items]
+      properties:
+        intervalHours: { type: integer }
+        keep: { type: integer }
+        intervals: { type: array, items: { type: integer } }
+        lastRunAt: { type: [string, 'null'] }
+        lastError: { type: [string, 'null'] }
+        nextRunAt: { type: [string, 'null'] }
+        totalSize: { type: integer }
+        items: { type: array, items: { $ref: '#/components/schemas/Backup' } }
+    Backup:
+      type: object
+      required: [id, createdAt, trigger, size, budgets, skipped, household]
+      properties:
+        id: { type: string }
+        createdAt: { type: string, format: date-time }
+        trigger: { type: string, enum: [scheduled, manual] }
+        size: { type: integer }
+        budgets:
+          type: array
+          items:
+            type: object
+            required: [budgetId, name, file, size]
+            properties:
+              budgetId: { type: string }
+              name: { type: string }
+              file: { type: string }
+              size: { type: integer }
+        skipped:
+          type: array
+          items:
+            type: object
+            required: [budgetId, name, reason]
+            properties:
+              budgetId: { type: string }
+              name: { type: string }
+              reason: { type: string }
+        household: { type: boolean }
     BudgetMonth:
       type: object
       required: [month, budgetType, toBudget, incomeAvailable, lastMonthOverspent, forNextMonth,

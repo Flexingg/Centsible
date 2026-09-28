@@ -42,6 +42,7 @@ data class SettingsUiState(
     val reminders: Boolean = false,
     val reminderDays: Int = 1,
     val alerts: Boolean = false,
+    val reviews: Set<String> = emptySet(),
 )
 
 @HiltViewModel
@@ -61,17 +62,25 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch { reminders.enabled.collect { on -> state.update { it.copy(reminders = on) } } }
         viewModelScope.launch { reminders.daysAhead.collect { d -> state.update { it.copy(reminderDays = d) } } }
         viewModelScope.launch { reminders.alerts.collect { on -> state.update { it.copy(alerts = on) } } }
+        viewModelScope.launch { reminders.reviews.collect { r -> state.update { it.copy(reviews = r) } } }
     }
 
     fun setReminders(enabled: Boolean) = viewModelScope.launch {
         reminders.setEnabled(enabled)
-        reminderScheduler.apply(enabled || state.value.alerts)
+        reminderScheduler.apply(enabled || state.value.alerts || state.value.reviews.isNotEmpty())
     }
 
     /** Spending alerts share the daily background check with bill reminders. */
     fun setAlerts(enabled: Boolean) = viewModelScope.launch {
         reminders.setAlerts(enabled)
-        reminderScheduler.apply(enabled || state.value.reminders)
+        reminderScheduler.apply(enabled || state.value.reminders || state.value.reviews.isNotEmpty())
+    }
+
+    /** "Tell me when my week/month/quarter/year is wrapped." */
+    fun toggleReview(period: String) = viewModelScope.launch {
+        val next = state.value.reviews.let { if (period in it) it - period else it + period }
+        reminders.setReviews(next)
+        reminderScheduler.apply(next.isNotEmpty() || state.value.reminders || state.value.alerts)
     }
 
     fun setReminderDays(days: Int) = viewModelScope.launch { reminders.setDaysAhead(days) }

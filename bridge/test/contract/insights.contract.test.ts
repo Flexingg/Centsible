@@ -166,6 +166,39 @@ describe('year in review', () => {
   });
 });
 
+describe('reviews of any period', () => {
+  const path = '/reports/review';
+
+  it('reviews a month, day by day, against the month before', async () => {
+    const last = shift(M, -1);
+    const r = (await call('GET', `/reports/review?period=month&date=${last}-15`, path, viewer)).body;
+    expect(r).toMatchObject({ period: 'month', start: `${last}-01`, complete: true, empty: false, previousStart: `${shift(M, -2)}-01` });
+    expect(r.buckets.length).toBe(Number(r.end.slice(8)));
+    expect(r.biggestBucket).toMatchObject({ key: `${last}-20`, spending: 250000 }); // the Jeweler
+    expect(r.biggestPurchase).toMatchObject({ payeeName: 'Jeweler' });
+    expect(r.previousPeriod).toMatchObject({ spending: 32099 }); // groceries, a coffee and Netflix the month before
+    expect(r.spending).toBe(r.buckets.reduce((s: number, b: any) => s + b.spending, 0));
+    recordFixture('review-month', r);
+  });
+
+  it('reviews a week by day and a quarter by week', async () => {
+    const last = shift(M, -1);
+    const week = (await call('GET', `/reports/review?period=week&date=${last}-20`, path, viewer)).body;
+    expect(week.buckets.map((b: any) => b.label)).toEqual(['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']);
+    expect(week.start <= `${last}-20` && week.end >= `${last}-20`).toBe(true);
+    const quarter = (await call('GET', `/reports/review?period=quarter&date=${last}-20`, path, viewer)).body;
+    expect(quarter.label).toMatch(/^Q[1-4] \d{4}$/);
+    expect(quarter.buckets.length).toBeGreaterThanOrEqual(13);
+  });
+
+  it('defaults to the last finished period, and refuses the future', async () => {
+    const r = (await call('GET', '/reports/review?period=month', path, viewer)).body;
+    expect(r).toMatchObject({ start: `${shift(M, -1)}-01`, complete: true, nextStart: `${M}-01` });
+    expect((await call('GET', `/reports/review?period=week&date=${shift(M, 3)}-01`, path, viewer)).status).toBe(400);
+    expect((await call('GET', '/reports/review?period=decade', path, viewer)).status).toBe(400);
+  });
+});
+
 describe('net worth by account', () => {
   it('breaks the total down per account', async () => {
     const res = await call('GET', '/reports/net-worth?months=6', '/reports/net-worth', viewer);

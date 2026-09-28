@@ -131,6 +131,11 @@ export class HouseholdStore {
   }
 
   /** SimpleFIN requests in the last 24 hours (their quota is ~24 a day). */
+  /** A consistent copy of the household database (members, devices, settings), safe while running. */
+  async backupTo(path: string): Promise<void> {
+    await this.db.backup(path);
+  }
+
   simpleFinRequestsToday(): number {
     return (this.db.prepare('SELECT COUNT(*) AS n FROM simplefin_requests WHERE at >= ?').get(this.now() - 24 * 3600 * 1000) as { n: number }).n;
   }

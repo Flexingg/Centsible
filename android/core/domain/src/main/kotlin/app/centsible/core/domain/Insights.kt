@@ -16,4 +16,6 @@ interface InsightsGateway {
     suspend fun dismissSubscription(budget: BudgetId, payee: PayeeId)
     /** null: the bridge picks (this year from November, otherwise last year). */
     suspend fun yearInReview(budget: BudgetId, year: Int? = null): YearInReview
+    /** [date]: any day in the period; null for the last finished one. */
+    suspend fun review(budget: BudgetId, period: app.centsible.core.model.ReviewPeriod, date: String? = null): YearInReview
 }

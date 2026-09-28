@@ -36,12 +36,13 @@ enum class MoreItem(val emoji: String, val title: String, val subtitle: String) 
     Subscriptions("🔎", "Subscriptions", "Find recurring payments and price changes"),
     Trends("📉", "Trends", "Spending against your usual, and alerts"),
     NetWorth("🏔️", "Net worth", "Assets and debts over time"),
-    YearInReview("✨", "Year in review", "Your year in money, wrapped"),
+    YearInReview("✨", "Reviews", "Your week, month, quarter or year, wrapped"),
     Reports("📊", "Reports", "Cash flow, spending and net worth"),
     Merchants("🏪", "Merchants", "Rename, merge and tidy up"),
     Rules("⚙️", "Rules", "Categorize automatically"),
     Tags("🏷️", "Tags", "#tags from your notes"),
     BankSync("🏦", "Bank sync", "SimpleFIN accounts and automatic syncing"),
+    Server("🖥️", "Server", "Updates, backups and health"),
     Settings("👥", "Household & settings", "People, devices and connection"),
 }
 

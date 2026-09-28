@@ -18,6 +18,7 @@ import kotlinx.coroutines.flow.map
 private val REMINDERS = booleanPreferencesKey("reminders")
 private val REMINDER_DAYS = intPreferencesKey("reminder_days")
 private val ALERTS = booleanPreferencesKey("spending_alerts")
+private val REVIEWS = stringSetPreferencesKey("review_notifications")
 private val REMINDERS_SENT = stringSetPreferencesKey("reminders_sent")
 
 @Singleton
@@ -33,6 +34,8 @@ class DataStoreReminderSettings @Inject constructor(
 
     override suspend fun setEnabled(enabled: Boolean) { store.edit { it[REMINDERS] = enabled } }
     override suspend fun setAlerts(enabled: Boolean) { store.edit { it[ALERTS] = enabled } }
+    override val reviews: Flow<Set<String>> = store.data.map { it[REVIEWS] ?: emptySet() }
+    override suspend fun setReviews(periods: Set<String>) { store.edit { it[REVIEWS] = periods } }
     override suspend fun setDaysAhead(days: Int) { store.edit { it[REMINDER_DAYS] = days } }
     override suspend fun sent(): Set<String> = store.data.first()[REMINDERS_SENT] ?: emptySet()
 

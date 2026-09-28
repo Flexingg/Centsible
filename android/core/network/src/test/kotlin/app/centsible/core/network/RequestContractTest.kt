@@ -122,6 +122,10 @@ class RequestContractTest {
         call { planning.setGoal(b, "c1", GoalInputDto("by", 120000, "2027-03")) }
         call { planning.setGoal(b, "c1", GoalInputDto("balance", 500000)) }
         call { planning.dismissSubscription(b, "p1") }
+        val server = ServerApi(client)
+        call { server.backupSettings(BackupSettingsDto(intervalHours = 24, keep = 7)) }
+        call { server.backupSettings(BackupSettingsDto(keep = 3)) }
+        call { server.restore("20260928T120000Z", b) }
         call { planning.startBackfill(b, BackfillRequestDto(years = 2, accountIds = listOf("acc"))) }
 
         val withBodies = sent.filter { it.body != null }

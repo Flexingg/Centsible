@@ -133,6 +133,28 @@ export class ActualHost {
     });
   }
 
+  /** Exports a budget as Actual's own .zip (what "Export" in the web app makes). */
+  exportBudget(budgetId: string): Promise<Uint8Array> {
+    return this.withBudget(budgetId, 'read', () => api.exportBudget());
+  }
+
+  /**
+   * Imports an Actual .zip as a new budget on the server (Actual uploads it) and returns
+   * its sync id. Nothing existing is replaced.
+   */
+  importBudget(zip: Uint8Array): Promise<string> {
+    return this.enqueue(async () => {
+      this.requireLib();
+      this.openBudgetId = null; // importing loads the new budget in place of whatever was open
+      const { id } = await api.importBudget(zip);
+      const file = (await api.getBudgets()).find((f) => f.id === id);
+      if (!file?.groupId) throw new Error('The imported budget was not uploaded to the Actual server');
+      this.openBudgetId = file.groupId;
+      this.lastSyncAt = Date.now();
+      return file.groupId;
+    });
+  }
+
   /**
    * Run `fn` with `budgetId` open. Reads sync first when the local copy is stale;
    * writes always sync afterwards so other household devices see them.

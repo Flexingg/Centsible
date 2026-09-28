@@ -1,6 +1,7 @@
 import type { FastifyPluginAsync } from 'fastify';
+import { REVIEW_PERIODS, type ReviewPeriod } from '../../actual/insights-ops.js';
 import { audit, requireBudget, type Deps } from '../server.js';
-import { MONTH } from './budgets.js';
+import { DATE, MONTH } from './budgets.js';
 
 type BudgetParams = { budgetId: string };
 
@@ -32,6 +33,23 @@ export const insightsRoutes =
         insights.dismissSubscription(req.params.budgetId, req.body.payeeId);
         audit(deps, req, req.params.budgetId, 'subscriptions.dismissed', req.body.payeeId);
         return reply.status(204).send();
+      },
+    );
+
+    app.get<{ Params: BudgetParams; Querystring: { period: ReviewPeriod; date?: string } }>(
+      '/v1/budgets/:budgetId/reports/review',
+      {
+        schema: {
+          querystring: {
+            type: 'object',
+            required: ['period'],
+            properties: { period: { type: 'string', enum: [...REVIEW_PERIODS] }, date: DATE },
+          },
+        },
+      },
+      async (req) => {
+        requireBudget(deps, req, req.params.budgetId);
+        return insights.review(req.params.budgetId, req.query.period, req.query.date);
       },
     );
 

@@ -120,7 +120,7 @@ class InsightsScreenshotTest {
     )
 
     private fun page(i: Int, name: String) {
-        compose.setContent { CentsibleTheme(darkTheme = false) { YearInReviewScreen(YearInReviewUiState(Loadable.Ready(review)), initialPage = i) } }
+        compose.setContent { CentsibleTheme(darkTheme = false) { YearInReviewScreen(YearInReviewUiState(data = Loadable.Ready(review)), initialPage = i) } }
         compose.onRoot().captureRoboImage("screenshots/year_$name.png")
         app.centsible.core.uitesting.A11y.assertOk(compose)
     }
@@ -134,4 +134,24 @@ class InsightsScreenshotTest {
     @Test fun year_nospend() = page(7, "nospend")
     @Test fun year_saved() = page(8, "saved")
     @Test fun year_summary() = page(9, "summary")
+
+    private val september = review.copy(
+        period = app.centsible.core.model.ReviewPeriod.Month, start = "2026-09-01", end = "2026-09-30", label = "September 2026", year = 2026,
+        previousStart = "2026-08-01", nextStart = "2026-10-01", spending = Money(812_430), purchases = 97,
+        buckets = (1..30).map { d ->
+            val date = "2026-09-%02d".format(d)
+            YearInReview.Bucket(date, "$d", date, Money(if (d == 20) 186_420L else 8_000L + (d * 7_919L % 31_000L)), Money(0))
+        },
+        previousPeriod = YearInReview.PreviousPeriod(Money(901_200), Money(1_053_333), -10, "August 2026"),
+    ).let { it.copy(biggestBucket = it.buckets[19], smallestBucket = it.buckets[3]) }
+
+    private fun reviewPage(r: YearInReview, i: Int, name: String) {
+        compose.setContent { CentsibleTheme(darkTheme = false) { YearInReviewScreen(YearInReviewUiState(r.period, Loadable.Ready(r)), initialPage = i) } }
+        compose.onRoot().captureRoboImage("screenshots/review_$name.png")
+        app.centsible.core.uitesting.A11y.assertOk(compose)
+    }
+
+    @Test fun month_intro() = reviewPage(september, 0, "month_intro")
+    @Test fun month_spent() = reviewPage(september, 1, "month_spent")
+    @Test fun month_days() = reviewPage(september, 6, "month_days")
 }

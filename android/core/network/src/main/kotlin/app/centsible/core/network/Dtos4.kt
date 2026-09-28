@@ -76,4 +76,16 @@ import kotlinx.serialization.Serializable
     val newMerchants: Int = 0,
     val merchantsVisited: Int = 0,
     val previousYear: PreviousYearDto? = null,
+    val period: String = "year",
+    val start: String? = null,
+    val end: String? = null,
+    val label: String? = null,
+    val previousStart: String? = null,
+    val nextStart: String? = null,
+    val buckets: List<ReviewBucketDto> = emptyList(),
+    val biggestBucket: ReviewBucketDto? = null,
+    val smallestBucket: ReviewBucketDto? = null,
+    val previousPeriod: PreviousPeriodDto? = null,
 )
+@Serializable data class ReviewBucketDto(val key: String, val label: String, val start: String, val spending: Long = 0, val income: Long = 0)
+@Serializable data class PreviousPeriodDto(val spending: Long = 0, val income: Long = 0, val spendingChangePct: Int? = null, val label: String = "")

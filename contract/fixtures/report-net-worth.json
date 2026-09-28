@@ -21,7 +21,7 @@
   ],
   "accounts": [
     {
-      "accountId": "a125b3dd-dee1-4712-8bf7-d34f375f9dc9",
+      "accountId": "da39c5c7-479c-473e-8864-0c1caa05a1d8",
       "name": "Brokerage",
       "offBudget": true,
       "closed": false,
@@ -32,7 +32,7 @@
       ]
     },
     {
-      "accountId": "e4092280-45ac-4ee8-a010-aa1731712fc3",
+      "accountId": "15774009-d48c-4ddc-9370-8dd12db7ad26",
       "name": "Joint Checking",
       "offBudget": false,
       "closed": false,
@@ -43,7 +43,7 @@
       ]
     },
     {
-      "accountId": "8cfd965b-2ed9-426b-a9f4-92919082530a",
+      "accountId": "54e13bbf-a13d-4c6c-a36f-345b65874410",
       "name": "Visa",
       "offBudget": false,
       "closed": false,
@@ -54,7 +54,7 @@
       ]
     },
     {
-      "accountId": "69a9e71d-389b-41c8-8fa6-aea40d8d934d",
+      "accountId": "b2fa156e-a644-4f24-a065-dc447ea6cff2",
       "name": "Kid Savings",
       "offBudget": false,
       "closed": false,

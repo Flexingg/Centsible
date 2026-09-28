@@ -251,21 +251,49 @@ export class InsightsOps {
 
   // ── #12 Year in review ──────────────────────────────────────────────────
 
+  /** The year's story; see [review]. */
   yearInReview(budgetId: string, year: number) {
+    return this.review(budgetId, 'year', `${year}-01-01`);
+  }
+
+  /**
+   * A period's story (week, month, quarter or year), Spotify Wrapped style: totals,
+   * top categories and merchants, the biggest purchase, spending over the period in
+   * buckets (days for a week or month, weeks for a quarter, months for a year),
+   * no-spend days, and the change against the period before (the same number of
+   * elapsed days, while the period is still going). [anchor] is any date in the
+   * period; without one, the most recently finished period.
+   */
+  review(budgetId: string, period: ReviewPeriod, anchor?: string) {
     return this.host.withBudget(budgetId, 'read', async () => {
       const now = today();
-      const y = String(year);
-      if (y > now.slice(0, 4)) throw ApiError.validation('That year hasn’t happened yet.');
-      const end = y === now.slice(0, 4) ? now : `${y}-12-31`;
+      const range = periodRange(period, anchor ?? defaultAnchor(period, now));
+      if (range.start > now) throw ApiError.validation('That period hasn’t started yet.');
+      const complete = range.end < now;
+      const end = complete ? range.end : now;
+      const elapsedDays = daysBetween(range.start, end) + 1;
+      const prev = periodRange(period, iso(Date.parse(`${range.start}T00:00:00Z`) - DAY));
+      const prevEnd = complete ? prev.end : minDate(prev.end, iso(Date.parse(`${prev.start}T00:00:00Z`) + (elapsedDays - 1) * DAY));
       const [all, previous, { data: months0 }] = await Promise.all([
-        flows(`${y}-01-01`, end),
-        flows(`${year - 1}-01-01`, `${year - 1}-12-31`),
+        flows(range.start, end),
+        flows(prev.start, prevEnd),
         api.aqlQuery(api.q('transactions').filter(BUDGET_FLOW).groupBy([{ $month: '$date' }]).select([{ month: { $month: '$date' } }])) as Promise<{ data: Raw[] }>,
       ]);
       const availableYears = [...new Set(months0.map((r) => Number(String(r.month).slice(0, 4))))].filter(Number.isFinite).sort((a, b) => b - a);
-      if (!all.length) {
-        return { year, complete: y < now.slice(0, 4), availableYears, empty: true, ...emptyReview() };
-      }
+      const nextRange = periodRange(period, iso(Date.parse(`${range.end}T00:00:00Z`) + DAY));
+      const base = {
+        period,
+        start: range.start,
+        end: range.end,
+        label: range.label,
+        previousStart: prev.start,
+        nextStart: nextRange.start <= now ? nextRange.start : null,
+        year: Number(range.start.slice(0, 4)),
+        complete,
+        availableYears,
+      };
+      if (!all.length) return { ...base, empty: true, ...emptyReview() };
+
       const income = all.filter((f) => f.income).reduce((s, f) => s + f.amount, 0);
       const spending = -all.filter((f) => !f.income).reduce((s, f) => s + f.amount, 0);
       const expenses = all.filter(isExpense);
@@ -295,24 +323,34 @@ export class InsightsOps {
       const merchantList = [...merchants.entries()].map(([k, v]) => ({ payeeId: k, name: v.name, amount: v.amount, visits: v.count }));
       const topMerchants = [...merchantList].sort((a, b) => b.amount - a.amount).slice(0, 5);
       const mostVisited = [...merchantList].sort((a, b) => b.visits - a.visits || b.amount - a.amount)[0] ?? null;
-
       const biggest = expenses.reduce<Flow | null>((m, f) => (!m || f.amount < m.amount ? f : m), null);
-      const months = [...Array(12).keys()].map((i) => `${y}-${String(i + 1).padStart(2, '0')}`).map((month) => {
-        const rows = all.filter((f) => f.date.startsWith(month));
-        return { month, spending: -rows.filter((f) => !f.income).reduce((s, f) => s + f.amount, 0), income: rows.filter((f) => f.income).reduce((s, f) => s + f.amount, 0) };
-      });
-      const active = months.filter((m) => m.month <= end.slice(0, 7) && (m.spending !== 0 || m.income !== 0));
-      const biggestMonth = active.reduce<(typeof months)[number] | null>((m, x) => (!m || x.spending > m.spending ? x : m), null);
-      const smallestMonth = active.reduce<(typeof months)[number] | null>((m, x) => (!m || x.spending < m.spending ? x : m), null);
 
-      // No-spend days: days in the year so far without a single purchase.
+      const buckets = bucketsFor(period, range).map((b) => {
+        const rows = all.filter((f) => f.date >= b.start && f.date <= b.end);
+        return {
+          key: b.key,
+          label: b.label,
+          start: b.start,
+          spending: -rows.filter((f) => !f.income).reduce((s, f) => s + f.amount, 0),
+          income: rows.filter((f) => f.income).reduce((s, f) => s + f.amount, 0),
+        };
+      });
+      const active = buckets.filter((b) => b.start <= end && (b.spending !== 0 || b.income !== 0));
+      const biggestBucket = active.reduce<(typeof buckets)[number] | null>((m, x) => (!m || x.spending > m.spending ? x : m), null);
+      const smallestBucket = active.reduce<(typeof buckets)[number] | null>((m, x) => (!m || x.spending < m.spending ? x : m), null);
+      // Kept for the year view (and older apps): buckets are months there.
+      const months = period === 'year' ? buckets.map((b) => ({ month: b.key, spending: b.spending, income: b.income })) : [];
+      const asMonth = (b: (typeof buckets)[number] | null) => (b && period === 'year' ? { month: b.key, spending: b.spending, income: b.income } : null);
+
+      // No-spend days: days in the period so far without a single purchase.
       const spendDays = new Set(expenses.map((f) => f.date));
       let noSpendDays = 0;
       let streak = 0;
       let longest = { days: 0, start: null as string | null, end: null as string | null };
       let streakStart: string | null = null;
-      const firstDay = Math.max(Date.parse(`${y}-01-01`), Date.parse(all.reduce((m, f) => (f.date < m ? f.date : m), end)));
-      for (let t = firstDay; t <= Date.parse(end); t += DAY) {
+      // A year starts counting from the first transaction (so a budget begun in March isn't "60 no-spend days").
+      const firstDay = period === 'year' ? Math.max(Date.parse(`${range.start}T00:00:00Z`), Date.parse(`${all.reduce((m, f) => (f.date < m ? f.date : m), end)}T00:00:00Z`)) : Date.parse(`${range.start}T00:00:00Z`);
+      for (let t = firstDay; t <= Date.parse(`${end}T00:00:00Z`); t += DAY) {
         const d = iso(t);
         if (spendDays.has(d)) {
           streak = 0;
@@ -324,21 +362,20 @@ export class InsightsOps {
         streakStart ??= d;
         if (streak > longest.days) longest = { days: streak, start: streakStart, end: d };
       }
-      const daysCovered = Math.round((Date.parse(end) - firstDay) / DAY) + 1;
+      const daysCovered = Math.round((Date.parse(`${end}T00:00:00Z`) - firstDay) / DAY) + 1;
 
-      // New this year: merchants with no transaction at all before January 1st.
+      // New: merchants with no transaction at all before this period.
       const { data: before } = (await api.aqlQuery(
-        api.q('transactions').filter({ date: { $lt: `${y}-01-01` }, payee: { $oneof: merchantList.map((m) => m.payeeId) } }).groupBy(['payee']).select(['payee']),
+        api.q('transactions').filter({ date: { $lt: range.start }, payee: { $oneof: merchantList.map((m) => m.payeeId) } }).groupBy(['payee']).select(['payee']),
       )) as { data: Raw[] };
       const known = new Set(before.map((r) => String(r.payee)));
       const newMerchants = merchantList.filter((m) => !known.has(m.payeeId)).length;
       const prevSpending = -previous.filter((f) => !f.income).reduce((s, f) => s + f.amount, 0);
       const prevIncome = previous.filter((f) => f.income).reduce((s, f) => s + f.amount, 0);
+      const previousPeriod = previous.length ? { spending: prevSpending, income: prevIncome, spendingChangePct: pct(spending, prevSpending), label: prev.label } : null;
 
       return {
-        year,
-        complete: y < now.slice(0, 4),
-        availableYears,
+        ...base,
         empty: false,
         income,
         spending,
@@ -350,24 +387,91 @@ export class InsightsOps {
         topMerchants,
         mostVisited,
         biggestPurchase: biggest && { transactionId: biggest.id, date: biggest.date, payeeName: biggest.payeeName, categoryName: biggest.categoryName, amount: -biggest.amount },
+        buckets,
+        biggestBucket,
+        smallestBucket,
         months,
-        biggestMonth,
-        smallestMonth,
+        biggestMonth: asMonth(biggestBucket),
+        smallestMonth: asMonth(smallestBucket),
         noSpendDays,
         longestNoSpendStreak: longest,
         newMerchants,
         merchantsVisited: merchantList.length,
-        previousYear: previous.length ? { spending: prevSpending, income: prevIncome, spendingChangePct: pct(spending, prevSpending) } : null,
+        previousPeriod,
+        previousYear: period === 'year' ? previousPeriod : null,
       };
     });
   }
 }
 
+export const REVIEW_PERIODS = ['week', 'month', 'quarter', 'year'] as const;
+export type ReviewPeriod = (typeof REVIEW_PERIODS)[number];
+
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const LONG_MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+const utc = (d: string) => new Date(`${d}T00:00:00Z`);
+const daysBetween = (a: string, b: string) => Math.round((Date.parse(`${b}T00:00:00Z`) - Date.parse(`${a}T00:00:00Z`)) / DAY);
+const minDate = (a: string, b: string) => (a < b ? a : b);
+const short = (d: string) => `${MONTHS[utc(d).getUTCMonth()]} ${utc(d).getUTCDate()}`;
+
+/** The week (Monday to Sunday), month, quarter or year containing [date]. */
+export function periodRange(period: ReviewPeriod, date: string): { start: string; end: string; label: string } {
+  const d = utc(date);
+  const y = d.getUTCFullYear();
+  const m = d.getUTCMonth();
+  switch (period) {
+    case 'week': {
+      const start = iso(d.getTime() - ((d.getUTCDay() + 6) % 7) * DAY);
+      return { start, end: iso(Date.parse(`${start}T00:00:00Z`) + 6 * DAY), label: `Week of ${short(start)}, ${start.slice(0, 4)}` };
+    }
+    case 'month':
+      return { start: iso(Date.UTC(y, m, 1)), end: iso(Date.UTC(y, m + 1, 0)), label: `${LONG_MONTHS[m]} ${y}` };
+    case 'quarter': {
+      const q = Math.floor(m / 3);
+      return { start: iso(Date.UTC(y, q * 3, 1)), end: iso(Date.UTC(y, q * 3 + 3, 0)), label: `Q${q + 1} ${y}` };
+    }
+    case 'year':
+      return { start: `${y}-01-01`, end: `${y}-12-31`, label: String(y) };
+  }
+}
+
+/** Without a date: the last finished period. A year is "wrapped" from November on, like the app's card. */
+function defaultAnchor(period: ReviewPeriod, now: string): string {
+  if (period === 'year') return utc(now).getUTCMonth() >= 10 ? now : `${Number(now.slice(0, 4)) - 1}-06-30`;
+  return iso(Date.parse(`${periodRange(period, now).start}T00:00:00Z`) - DAY);
+}
+
+/** Days for a week or month, weeks for a quarter, months for a year. */
+function bucketsFor(period: ReviewPeriod, r: { start: string; end: string }) {
+  const out: { key: string; label: string; start: string; end: string }[] = [];
+  if (period === 'week' || period === 'month') {
+    for (let t = Date.parse(`${r.start}T00:00:00Z`); t <= Date.parse(`${r.end}T00:00:00Z`); t += DAY) {
+      const d = iso(t);
+      out.push({ key: d, label: period === 'week' ? DAYS[(utc(d).getUTCDay() + 6) % 7]! : String(utc(d).getUTCDate()), start: d, end: d });
+    }
+  } else if (period === 'quarter') {
+    let start = periodRange('week', r.start).start;
+    while (start <= r.end) {
+      const end = iso(Date.parse(`${start}T00:00:00Z`) + 6 * DAY);
+      const s = start < r.start ? r.start : start;
+      out.push({ key: s, label: short(s), start: s, end: minDate(end, r.end) });
+      start = iso(Date.parse(`${start}T00:00:00Z`) + 7 * DAY);
+    }
+  } else {
+    for (let i = 0; i < 12; i++) {
+      const s = iso(Date.UTC(Number(r.start.slice(0, 4)), i, 1));
+      out.push({ key: s.slice(0, 7), label: MONTHS[i]!, start: s, end: iso(Date.UTC(Number(r.start.slice(0, 4)), i + 1, 0)) });
+    }
+  }
+  return out;
+}
+
 function emptyReview() {
   return {
     income: 0, spending: 0, saved: 0, savingsRate: null, purchases: 0, dailyAverage: 0, topCategories: [], topMerchants: [], mostVisited: null,
-    biggestPurchase: null, months: [], biggestMonth: null, smallestMonth: null, noSpendDays: 0, longestNoSpendStreak: { days: 0, start: null, end: null },
-    newMerchants: 0, merchantsVisited: 0, previousYear: null,
+    biggestPurchase: null, buckets: [], biggestBucket: null, smallestBucket: null, months: [], biggestMonth: null, smallestMonth: null,
+    noSpendDays: 0, longestNoSpendStreak: { days: 0, start: null, end: null }, newMerchants: 0, merchantsVisited: 0, previousPeriod: null, previousYear: null,
   };
 }
 

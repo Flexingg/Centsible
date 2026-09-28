@@ -12,6 +12,9 @@ COPY src ./src
 RUN npm run build && npm prune --omit=dev
 
 FROM node:22-bookworm-slim
+# CI passes the release (0.2.<run>) so the bridge can tell when a newer one is out.
+ARG BRIDGE_RELEASE=
+ENV BRIDGE_RELEASE=${BRIDGE_RELEASE}
 ENV NODE_ENV=production \
     BRIDGE_DATA_DIR=/data \
     BRIDGE_PORT=8787

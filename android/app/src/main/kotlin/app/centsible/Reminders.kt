@@ -41,6 +41,7 @@ internal const val EXTRA_OPEN = "open"
 internal const val OPEN_RECURRING = "recurring"
 internal const val OPEN_INSIGHTS = "insights"
 internal const val ALERTS_CHANNEL = "alerts"
+internal const val REVIEWS_CHANNEL = "reviews"
 
 /** Once a day (around 8am, when the phone has a network), checks for bills coming up. */
 class BillReminderWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
@@ -59,11 +60,13 @@ class BillReminderWorker(context: Context, params: WorkerParameters) : Coroutine
         val settings = deps.reminders()
         val bills = settings.enabled.first()
         val alerts = settings.alerts.first()
-        if (!bills && !alerts) return Result.success()
+        val reviews = settings.reviews.first()
+        if (!bills && !alerts && reviews.isEmpty()) return Result.success()
         val budget = deps.sessions().current()?.selectedBudget ?: return Result.success()
         val notifications = NotificationManagerCompat.from(applicationContext)
         if (!notifications.areNotificationsEnabled()) return Result.success()
         if (alerts) notifyAlerts(deps, budget, notifications)
+        if (reviews.isNotEmpty()) notifyReviews(deps.reminders(), reviews, notifications)
         if (!bills) return Result.success()
 
         val today = LocalDate.now()
@@ -86,6 +89,32 @@ class BillReminderWorker(context: Context, params: WorkerParameters) : Coroutine
         }
         settings.markSent(due.map { it.key }, today)
         return Result.success()
+    }
+
+    /** "Your September is wrapped": once per finished period the person asked for. */
+    private suspend fun notifyReviews(settings: ReminderSettings, periods: Set<String>, notifications: NotificationManagerCompat) {
+        val today = LocalDate.now()
+        val sent = settings.sent()
+        val due = BillReminders.wrappedPeriods(today, periods).filterNot { (p, start) -> BillReminders.reviewSent(sent, p, start) }
+        if (due.isEmpty()) return
+        due.forEach { (period, start) ->
+            val title = when (period) {
+                "week" -> "Your week is wrapped ✨"
+                "month" -> "Your ${start.month.getDisplayName(java.time.format.TextStyle.FULL, java.util.Locale.getDefault())} is wrapped ✨"
+                "quarter" -> "Your Q${(start.monthValue - 1) / 3 + 1} is wrapped ✨"
+                else -> "Your ${start.year} is wrapped ✨"
+            }
+            val notification = NotificationCompat.Builder(applicationContext, REVIEWS_CHANNEL)
+                .setSmallIcon(android.R.drawable.star_on)
+                .setContentTitle(title)
+                .setContentText("Where it went, where you went, and what you kept.")
+                .setContentIntent(open(applicationContext, "review:$period:$start", 3 + period.hashCode()))
+                .setAutoCancel(true)
+                .build()
+            @Suppress("MissingPermission") // checked with areNotificationsEnabled before this runs
+            notifications.notify("review:$period".hashCode(), notification)
+        }
+        settings.markSent(due.map { (p, start) -> BillReminders.reviewKey(p, start, today) }, today)
     }
 
     /** At most three new warnings a day, each sent once. */
@@ -131,6 +160,9 @@ class BillReminderWorker(context: Context, params: WorkerParameters) : Coroutine
             val alerts = NotificationChannel(ALERTS_CHANNEL, "Spending alerts", NotificationManager.IMPORTANCE_DEFAULT)
                 .apply { description = "Spending well above usual, unusual charges and price increases" }
             context.getSystemService(NotificationManager::class.java).createNotificationChannel(alerts)
+            val reviews = NotificationChannel(REVIEWS_CHANNEL, "Reviews", NotificationManager.IMPORTANCE_LOW)
+                .apply { description = "When a week, month, quarter or year you follow wraps up" }
+            context.getSystemService(NotificationManager::class.java).createNotificationChannel(reviews)
         }
     }
 }

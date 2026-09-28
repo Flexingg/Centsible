@@ -71,24 +71,41 @@ class BridgeInsights(private val api: PlanningApi) : InsightsGateway {
 
     override suspend fun dismissSubscription(budget: BudgetId, payee: PayeeId) = api.dismissSubscription(budget.raw, payee.raw)
 
-    override suspend fun yearInReview(budget: BudgetId, year: Int?): YearInReview {
-        val d = api.yearInReview(budget.raw, year)
-        fun MerchantTotalDto.m() = YearInReview.MerchantTotal(PayeeId(payeeId), name, Money(amount), visits)
-        fun MonthTotalsDto.m() = YearInReview.MonthTotal(YearMonth(month), Money(spending), Money(income))
-        return YearInReview(
-            d.year, d.complete, d.availableYears, d.empty, Money(d.income), Money(d.spending), Money(d.saved), d.savingsRate, d.purchases, Money(d.dailyAverage),
-            d.topCategories.map { YearInReview.CategoryShare(it.categoryId?.let(::CategoryId), it.name, Money(it.amount), it.share) },
-            d.topMerchants.map { it.m() },
-            d.mostVisited?.m(),
-            d.biggestPurchase?.let { YearInReview.BiggestPurchase(TransactionId(it.transactionId), it.date, it.payeeName, it.categoryName, Money(it.amount)) },
-            d.months.map { it.m() },
-            d.biggestMonth?.m(),
-            d.smallestMonth?.m(),
-            d.noSpendDays,
-            YearInReview.Streak(d.longestNoSpendStreak.days, d.longestNoSpendStreak.start, d.longestNoSpendStreak.end),
-            d.newMerchants,
-            d.merchantsVisited,
-            d.previousYear?.let { YearInReview.PreviousYear(Money(it.spending), Money(it.income), it.spendingChangePct) },
-        )
-    }
+    override suspend fun yearInReview(budget: BudgetId, year: Int?): YearInReview = api.yearInReview(budget.raw, year).toModel()
+
+    override suspend fun review(budget: BudgetId, period: app.centsible.core.model.ReviewPeriod, date: String?): YearInReview =
+        api.review(budget.raw, period.key, date).toModel()
 }
+
+private fun app.centsible.core.network.YearInReviewDto.toModel(): YearInReview {
+    val d = this
+    fun MerchantTotalDto.m() = YearInReview.MerchantTotal(PayeeId(payeeId), name, Money(amount), visits)
+    fun MonthTotalsDto.m() = YearInReview.MonthTotal(YearMonth(month), Money(spending), Money(income))
+    return YearInReview(
+        d.year, d.complete, d.availableYears, d.empty, Money(d.income), Money(d.spending), Money(d.saved), d.savingsRate, d.purchases, Money(d.dailyAverage),
+        d.topCategories.map { YearInReview.CategoryShare(it.categoryId?.let(::CategoryId), it.name, Money(it.amount), it.share) },
+        d.topMerchants.map { it.m() },
+        d.mostVisited?.m(),
+        d.biggestPurchase?.let { YearInReview.BiggestPurchase(TransactionId(it.transactionId), it.date, it.payeeName, it.categoryName, Money(it.amount)) },
+        d.months.map { it.m() },
+        d.biggestMonth?.m(),
+        d.smallestMonth?.m(),
+        d.noSpendDays,
+        YearInReview.Streak(d.longestNoSpendStreak.days, d.longestNoSpendStreak.start, d.longestNoSpendStreak.end),
+        d.newMerchants,
+        d.merchantsVisited,
+        d.previousYear?.let { YearInReview.PreviousYear(Money(it.spending), Money(it.income), it.spendingChangePct) },
+        period = app.centsible.core.model.ReviewPeriod.of(d.period),
+        start = d.start ?: "${d.year}-01-01",
+        end = d.end ?: "${d.year}-12-31",
+        label = d.label ?: "${d.year}",
+        previousStart = d.previousStart,
+        nextStart = d.nextStart,
+        buckets = d.buckets.map { it.m() },
+        biggestBucket = d.biggestBucket?.m(),
+        smallestBucket = d.smallestBucket?.m(),
+        previousPeriod = d.previousPeriod?.let { YearInReview.PreviousPeriod(Money(it.spending), Money(it.income), it.spendingChangePct, it.label) },
+    )
+}
+
+private fun app.centsible.core.network.ReviewBucketDto.m() = YearInReview.Bucket(key, label, start, Money(spending), Money(income))

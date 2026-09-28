@@ -101,5 +101,10 @@ abstract class DataModule {
         @Provides
         @Singleton
         fun insights(api: PlanningApi): app.centsible.core.domain.InsightsGateway = app.centsible.core.engine.bridge.BridgeInsights(api)
+
+        @Provides
+        @Singleton
+        fun server(client: BridgeClient): app.centsible.core.domain.ServerGateway =
+            app.centsible.core.engine.bridge.BridgeServer(app.centsible.core.network.ServerApi(client))
     }
 }

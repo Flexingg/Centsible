@@ -5,6 +5,8 @@ import type { ActualHost } from './actual/host.js';
 import { PlanningOps } from './actual/planning-ops.js';
 import { PlanOps } from './actual/plan-ops.js';
 import { InsightsOps } from './actual/insights-ops.js';
+import { BackupService } from './backups.js';
+import { ServerOps } from './server-ops.js';
 import { ReportOps } from './actual/report-ops.js';
 import { StructureOps } from './actual/structure-ops.js';
 import { TransactionOps } from './actual/transaction-ops.js';
@@ -26,6 +28,7 @@ export function createDeps(config: BridgeConfig, store: HouseholdStore, host: Ac
   const keys = new SimpleFinKeyFile(config.dataDir);
   const bankSync = new BankSyncOps(host, store, keys);
   const backfill = new BankSyncBackfill(host, store, keys, log);
+  const backups = new BackupService(config, host, store, log);
   return {
     config,
     store,
@@ -34,7 +37,9 @@ export function createDeps(config: BridgeConfig, store: HouseholdStore, host: Ac
     jobs,
     bankSync,
     backfill,
-    scheduler: new BankSyncScheduler(host, store, bankSync, jobs, log, Date.now, backfill),
+    backups,
+    server: new ServerOps(config, host, store, log),
+    scheduler: new BankSyncScheduler(host, store, bankSync, jobs, log, Date.now, backfill, backups),
     ops: budgetOps,
     plan: new PlanOps(host, budgetOps),
     insights: new InsightsOps(host, store),

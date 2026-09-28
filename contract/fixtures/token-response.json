@@ -3,18 +3,18 @@
   "refreshToken": "<refreshToken>",
   "expiresIn": 3600,
   "member": {
-    "id": "377ea410-0f69-4fd9-b07a-912ee6c2ef2d",
+    "id": "52ffdb53-f566-4218-9c1b-b883e76c5aed",
     "displayName": "Sam",
     "role": "member",
     "disabled": false,
     "budgetIds": []
   },
   "device": {
-    "id": "8b737608-790c-4e79-8be3-93f92bf990bd",
-    "memberId": "377ea410-0f69-4fd9-b07a-912ee6c2ef2d",
+    "id": "156a2235-e04f-4177-96c1-1276b6d6da6a",
+    "memberId": "52ffdb53-f566-4218-9c1b-b883e76c5aed",
     "name": "Sam's phone",
     "platform": "android",
-    "createdAt": "2026-09-28T20:45:59.491Z",
+    "createdAt": "2026-09-28T21:39:26.756Z",
     "lastSeenAt": null
   }
 }
