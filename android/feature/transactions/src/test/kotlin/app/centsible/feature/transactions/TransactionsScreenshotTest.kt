@@ -30,5 +30,6 @@ class TransactionsScreenshotTest {
         )
         compose.setContent { CentsibleTheme(darkTheme = false) { TransactionsScreen(TransactionsUiState(data = Loadable.Ready(data)), onRetry = {}, onLoadMore = {}, today = LocalDate.of(2026, 9, 26)) } }
         compose.onRoot().captureRoboImage("screenshots/transactions_light.png")
+        app.centsible.core.uitesting.A11y.assertOk(compose)
     }
 }

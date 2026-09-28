@@ -41,6 +41,7 @@ class EditorScreenshotTest {
     private fun render(state: EditorUiState, name: String) {
         compose.setContent { CentsibleTheme(darkTheme = false) { TransactionEditorScreen(state, EditorActions()) } }
         compose.onRoot().captureRoboImage("screenshots/$name.png")
+        app.centsible.core.uitesting.A11y.assertOk(compose)
     }
 
     @Test fun editor_new_expense() = render(
@@ -80,4 +81,11 @@ class EditorScreenshotTest {
         ),
         "editor_remember_category",
     )
+
+    @Test fun editor_large_text() {
+        val state = base.copy(form = TransactionForm(amount = "87.34", payee = "Trader Joe's", accountId = AccountId("acc-visa"), categoryId = CategoryId("c-groceries"), date = LocalDate.now()))
+        compose.setContent { CentsibleTheme(darkTheme = false) { app.centsible.core.uitesting.LargeText { TransactionEditorScreen(state, EditorActions()) } } }
+        compose.onRoot().captureRoboImage("screenshots/editor_large_text.png")
+        app.centsible.core.uitesting.A11y.assertOk(compose)
+    }
 }

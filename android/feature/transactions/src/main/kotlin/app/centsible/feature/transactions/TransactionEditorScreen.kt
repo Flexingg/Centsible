@@ -1,5 +1,6 @@
 package app.centsible.feature.transactions
 
+import app.centsible.core.designsystem.component.toggleRow
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -208,10 +209,10 @@ fun TransactionEditorScreen(state: EditorUiState, actions: EditorActions) {
                         FieldRow("Category", name ?: "Needs category", enabled, emoji = name, warn = name == null) { picker = Picker.Category }
                         if (state.canRememberCategory && name != null) {
                             Row(
-                                Modifier.fillMaxWidth().clickable { actions.rememberCategory(!state.rememberCategory) }.padding(bottom = 6.dp),
+                                Modifier.fillMaxWidth().toggleRow(state.rememberCategory, role = androidx.compose.ui.semantics.Role.Checkbox, onChange = actions.rememberCategory).padding(bottom = 6.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
-                                androidx.compose.material3.Checkbox(checked = state.rememberCategory, onCheckedChange = actions.rememberCategory)
+                                androidx.compose.material3.Checkbox(checked = state.rememberCategory, onCheckedChange = null)
                                 Text(
                                     "Always use $name for ${form.payee.trim()}",
                                     style = MaterialTheme.typography.bodyMedium,
@@ -224,9 +225,9 @@ fun TransactionEditorScreen(state: EditorUiState, actions: EditorActions) {
                     HorizontalDivider(color = colors.border)
                     FieldRow("Date", form.date.pretty(), enabled) { pickingDate = true }
                     HorizontalDivider(color = colors.border)
-                    Row(Modifier.fillMaxWidth().padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Row(Modifier.fillMaxWidth().toggleRow(form.cleared, enabled) { c -> actions.edit { it.copy(cleared = c) } }.padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
                         Text("Cleared", style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
-                        Switch(checked = form.cleared, onCheckedChange = { c -> actions.edit { it.copy(cleared = c) } }, enabled = enabled)
+                        Switch(checked = form.cleared, onCheckedChange = null, enabled = enabled)
                     }
                 }
 
@@ -379,16 +380,23 @@ private fun SplitsCard(
 @Composable
 private fun FieldRow(label: String, value: String, enabled: Boolean, emoji: String? = null, warn: Boolean = false, onClick: () -> Unit) {
     val colors = CentsibleTheme.colors
+    // Large system text: the label column can't hold "ACCOUNT" on one line, so stack it.
+    val stacked = androidx.compose.ui.platform.LocalDensity.current.fontScale > 1.3f
     Row(
-        Modifier.fillMaxWidth().clickable(enabled = enabled, onClick = onClick).padding(vertical = 14.dp),
+        Modifier.fillMaxWidth().clickable(enabled = enabled, onClick = onClick).padding(vertical = if (stacked) 10.dp else 14.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        StatLabel(label, Modifier.width(96.dp))
-        if (emoji != null) {
-            CategoryAvatar(emoji, size = 26.dp)
-            Spacer(Modifier.width(8.dp))
+        if (!stacked) StatLabel(label, Modifier.width(96.dp))
+        Column(Modifier.weight(1f)) {
+            if (stacked) StatLabel(label)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (emoji != null) {
+                    CategoryAvatar(emoji, size = 26.dp)
+                    Spacer(Modifier.width(8.dp))
+                }
+                Text(value, style = MaterialTheme.typography.bodyLarge, color = if (warn) colors.accent else colors.textPrimary)
+            }
         }
-        Text(value, style = MaterialTheme.typography.bodyLarge, color = if (warn) colors.accent else colors.textPrimary, modifier = Modifier.weight(1f))
         if (enabled) Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, contentDescription = null, tint = colors.textTertiary)
     }
 }

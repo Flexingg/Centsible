@@ -1,5 +1,6 @@
 package app.centsible.feature.settings
 
+import app.centsible.core.designsystem.component.toggleRow
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -157,7 +158,7 @@ fun SettingsScreen(state: SettingsUiState, actions: SettingsActions, renderQr: B
                     }
                     item {
                         SectionCard("Reminders") {
-                            Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Row(Modifier.fillMaxWidth().toggleRow(state.reminders, onChange = actions.setReminders).padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                                 Column(Modifier.weight(1f)) {
                                     Text("Bill reminders", style = MaterialTheme.typography.bodyLarge)
                                     Text(
@@ -166,7 +167,7 @@ fun SettingsScreen(state: SettingsUiState, actions: SettingsActions, renderQr: B
                                         color = colors.textSecondary,
                                     )
                                 }
-                                androidx.compose.material3.Switch(checked = state.reminders, onCheckedChange = actions.setReminders)
+                                androidx.compose.material3.Switch(checked = state.reminders, onCheckedChange = null)
                             }
                             if (state.reminders) {
                                 Row(Modifier.padding(top = 8.dp), horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp)) {
@@ -183,7 +184,7 @@ fun SettingsScreen(state: SettingsUiState, actions: SettingsActions, renderQr: B
                     }
                     item {
                         SectionCard("Security") {
-                            Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Row(Modifier.fillMaxWidth().toggleRow(state.appLock, deviceSecure || state.appLock, onChange = actions.setAppLock).padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                                 Column(Modifier.weight(1f)) {
                                     Text("Lock with fingerprint or PIN", style = MaterialTheme.typography.bodyLarge)
                                     Text(
@@ -195,7 +196,7 @@ fun SettingsScreen(state: SettingsUiState, actions: SettingsActions, renderQr: B
                                 }
                                 androidx.compose.material3.Switch(
                                     checked = state.appLock,
-                                    onCheckedChange = actions.setAppLock,
+                                    onCheckedChange = null,
                                     enabled = deviceSecure || state.appLock,
                                 )
                             }

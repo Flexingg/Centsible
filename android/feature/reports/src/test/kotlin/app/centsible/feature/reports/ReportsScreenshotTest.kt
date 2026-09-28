@@ -30,6 +30,7 @@ class ReportsScreenshotTest {
     private fun shot(state: ReportsUiState, name: String, dark: Boolean = false) {
         compose.setContent { CentsibleTheme(darkTheme = dark) { ReportsScreen(state, onBack = {}) } }
         compose.onRoot().captureRoboImage("screenshots/$name.png")
+        app.centsible.core.uitesting.A11y.assertOk(compose)
     }
 
     @Test fun cash_flow_light() = shot(base, "reports_cash_flow_light")

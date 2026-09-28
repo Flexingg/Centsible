@@ -1,5 +1,6 @@
 package app.centsible.feature.accounts
 
+import app.centsible.core.designsystem.component.toggleRow
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.text.KeyboardOptions
@@ -131,12 +132,12 @@ private fun AddAccountDialog(onDismiss: () -> Unit, onAdd: (String, Boolean, Mon
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 )
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(Modifier.toggleRow(offBudget) { offBudget = it }, verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
                         Text("Track only (off budget)", style = MaterialTheme.typography.bodyLarge)
                         Text("For investments, retirement and loans. Can't be changed later.", style = MaterialTheme.typography.bodySmall, color = CentsibleTheme.colors.textSecondary)
                     }
-                    Switch(checked = offBudget, onCheckedChange = { offBudget = it })
+                    Switch(checked = offBudget, onCheckedChange = null)
                 }
             }
         },

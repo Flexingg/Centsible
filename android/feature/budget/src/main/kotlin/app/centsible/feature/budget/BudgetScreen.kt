@@ -104,34 +104,51 @@ fun BudgetScreen(
         containerColor = CentsibleTheme.colors.canvas,
         snackbarHost = { SnackbarHost(snackbar) },
         topBar = {
-            Row(
-                Modifier.fillMaxWidth().padding(start = 20.dp, end = 8.dp, top = 12.dp, bottom = 4.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween,
-            ) {
-                Text("Budget", style = MaterialTheme.typography.headlineMedium)
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    MonthSwitcher(
-                        month = state.month,
-                        onPrevious = onPreviousMonth.takeIf { state.hasPrevious || state.availableMonths.isEmpty() },
-                        onNext = onNextMonth.takeIf { state.hasNext || state.availableMonths.isEmpty() },
-                    )
-                    if (state.canApplyGoals) {
-                        androidx.compose.foundation.layout.Box {
-                            androidx.compose.material3.IconButton(onClick = { goalsMenu = true }, enabled = !state.saving) {
-                                androidx.compose.material3.Icon(androidx.compose.material.icons.Icons.Rounded.MoreVert, contentDescription = "Budget actions")
-                            }
-                            androidx.compose.material3.DropdownMenu(expanded = goalsMenu, onDismissRequest = { goalsMenu = false }) {
-                                androidx.compose.material3.DropdownMenuItem(
-                                    text = { Text("Apply goals") },
-                                    onClick = { goalsMenu = false; onApplyGoals(false) },
-                                )
-                                androidx.compose.material3.DropdownMenuItem(
-                                    text = { Text("Apply goals, overwriting amounts") },
-                                    onClick = { goalsMenu = false; onApplyGoals(true) },
-                                )
-                            }
+            val switcher: @Composable () -> Unit = {
+                MonthSwitcher(
+                    month = state.month,
+                    onPrevious = onPreviousMonth.takeIf { state.hasPrevious || state.availableMonths.isEmpty() },
+                    onNext = onNextMonth.takeIf { state.hasNext || state.availableMonths.isEmpty() },
+                )
+            }
+            val menu: @Composable () -> Unit = {
+                if (state.canApplyGoals) {
+                    androidx.compose.foundation.layout.Box {
+                        androidx.compose.material3.IconButton(onClick = { goalsMenu = true }, enabled = !state.saving) {
+                            androidx.compose.material3.Icon(androidx.compose.material.icons.Icons.Rounded.MoreVert, contentDescription = "Budget actions")
                         }
+                        androidx.compose.material3.DropdownMenu(expanded = goalsMenu, onDismissRequest = { goalsMenu = false }) {
+                            androidx.compose.material3.DropdownMenuItem(
+                                text = { Text("Apply goals") },
+                                onClick = { goalsMenu = false; onApplyGoals(false) },
+                            )
+                            androidx.compose.material3.DropdownMenuItem(
+                                text = { Text("Apply goals, overwriting amounts") },
+                                onClick = { goalsMenu = false; onApplyGoals(true) },
+                            )
+                        }
+                    }
+                }
+            }
+            // With large system text the month no longer fits beside the title: give it its own line.
+            if (androidx.compose.ui.platform.LocalDensity.current.fontScale > 1.3f) {
+                Column(Modifier.fillMaxWidth().padding(start = 20.dp, end = 8.dp, top = 12.dp, bottom = 4.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("Budget", style = MaterialTheme.typography.headlineMedium, modifier = Modifier.weight(1f))
+                        menu()
+                    }
+                    switcher()
+                }
+            } else {
+                Row(
+                    Modifier.fillMaxWidth().padding(start = 20.dp, end = 8.dp, top = 12.dp, bottom = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Text("Budget", style = MaterialTheme.typography.headlineMedium)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        switcher()
+                        menu()
                     }
                 }
             }

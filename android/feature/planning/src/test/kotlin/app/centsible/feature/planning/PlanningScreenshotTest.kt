@@ -31,6 +31,7 @@ class PlanningScreenshotTest {
     @Test fun recurring_light() {
         compose.setContent { CentsibleTheme(darkTheme = false) { RecurringScreen(RecurringUiState(Loadable.Ready(recurring), canEdit = true), onBack = {}, today = today) } }
         compose.onRoot().captureRoboImage("screenshots/recurring_light.png")
+        app.centsible.core.uitesting.A11y.assertOk(compose)
     }
 
     @Test fun recurring_sheet() {
@@ -41,11 +42,13 @@ class PlanningScreenshotTest {
         }
         compose.waitForIdle()
         captureScreenRoboImage("screenshots/recurring_sheet.png")
+        app.centsible.core.uitesting.A11y.assertOk(compose)
     }
 
     @Test fun merchants_light() {
         compose.setContent { CentsibleTheme(darkTheme = false) { MerchantsScreen(MerchantsUiState(Loadable.Ready(SamplePlanning.payees.filter { it.transferAccountId == null }), canEdit = true), onBack = {}) } }
         compose.onRoot().captureRoboImage("screenshots/merchants_light.png")
+        app.centsible.core.uitesting.A11y.assertOk(compose)
     }
 
     @Test fun rules_light() {
@@ -54,5 +57,6 @@ class PlanningScreenshotTest {
         val data = RulesData(SamplePlanning.rules, names, SamplePlanning.payeeNames.map { (id, n) -> Payee(PayeeId(id), n, null) }, groups)
         compose.setContent { CentsibleTheme(darkTheme = false) { RulesScreen(RulesUiState(Loadable.Ready(data), canEdit = true), onBack = {}) } }
         compose.onRoot().captureRoboImage("screenshots/rules_light.png")
+        app.centsible.core.uitesting.A11y.assertOk(compose)
     }
 }

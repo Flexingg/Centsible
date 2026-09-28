@@ -1,5 +1,6 @@
 package app.centsible.feature.planning
 
+import app.centsible.core.designsystem.component.toggleRow
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -118,8 +119,8 @@ internal fun ScheduleSheet(
                     modifier = Modifier.weight(1f),
                 )
                 Spacer(Modifier.width(12.dp))
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Switch(checked = approx, onCheckedChange = { approx = it }, enabled = canEdit)
+                Column(Modifier.toggleRow(approx, canEdit) { approx = it }, horizontalAlignment = Alignment.CenterHorizontally) {
+                    Switch(checked = approx, onCheckedChange = null, enabled = canEdit)
                     Text("Varies", style = MaterialTheme.typography.labelSmall, color = colors.textSecondary)
                 }
             }
@@ -150,12 +151,12 @@ internal fun ScheduleSheet(
                 StatLabel(if (repeat == Repeat.Once) "Date" else "Next", Modifier.width(96.dp))
                 Text(Describe.shortDate(date.toString()) + " " + date.year, style = MaterialTheme.typography.bodyLarge)
             }
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(Modifier.toggleRow(auto, canEdit) { auto = it }, verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text("Add automatically", style = MaterialTheme.typography.bodyLarge)
                     Text("Actual creates the transaction on the due date", style = MaterialTheme.typography.bodySmall, color = colors.textSecondary)
                 }
-                Switch(checked = auto, onCheckedChange = { auto = it }, enabled = canEdit)
+                Switch(checked = auto, onCheckedChange = null, enabled = canEdit)
             }
             if (existing != null && existing.upcoming.size > 1) {
                 Text("Coming up: " + existing.upcoming.joinToString(", ") { Describe.shortDate(it) }, style = MaterialTheme.typography.bodySmall, color = colors.textSecondary)

@@ -1,5 +1,6 @@
 package app.centsible.feature.accounts
 
+import app.centsible.core.designsystem.component.toggleRow
 import android.content.Context
 import android.net.Uri
 import android.provider.OpenableColumns
@@ -98,8 +99,14 @@ internal fun ImportSheet(imp: PendingImport, actions: AccountActions) {
                     Choice("Dates", imp.options.dateFormat ?: "Auto", listOf("Auto") + DATE_FORMATS) { f ->
                         actions.importOptions(imp.options.copy(dateFormat = f.takeIf { it != "Auto" }))
                     }
-                    Text("Flip signs", style = MaterialTheme.typography.labelMedium)
-                    Switch(checked = imp.options.invertAmounts, onCheckedChange = { actions.importOptions(imp.options.copy(invertAmounts = it)) })
+                    Row(
+                        Modifier.toggleRow(imp.options.invertAmounts) { actions.importOptions(imp.options.copy(invertAmounts = it)) },
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        Text("Flip signs", style = MaterialTheme.typography.labelMedium)
+                        Switch(checked = imp.options.invertAmounts, onCheckedChange = null)
+                    }
                 }
                 if (p.columns.isNotEmpty()) CsvColumns(p.columns, p.mapping ?: CsvMapping()) { m -> actions.importOptions(imp.options.copy(csvMapping = m)) }
                 p.errors.take(3).forEach { Text("⚠ $it", style = MaterialTheme.typography.bodySmall, color = colors.warning) }

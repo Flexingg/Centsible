@@ -24,6 +24,13 @@ class AccountsScreenshotTest {
     @Test fun accounts_light() {
         compose.setContent { CentsibleTheme(darkTheme = false) { AccountsScreen(AccountsUiState(Loadable.Ready(AccountsSummary.from(SampleHousehold.accounts)), canWrite = true), onRetry = {}) } }
         compose.onRoot().captureRoboImage("screenshots/accounts_light.png")
+        app.centsible.core.uitesting.A11y.assertOk(compose)
+    }
+
+    @Test fun accounts_large_text() {
+        compose.setContent { CentsibleTheme(darkTheme = false) { app.centsible.core.uitesting.LargeText { AccountsScreen(AccountsUiState(Loadable.Ready(AccountsSummary.from(SampleHousehold.accounts)), canWrite = true), onRetry = {}) } } }
+        compose.onRoot().captureRoboImage("screenshots/accounts_large_text.png")
+        app.centsible.core.uitesting.A11y.assertOk(compose)
     }
 }
 
@@ -44,6 +51,7 @@ class AccountDetailScreenshotTest {
         )
         compose.setContent { CentsibleTheme(darkTheme = false) { AccountDetailScreen(AccountDetailUiState(Loadable.Ready(detail), canWrite = true), onBack = {}, onRetry = {}) } }
         compose.onRoot().captureRoboImage("screenshots/account_detail_light.png")
+        app.centsible.core.uitesting.A11y.assertOk(compose)
     }
 
     private fun detail(): AccountDetail {
@@ -62,6 +70,7 @@ class AccountDetailScreenshotTest {
     @Test fun account_detail_actions() {
         compose.setContent { CentsibleTheme(darkTheme = false) { AccountDetailScreen(actionsState, onBack = {}, onRetry = {}) } }
         compose.onRoot().captureRoboImage("screenshots/account_detail_actions.png")
+        app.centsible.core.uitesting.A11y.assertOk(compose)
     }
 
     @Test fun account_import_preview() {
@@ -74,6 +83,7 @@ class AccountDetailScreenshotTest {
         compose.setContent { CentsibleTheme(darkTheme = false) { AccountDetailScreen(state, onBack = {}, onRetry = {}) } }
         compose.waitForIdle()
         captureScreenRoboImage("screenshots/account_import_preview.png")
+        app.centsible.core.uitesting.A11y.assertOk(compose)
     }
 
     @Test fun account_reconcile() {
@@ -83,5 +93,6 @@ class AccountDetailScreenshotTest {
         compose.setContent { CentsibleTheme(darkTheme = false) { AccountDetailScreen(state, onBack = {}, onRetry = {}) } }
         compose.mainClock.advanceTimeBy(1_000)
         captureScreenRoboImage("screenshots/account_reconcile.png")
+        app.centsible.core.uitesting.A11y.assertOk(compose)
     }
 }

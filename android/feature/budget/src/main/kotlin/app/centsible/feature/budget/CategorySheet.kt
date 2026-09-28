@@ -1,5 +1,6 @@
 package app.centsible.feature.budget
 
+import app.centsible.core.designsystem.component.toggleRow
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -140,12 +141,12 @@ private fun CategoryDetails(
             OutlinedButton(onClick = onMoveMoney, modifier = Modifier.fillMaxWidth()) { Text("Move money") }
         }
         if (state.canToggleRollover) {
-            Row(Modifier.fillMaxWidth().padding(top = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(Modifier.fillMaxWidth().padding(top = 12.dp).toggleRow(category.carryover, !state.saving, onChange = onRollover), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text("Roll over overspending", style = MaterialTheme.typography.bodyLarge)
                     Text("Carry a negative balance into next month instead of taking it from To Budget", style = MaterialTheme.typography.bodySmall, color = colors.textSecondary)
                 }
-                Switch(checked = category.carryover, onCheckedChange = onRollover, enabled = !state.saving)
+                Switch(checked = category.carryover, onCheckedChange = null, enabled = !state.saving)
             }
         }
     } else {

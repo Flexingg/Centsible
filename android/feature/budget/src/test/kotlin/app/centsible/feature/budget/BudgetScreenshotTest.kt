@@ -39,22 +39,26 @@ class BudgetScreenshotTest {
     @Test fun budget_light() {
         render(ready)
         compose.onRoot().captureRoboImage("screenshots/budget_light.png")
+        app.centsible.core.uitesting.A11y.assertOk(compose)
     }
 
     @Test fun budget_dark() {
         render(ready, dark = true)
         compose.onRoot().captureRoboImage("screenshots/budget_dark.png")
+        app.centsible.core.uitesting.A11y.assertOk(compose)
     }
 
     @Test fun category_sheet() {
         render(ready.copy(selectedCategory = CategoryId("c-dining")))
         compose.waitForIdle()
         captureScreenRoboImage("screenshots/budget_category_sheet.png")
+        app.centsible.core.uitesting.A11y.assertOk(compose)
     }
 
     @Test fun budget_error() {
         render(ready.copy(data = Loadable.Failed("Can't reach your bridge. Check your connection.")))
         compose.onRoot().captureRoboImage("screenshots/budget_error.png")
+        app.centsible.core.uitesting.A11y.assertOk(compose)
     }
 
     @Test fun category_sheet_goals() {
@@ -69,11 +73,23 @@ class BudgetScreenshotTest {
         )
         compose.waitForIdle()
         captureScreenRoboImage("screenshots/budget_category_goals.png")
+        app.centsible.core.uitesting.A11y.assertOk(compose)
     }
 
     @Test fun budget_holding() {
         val m = SampleHousehold.budgetMonth
         render(ready.copy(canHold = true, data = Loadable.Ready(m.copy(toBudget = app.centsible.core.model.Money(0), forNextMonth = m.toBudget))))
         compose.onRoot().captureRoboImage("screenshots/budget_holding.png")
+        app.centsible.core.uitesting.A11y.assertOk(compose)
+    }
+
+    @Test fun budget_large_text() {
+        compose.setContent {
+            CentsibleTheme(darkTheme = false) {
+                app.centsible.core.uitesting.LargeText { BudgetScreen(ready, {}, {}, {}, {}, { _, _ -> }, { _, _, _ -> }, { _, _ -> }, {}) }
+            }
+        }
+        compose.onRoot().captureRoboImage("screenshots/budget_large_text.png")
+        app.centsible.core.uitesting.A11y.assertOk(compose)
     }
 }

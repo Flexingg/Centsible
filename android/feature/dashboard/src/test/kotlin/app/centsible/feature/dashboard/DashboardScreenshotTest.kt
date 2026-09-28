@@ -47,5 +47,6 @@ class DashboardScreenshotTest {
             }
         }
         compose.onRoot().captureRoboImage("screenshots/dashboard_light.png")
+        app.centsible.core.uitesting.A11y.assertOk(compose)
     }
 }

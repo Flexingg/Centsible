@@ -42,6 +42,7 @@ class SettingsScreenshotTest {
     @Test fun settings_light() {
         compose.setContent { CentsibleTheme(darkTheme = false) { SettingsScreen(SettingsUiState(Loadable.Ready(data), reminders = true, reminderDays = 1), SettingsActions()) } }
         compose.onRoot().captureRoboImage("screenshots/settings_light.png")
+        app.centsible.core.uitesting.A11y.assertOk(compose)
     }
 
     @Test fun settings_invite() {
@@ -55,5 +56,6 @@ class SettingsScreenshotTest {
         }
         compose.waitForIdle()
         captureScreenRoboImage("screenshots/settings_invite.png")
+        app.centsible.core.uitesting.A11y.assertOk(compose)
     }
 }

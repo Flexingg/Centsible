@@ -21,6 +21,7 @@ dependencies {
     "testImplementation"(libs.lib("roborazzi-compose"))
     "testImplementation"(platform(libs.lib("compose-bom")))
     "testImplementation"(libs.lib("compose-ui-test-junit4"))
+    "testImplementation"(project(":core:ui-testing")) // A11y checks in screenshot tests
     "debugImplementation"(libs.lib("compose-ui-test-manifest"))
     "testImplementation"(project(":core:testing"))
 }

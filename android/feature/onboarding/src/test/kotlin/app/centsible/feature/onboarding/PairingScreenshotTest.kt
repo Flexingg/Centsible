@@ -22,6 +22,7 @@ class PairingScreenshotTest {
     private fun render(state: OnboardingUiState, name: String) {
         compose.setContent { CentsibleTheme(darkTheme = false) { OnboardingScreen(state, OnboardingActions()) } }
         compose.onRoot().captureRoboImage("screenshots/$name.png")
+        app.centsible.core.uitesting.A11y.assertOk(compose)
     }
 
     @Test fun onboarding_address() = render(OnboardingUiState(url = "budget-api.example.com", deviceName = "Pixel 9"), "onboarding_address")
@@ -56,5 +57,6 @@ class PairingScreenshotTest {
             }
         }
         compose.onRoot().captureRoboImage("screenshots/onboarding_first_budget.png")
+        app.centsible.core.uitesting.A11y.assertOk(compose)
     }
 }
