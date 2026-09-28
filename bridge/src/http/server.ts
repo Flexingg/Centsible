@@ -9,6 +9,7 @@ import type { ReportOps } from '../actual/report-ops.js';
 import type { JobStore } from '../jobs.js';
 import type { SetupService } from '../setup.js';
 import type { BankSyncOps } from '../actual/bank-sync-ops.js';
+import type { BankSyncBackfill } from '../bank-sync-backfill.js';
 import type { BankSyncScheduler } from '../bank-sync-scheduler.js';
 import type { HouseholdStore, Member, Device, Role } from '../auth/store.js';
 import type { BridgeConfig } from '../config.js';
@@ -38,6 +39,7 @@ export type Deps = {
   setup: SetupService;
   bankSync: BankSyncOps;
   scheduler: BankSyncScheduler;
+  backfill: BankSyncBackfill;
 };
 
 declare module 'fastify' {

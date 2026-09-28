@@ -116,6 +116,8 @@ class RequestContractTest {
         call { planning.linkSimpleFin(b, LinkRequestDto("SF-CARD", accountId = "acc")) }
         val mapping = FieldMappingDto("postedDate", "notes", "payeeName")
         call { planning.updateBankSyncSettings(b, "acc", BankSyncSettingsDto(true, false, true, true, false, SyncMappingsDto(mapping, mapping))) }
+        call { planning.startBackfill(b, BackfillRequestDto(years = 10)) }
+        call { planning.startBackfill(b, BackfillRequestDto(years = 2, accountIds = listOf("acc"))) }
 
         val withBodies = sent.filter { it.body != null }
         assertTrue("expected every write to be captured, got ${withBodies.size}", withBodies.size >= 30)

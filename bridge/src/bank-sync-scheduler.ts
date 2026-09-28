@@ -1,6 +1,7 @@
 import type { ActualHost } from './actual/host.js';
 import { SIMPLEFIN_DAILY_QUOTA, type BankSyncOps, type SyncSummary } from './actual/bank-sync-ops.js';
 import type { HouseholdStore } from './auth/store.js';
+import type { BankSyncBackfill } from './bank-sync-backfill.js';
 import type { JobStore } from './jobs.js';
 
 type Logger = { info: (o: unknown, m?: string) => void; warn: (o: unknown, m?: string) => void };
@@ -33,10 +34,14 @@ export class BankSyncScheduler {
     private readonly jobs: JobStore,
     private readonly log: Logger,
     private readonly now: () => number = Date.now,
+    private readonly backfill?: BankSyncBackfill,
   ) {}
 
   start() {
-    this.timer = setInterval(() => void this.tick(), 60_000);
+    this.timer = setInterval(() => {
+      void this.tick();
+      void this.backfill?.tick(); // resumes a history import once SimpleFIN's quota frees up
+    }, 60_000);
     this.timer.unref();
   }
 

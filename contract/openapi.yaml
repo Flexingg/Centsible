@@ -339,6 +339,55 @@ paths:
         '400': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
 
+  /v1/bank-sync/backfill:
+    delete:
+      tags: [bank-sync]
+      operationId: cancelBackfill
+      summary: Owners. Stop the history import in progress; what was imported stays.
+      responses:
+        '200':
+          description: The import's final state (null when there was none)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [backfill]
+                properties:
+                  backfill:
+                    oneOf:
+                      - type: 'null'
+                      - $ref: '#/components/schemas/BackfillState'
+        '403': { $ref: '#/components/responses/Problem' }
+
+  /v1/budgets/{budgetId}/bank-sync/simplefin/backfill:
+    post:
+      tags: [bank-sync]
+      operationId: startBackfill
+      summary: Owners. Import older SimpleFIN history (up to 10 years) in 90-day windows, within SimpleFIN's daily limit. Runs in the background over hours or days; watch it in GET /v1/bank-sync.
+      parameters:
+        - $ref: '#/components/parameters/BudgetId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [years]
+              additionalProperties: false
+              properties:
+                years: { type: integer, minimum: 1, maximum: 10 }
+                accountIds: { type: array, items: { type: string, minLength: 1 }, maxItems: 100, description: Linked SimpleFIN accounts; omit for all }
+      responses:
+        '202':
+          description: Started
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BackfillState' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '423': { $ref: '#/components/responses/Problem' }
+
   /v1/budgets/{budgetId}/bank-sync/simplefin/accounts:
     get:
       tags: [bank-sync]
@@ -1566,10 +1615,32 @@ components:
           required: [configured, requestsToday, dailyQuota]
           properties:
             configured: { type: boolean }
+            historyAccess: { type: boolean, description: The bridge holds its own SimpleFIN access (needed to import older history). False for connections made before it existed; reconnect with a new setup token. }
             requestsToday: { type: integer, description: SimpleFIN requests the bridge made in the last 24 hours }
             dailyQuota: { type: integer, description: SimpleFIN Bridge asks for 24 or fewer a day }
         schedule: { $ref: '#/components/schemas/ScheduleState' }
         intervals: { type: array, items: { type: integer } }
+        backfill:
+          oneOf:
+            - type: 'null'
+            - $ref: '#/components/schemas/BackfillState'
+    BackfillState:
+      type: object
+      description: A history import walking back in 90-day windows. running and waiting carry on by themselves; waiting means paused for SimpleFIN's daily limit or a retry.
+      required: [budgetId, accountIds, since, status, reachedDate, windowsDone, windowsTotal, transactionsFound, transactionsAdded, message, startedAt, updatedAt]
+      properties:
+        budgetId: { type: string }
+        accountIds: { type: array, items: { type: string } }
+        since: { $ref: '#/components/schemas/Date' }
+        status: { type: string, enum: [running, waiting, done, failed, cancelled] }
+        reachedDate: { $ref: '#/components/schemas/Date' }
+        windowsDone: { type: integer }
+        windowsTotal: { type: integer }
+        transactionsFound: { type: integer }
+        transactionsAdded: { type: integer }
+        message: { type: [string, 'null'] }
+        startedAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
     ScheduleState:
       type: object
       required: [intervalHours, lastRunAt, nextRunAt, lastResult]

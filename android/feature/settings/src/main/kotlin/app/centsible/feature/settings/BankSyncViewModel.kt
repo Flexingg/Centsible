@@ -19,6 +19,7 @@ import app.centsible.core.model.JobStatus
 import app.centsible.core.model.Role
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -42,9 +43,16 @@ data class BankSyncUiState(
     val confirmDisconnect: Boolean = false,
     val busy: Boolean = false,
     val message: String? = null,
+    /** How far back a history import goes. */
+    val historyYears: Int = 2,
 ) {
     /** Open, not-yet-linked accounts an external account can be linked into. */
     val linkTargets: List<Account> get() = localAccounts.filter { !it.closed && it.syncSource == null }
+
+    val readyOverview: BankSyncOverview? get() = (overview as? Loadable.Ready)?.value
+
+    /** Accounts a history import would cover. */
+    val simpleFinLinked: Int get() = (external as? Loadable.Ready)?.value?.count { it.linkedAccountId != null } ?: 0
 }
 
 /** The options sheet for one linked account. */
@@ -70,6 +78,7 @@ class BankSyncViewModel @Inject constructor(
             .onSuccess { o ->
                 state.update { it.copy(overview = Loadable.Ready(o)) }
                 if (o.simplefinConfigured && state.value.external == null) loadAccounts(refresh = true)
+                watchBackfill()
             }
             .onFailure { e -> state.update { it.copy(overview = Loadable.Failed(e.userMessage())) } }
     }
@@ -184,7 +193,35 @@ class BankSyncViewModel @Inject constructor(
         }
     }
 
+    fun onHistoryYears(years: Int) = state.update { it.copy(historyYears = years) }
+
+    /** Older history for every SimpleFIN-linked account, walked back 90 days per request by the bridge. */
+    fun startBackfill() = act("Importing history. It carries on in the background, even with the app closed.") {
+        val started = bankSync.startBackfill(selectedBudget(), state.value.historyYears)
+        state.update { st -> st.copy(overview = st.readyOverview?.let { Loadable.Ready(it.copy(backfill = started)) } ?: st.overview) }
+        watchBackfill()
+    }
+
+    fun cancelBackfill() = act("History import stopped. What came in stays.") {
+        val stopped = bankSync.cancelBackfill()
+        state.update { st -> st.copy(overview = st.readyOverview?.let { Loadable.Ready(it.copy(backfill = stopped)) } ?: st.overview) }
+    }
+
     fun messageShown() = state.update { it.copy(message = null) }
+
+    private var backfillWatch: Job? = null
+
+    /** Refreshes progress while an import runs (it can take days; this only runs while the screen is open). */
+    private fun watchBackfill() {
+        if (backfillWatch?.isActive == true || state.value.readyOverview?.backfill?.active != true) return
+        backfillWatch = viewModelScope.launch {
+            while (state.value.readyOverview?.backfill?.active == true) {
+                delay(10_000)
+                refreshOverview()
+            }
+            loadAccounts(refresh = false) // balances and counts changed
+        }
+    }
 
     private suspend fun refreshOverview() {
         runCatching { bankSync.overview() }.onSuccess { o -> state.update { it.copy(overview = Loadable.Ready(o)) } }

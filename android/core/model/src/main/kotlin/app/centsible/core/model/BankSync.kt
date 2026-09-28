@@ -7,7 +7,32 @@ data class BankSyncOverview(
     val dailyQuota: Int,
     val schedule: SyncSchedule,
     val intervals: List<Int>,
+    /** False for SimpleFIN connections made before the bridge could import history; reconnecting fixes it. */
+    val historyAccess: Boolean = false,
+    val backfill: Backfill? = null,
 )
+
+/** Importing older SimpleFIN history, 90 days per request, over hours or days. */
+data class Backfill(
+    val budgetId: BudgetId,
+    val accountIds: List<AccountId>,
+    val since: String,
+    val status: Status,
+    val reachedDate: String,
+    val windowsDone: Int,
+    val windowsTotal: Int,
+    val transactionsAdded: Int,
+    val message: String?,
+) {
+    enum class Status { Running, Waiting, Done, Failed, Cancelled }
+
+    val active get() = status == Status.Running || status == Status.Waiting
+    val progress get() = if (windowsTotal <= 0) 0f else (windowsDone.toFloat() / windowsTotal).coerceIn(0f, 1f)
+
+    companion object {
+        val YEARS = listOf(1, 2, 3, 5, 10)
+    }
+}
 
 data class SyncSchedule(val intervalHours: Int, val lastRunAt: String?, val nextRunAt: String?, val lastResult: SyncRunResult?)
 

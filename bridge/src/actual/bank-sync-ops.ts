@@ -2,6 +2,7 @@ import * as api from '@actual-app/api';
 import type { HouseholdStore } from '../auth/store.js';
 import { ApiError } from '../errors.js';
 import type { ActualHost, Lib } from './host.js';
+import { claimSetupToken, SimpleFinError, type SimpleFinKeyFile } from './simplefin-client.js';
 
 type Raw = Record<string, unknown>;
 type Send = (name: string, args?: unknown) => Promise<unknown>;
@@ -55,7 +56,13 @@ export class BankSyncOps {
   constructor(
     private readonly host: ActualHost,
     private readonly store: HouseholdStore,
+    private readonly keys: SimpleFinKeyFile,
   ) {}
+
+  /** Whether the bridge holds its own copy of the SimpleFIN access URL (needed for history backfill). */
+  get historyAccess() {
+    return this.keys.read() != null;
+  }
 
   requestsToday() {
     return this.store.simpleFinRequestsToday();
@@ -79,10 +86,20 @@ export class BankSyncOps {
     } catch {
       throw ApiError.validation("That isn't a SimpleFIN setup token. Copy the whole token from bridge.simplefin.org (it's a long line of letters and numbers).");
     }
+    // Claim here rather than letting Actual do it, so the bridge keeps the access URL too
+    // (Actual never hands it back, and history backfill needs it).
+    let accessUrl: string;
+    try {
+      accessUrl = await claimSetupToken(token);
+    } catch (err) {
+      if (err instanceof SimpleFinError) throw new ApiError(502, 'bank_sync_failed', 'SimpleFIN error', err.message);
+      throw err;
+    }
     await this.host.withServer(async (lib) => {
-      await send(lib)('secret-set', { name: 'simplefin_accessKey', value: null });
+      await send(lib)('secret-set', { name: 'simplefin_accessKey', value: accessUrl });
       await send(lib)('secret-set', { name: 'simplefin_token', value: token });
     });
+    this.keys.write(accessUrl);
     this.listing = null;
     try {
       const accounts = await this.fetchAccounts();
@@ -95,6 +112,7 @@ export class BankSyncOps {
 
   async reset(): Promise<void> {
     this.listing = null;
+    this.keys.clear();
     await this.host.withServer(async (lib) => {
       await send(lib)('secret-set', { name: 'simplefin_token', value: null });
       await send(lib)('secret-set', { name: 'simplefin_accessKey', value: null });
@@ -256,9 +274,9 @@ export class BankSyncOps {
 }
 
 type SyncResponse = { errors?: { accountId?: string; message?: string }[]; newTransactions?: string[]; matchedTransactions?: string[] };
-type Linked = { id: string; name: string; externalId: string | null; source: string | null; closed: boolean };
+export type Linked = { id: string; name: string; externalId: string | null; source: string | null; closed: boolean };
 
-async function linkedAccounts(): Promise<Linked[]> {
+export async function linkedAccounts(): Promise<Linked[]> {
   const { data } = (await api.aqlQuery(api.q('accounts').select(['id', 'name', 'account_id', 'account_sync_source', 'closed']))) as { data: Raw[] };
   return data.map((a) => ({
     id: String(a.id),
@@ -293,7 +311,7 @@ async function withStatuses(results: AccountSyncResult[], simplefinRequests: num
   };
 }
 
-async function readSettings(accountId: string): Promise<BankSyncSettings> {
+export async function readSettings(accountId: string): Promise<BankSyncSettings> {
   const { data } = (await api.aqlQuery(api.q('preferences').select(['id', 'value']))) as { data: { id: string; value: string }[] };
   const pref = (id: string) => data.find((p) => p.id === id)?.value;
   const bools = Object.fromEntries(

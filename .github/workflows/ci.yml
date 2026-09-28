@@ -217,6 +217,7 @@ jobs:
             echo "CENTSIBLE_KEYSTORE=$RUNNER_TEMP/release.jks" >> "$GITHUB_ENV"
           else
             echo "::warning::CENTSIBLE_KEYSTORE_BASE64 isn't set, so this APK uses a throwaway debug key and can't update a previous install."
+            echo "SIGNING_NOTE=> ⚠️ This APK is signed with a temporary key, so it can't install over an earlier version (uninstall first). Add the CENTSIBLE_KEYSTORE_* repository secrets to fix updates for good." >> "$GITHUB_ENV"
           fi
       - name: Build release APK
         if: steps.current.outputs.stale != 'true'
@@ -245,4 +246,6 @@ jobs:
             deploy/env.example
           body: |
             **Phone:** install `centsible-${{ steps.version.outputs.name }}.apk`.
+            ${{ env.SIGNING_NOTE }}
+
             **Server:** download `docker-compose.yml` and `env.example` (rename it to `.env`, set `BRIDGE_PUBLIC_URL` and `CLOUDFLARE_TUNNEL_TOKEN`), then `docker compose up -d`. The bridge image is `ghcr.io/flexingg/centsible-bridge:${{ steps.version.outputs.name }}`.

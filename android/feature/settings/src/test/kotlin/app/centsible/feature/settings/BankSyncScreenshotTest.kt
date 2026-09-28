@@ -7,6 +7,8 @@ import app.centsible.core.designsystem.theme.CentsibleTheme
 import app.centsible.core.model.Account
 import app.centsible.core.model.AccountId
 import app.centsible.core.model.AccountSyncResult
+import app.centsible.core.model.Backfill
+import app.centsible.core.model.BudgetId
 import app.centsible.core.model.BankSyncOverview
 import app.centsible.core.model.BankSyncSettings
 import app.centsible.core.model.ExternalAccount
@@ -84,6 +86,47 @@ class BankSyncScreenshotTest {
         render(connected.copy(options = AccountOptions(external[1], settings)))
         compose.waitForIdle()
         captureScreenRoboImage("screenshots/bank_sync_options.png")
+        app.centsible.core.uitesting.A11y.assertOk(compose)
+    }
+
+    private fun withOverview(state: BankSyncUiState, change: (BankSyncOverview) -> BankSyncOverview) =
+        state.copy(overview = Loadable.Ready(change((state.overview as Loadable.Ready).value)), syncResults = null)
+
+    // Tall, so the Older history card at the bottom is on screen.
+    @Config(qualifiers = "w411dp-h1500dp-xxhdpi")
+    @Test fun bank_sync_history_importing() {
+        render(
+            withOverview(connected) {
+                it.copy(
+                    historyAccess = true,
+                    backfill = Backfill(
+                        BudgetId("b"), listOf(checking.id, visa.id), "2021-09-28", Backfill.Status.Waiting, "2024-02-11", 11, 22, 1843,
+                        "Paused to stay within SimpleFIN's daily limit. It carries on by itself as the limit frees up.",
+                    ),
+                )
+            },
+        )
+        compose.onRoot().captureRoboImage("screenshots/bank_sync_history_importing.png")
+        app.centsible.core.uitesting.A11y.assertOk(compose)
+    }
+
+    @Config(qualifiers = "w411dp-h1500dp-xxhdpi")
+    @Test fun bank_sync_history_start() {
+        render(withOverview(connected) { it.copy(historyAccess = true) }.copy(historyYears = 5))
+        compose.onRoot().captureRoboImage("screenshots/bank_sync_history_start.png")
+        app.centsible.core.uitesting.A11y.assertOk(compose)
+    }
+
+    @Config(qualifiers = "w411dp-h1500dp-xxhdpi")
+    @Test fun bank_sync_history_needs_reconnect() {
+        render(withOverview(connected) { it.copy(historyAccess = false) })
+        compose.onRoot().captureRoboImage("screenshots/bank_sync_history_reconnect.png")
+        app.centsible.core.uitesting.A11y.assertOk(compose)
+    }
+
+    @Test fun bank_sync_bridge_outdated() {
+        render(notConnected.copy(overview = Loadable.Failed(app.centsible.core.domain.BridgeException.OUTDATED)))
+        compose.onRoot().captureRoboImage("screenshots/bank_sync_bridge_outdated.png")
         app.centsible.core.uitesting.A11y.assertOk(compose)
     }
 }

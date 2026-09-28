@@ -1,7 +1,7 @@
 {
   "items": [
     {
-      "id": "fddff526-ec8c-4347-ae80-443b9d56757c",
+      "id": "73bcdeab-47df-460a-b66e-2377471e61ea",
       "name": "Brokerage",
       "offBudget": true,
       "closed": false,
@@ -12,7 +12,7 @@
       "lastSync": null
     },
     {
-      "id": "e44e28a1-54c5-4e6b-9341-b3ad4795ad41",
+      "id": "fac6fdc4-ad04-4225-bc47-83dad434c3c1",
       "name": "Joint Checking",
       "offBudget": false,
       "closed": false,
@@ -23,7 +23,7 @@
       "lastSync": null
     },
     {
-      "id": "fc328e49-110d-42f1-9e8e-670608df50b0",
+      "id": "c867d2de-c2ff-40a0-9c98-6162d13a361d",
       "name": "Visa",
       "offBudget": false,
       "closed": false,

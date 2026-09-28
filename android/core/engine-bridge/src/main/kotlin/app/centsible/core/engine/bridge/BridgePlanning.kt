@@ -98,10 +98,22 @@ class BridgeBankSync(private val api: PlanningApi, private val onWrite: () -> Un
     override suspend fun settings(budget: BudgetId, account: AccountId) = api.bankSyncSettings(budget.raw, account.raw).toModel()
     override suspend fun updateSettings(budget: BudgetId, account: AccountId, settings: app.centsible.core.model.BankSyncSettings) =
         api.updateBankSyncSettings(budget.raw, account.raw, settings.toDto()).toModel()
+    override suspend fun startBackfill(budget: BudgetId, years: Int, accounts: List<AccountId>) =
+        api.startBackfill(budget.raw, app.centsible.core.network.BackfillRequestDto(years, accounts.map { it.raw }.ifEmpty { null })).toModel()
+    override suspend fun cancelBackfill() = api.cancelBackfill().backfill?.toModel()
 }
 
+private fun app.centsible.core.network.BackfillDto.toModel() = app.centsible.core.model.Backfill(
+    BudgetId(budgetId), accountIds.map(::AccountId), since,
+    app.centsible.core.model.Backfill.Status.entries.firstOrNull { it.name.equals(status, ignoreCase = true) } ?: app.centsible.core.model.Backfill.Status.Failed,
+    reachedDate, windowsDone, windowsTotal, transactionsAdded, message,
+)
+
 private fun app.centsible.core.network.BankSyncOverviewDto.toModel() =
-    app.centsible.core.model.BankSyncOverview(simplefin.configured, simplefin.requestsToday, simplefin.dailyQuota, schedule.toModel(), intervals)
+    app.centsible.core.model.BankSyncOverview(
+        simplefin.configured, simplefin.requestsToday, simplefin.dailyQuota, schedule.toModel(), intervals,
+        historyAccess = simplefin.historyAccess, backfill = backfill?.toModel(),
+    )
 
 private fun app.centsible.core.network.ScheduleStateDto.toModel() = app.centsible.core.model.SyncSchedule(
     intervalHours, lastRunAt, nextRunAt,

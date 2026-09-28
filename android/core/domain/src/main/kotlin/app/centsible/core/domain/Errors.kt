@@ -5,6 +5,8 @@ sealed class BridgeException(message: String) : Exception(message) {
     class Unauthorized(message: String) : BridgeException(message)
     class Forbidden(message: String) : BridgeException(message)
     class NotFound(message: String) : BridgeException(message)
+    /** The bridge doesn't have this endpoint at all: it's an older version than the app. */
+    class BridgeOutdated(message: String = OUTDATED) : BridgeException(message)
     class Validation(message: String) : BridgeException(message)
     class Conflict(message: String) : BridgeException(message)
     class FeatureUnavailable(message: String) : BridgeException(message)
@@ -20,6 +22,11 @@ sealed class BridgeException(message: String) : Exception(message) {
     class Unexpected(message: String) : BridgeException(message)
     /** The bridge was unreachable, so the change was saved on the phone to send later. */
     class QueuedOffline(message: String = "Saved offline. It will sync when you're back online.") : BridgeException(message)
+
+    companion object {
+        const val OUTDATED = "Your bridge is older than this app, so this feature isn't there yet. " +
+            "Update it on your server: docker compose pull && docker compose up -d"
+    }
 }
 
 /** Short, human-readable text for snackbars and error states. */

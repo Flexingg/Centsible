@@ -30,6 +30,7 @@ class FixtureDecodingTest {
         "setup-status" to SetupStatusDto.serializer(),
         "budget-created" to BudgetDto.serializer(),
         "bank-sync-overview" to BankSyncOverviewDto.serializer(),
+        "bank-sync-backfill" to BackfillDto.serializer(),
         "bank-sync-summary" to SyncSummaryDto.serializer(),
         "bank-sync-settings" to BankSyncSettingsDto.serializer(),
         "simplefin-accounts" to ItemsDto.serializer(ExternalAccountDto.serializer()),

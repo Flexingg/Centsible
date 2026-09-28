@@ -189,7 +189,8 @@ class BridgeClient(
         throw when (problem?.code ?: "") {
             "unauthorized" -> BridgeException.Unauthorized(message)
             "forbidden" -> BridgeException.Forbidden(message)
-            "not_found" -> BridgeException.NotFound(message)
+            // The bridge's unknown-route answer ("GET /v1/...") rather than a missing record.
+            "not_found" -> if (UNKNOWN_ROUTE.matches(message)) BridgeException.BridgeOutdated() else BridgeException.NotFound(message)
             "validation" -> BridgeException.Validation(message)
             "conflict" -> BridgeException.Conflict(message)
             "rate_limited" -> BridgeException.RateLimited(message)
@@ -212,3 +213,6 @@ inline fun <reified B : Any> HttpRequestBuilder.jsonBody(body: B) {
     contentType(ContentType.Application.Json)
     setBody(body)
 }
+
+/** The detail of the bridge's 404 for a route it doesn't have, e.g. "GET /v1/bank-sync". */
+private val UNKNOWN_ROUTE = Regex("^(GET|POST|PUT|PATCH|DELETE) /\\S*$")

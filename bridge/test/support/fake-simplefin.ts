@@ -16,7 +16,7 @@ export type FakeAccount = {
 
 export async function startFakeSimpleFin(accounts: FakeAccount[]) {
   let claimed = false;
-  const stats = { claims: 0, accountRequests: 0, lastQuery: '' };
+  const stats = { claims: 0, accountRequests: 0, lastQuery: '', queries: [] as URLSearchParams[] };
   const user = 'fakeuser';
   const pass = 'fakepass';
   let port = 0;
@@ -35,6 +35,7 @@ export async function startFakeSimpleFin(accounts: FakeAccount[]) {
     if (req.method === 'GET' && url.pathname === '/simplefin/accounts') {
       stats.accountRequests++;
       stats.lastQuery = url.search;
+      stats.queries.push(url.searchParams);
       if (req.headers.authorization !== `Basic ${Buffer.from(`${user}:${pass}`).toString('base64')}`) {
         res.writeHead(403).end('Forbidden');
         return;
@@ -42,6 +43,8 @@ export async function startFakeSimpleFin(accounts: FakeAccount[]) {
       const only = url.searchParams.getAll('account');
       const balancesOnly = url.searchParams.get('balances-only') === '1';
       const start = Number(url.searchParams.get('start-date') ?? 0);
+      const end = url.searchParams.has('end-date') ? Number(url.searchParams.get('end-date')) : Infinity;
+
       const body = {
         errors: [],
         accounts: accounts
@@ -54,7 +57,7 @@ export async function startFakeSimpleFin(accounts: FakeAccount[]) {
             balance: a.balance,
             'available-balance': a.balance,
             'balance-date': Math.floor(Date.now() / 1000),
-            transactions: balancesOnly ? [] : a.transactions.filter((t) => t.posted >= start || t.pending),
+            transactions: balancesOnly ? [] : a.transactions.filter((t) => (t.posted >= start && t.posted < end) || t.pending),
           })),
       };
       res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify(body));

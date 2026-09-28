@@ -92,7 +92,8 @@ afterAll(async () => {
 describe('SimpleFIN setup', () => {
   it('starts out not connected, with the schedule off', async () => {
     const res = await call('GET', '/v1/bank-sync', '/v1/bank-sync', viewer);
-    expect(res.body.simplefin).toEqual({ configured: false, requestsToday: 0, dailyQuota: 24 });
+    expect(res.body.simplefin).toEqual({ configured: false, requestsToday: 0, dailyQuota: 24, historyAccess: false });
+    expect(res.body.backfill).toBeNull();
     expect(res.body.schedule).toMatchObject({ intervalHours: 0, nextRunAt: null, lastResult: null });
   });
 
@@ -110,7 +111,7 @@ describe('SimpleFIN setup', () => {
   it('connects with a setup token and claims it right away', async () => {
     const res = await call('PUT', '/v1/bank-sync/simplefin', '/v1/bank-sync/simplefin', owner, { setupToken: sf.setupToken });
     expect(res.status).toBe(200);
-    expect(res.body.simplefin).toMatchObject({ configured: true, requestsToday: 1 });
+    expect(res.body.simplefin).toMatchObject({ configured: true, requestsToday: 1, historyAccess: true });
     expect(sf.stats.claims).toBe(1);
     recordFixture('bank-sync-overview', res.body);
   });
@@ -120,7 +121,8 @@ describe('SimpleFIN setup', () => {
     const res = await call('PUT', '/v1/bank-sync/simplefin', '/v1/bank-sync/simplefin', owner, { setupToken: sf.setupToken });
     expect(res.status).toBe(502);
     expect(res.body.detail).toMatch(/Setup tokens work only once/);
-    expect((await call('GET', '/v1/bank-sync', '/v1/bank-sync', owner)).body.simplefin.configured).toBe(false);
+    // The claim fails before anything is stored, so the working connection stays.
+    expect((await call('GET', '/v1/bank-sync', '/v1/bank-sync', owner)).body.simplefin).toMatchObject({ configured: true, historyAccess: true });
   });
 });
 
@@ -216,9 +218,9 @@ describe('linking and syncing', () => {
 
   it('counts every SimpleFIN request against the daily quota', async () => {
     const res = await call('GET', '/v1/bank-sync', '/v1/bank-sync', viewer);
-    // Everything the current (second) fake SimpleFIN saw, plus the first connection and
-    // the rejected re-claim, which also reached SimpleFIN.
-    expect(res.body.simplefin.requestsToday).toBe(sf.stats.accountRequests + 2);
+    // Everything the current (second) fake SimpleFIN saw, plus the first connection's
+    // account listing (a rejected claim never gets as far as a data request).
+    expect(res.body.simplefin.requestsToday).toBe(sf.stats.accountRequests + 1);
   });
 });
 
@@ -260,6 +262,6 @@ describe('disconnecting', () => {
   it('owners can reset the SimpleFIN credentials', async () => {
     expect((await call('DELETE', '/v1/bank-sync/simplefin', '/v1/bank-sync/simplefin', member)).status).toBe(403);
     expect((await call('DELETE', '/v1/bank-sync/simplefin', '/v1/bank-sync/simplefin', owner)).status).toBe(204);
-    expect((await call('GET', '/v1/bank-sync', '/v1/bank-sync', owner)).body.simplefin.configured).toBe(false);
+    expect((await call('GET', '/v1/bank-sync', '/v1/bank-sync', owner)).body.simplefin).toMatchObject({ configured: false, historyAccess: false });
   });
 });

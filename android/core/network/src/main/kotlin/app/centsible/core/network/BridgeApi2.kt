@@ -66,6 +66,9 @@ class PlanningApi(private val client: BridgeClient) {
     suspend fun externalAccounts(budgetId: String, refresh: Boolean): List<ExternalAccountDto> =
         client.get<ItemsDto<ExternalAccountDto>>("${b(budgetId)}/bank-sync/simplefin/accounts") { parameter("refresh", refresh) }.items
     suspend fun linkSimpleFin(budgetId: String, body: LinkRequestDto): LinkedDto = client.send(HttpMethod.Post, "${b(budgetId)}/bank-sync/simplefin/link", body)
+    suspend fun startBackfill(budgetId: String, body: BackfillRequestDto): BackfillDto =
+        client.send(HttpMethod.Post, "${b(budgetId)}/bank-sync/simplefin/backfill", body)
+    suspend fun cancelBackfill(): BackfillCancelledDto = client.execute(HttpMethod.Delete, "/v1/bank-sync/backfill").body()
     suspend fun unlink(budgetId: String, accountId: String) { client.execute(HttpMethod.Post, "${b(budgetId)}/accounts/$accountId/unlink") }
     suspend fun bankSyncSettings(budgetId: String, accountId: String): BankSyncSettingsDto = client.get("${b(budgetId)}/accounts/$accountId/bank-sync-settings")
     suspend fun updateBankSyncSettings(budgetId: String, accountId: String, body: BankSyncSettingsDto): BankSyncSettingsDto =

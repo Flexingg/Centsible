@@ -1,10 +1,18 @@
 import type { FastifyPluginAsync } from 'fastify';
 import { SIMPLEFIN_DAILY_QUOTA, SIMPLEFIN_FIELDS, type BankSyncSettings } from '../../actual/bank-sync-ops.js';
+import { BACKFILL_MAX_YEARS, type BackfillState } from '../../bank-sync-backfill.js';
 import { SYNC_INTERVALS } from '../../bank-sync-scheduler.js';
 import { audit, requireBudget, requireRole, type Deps } from '../server.js';
 import { DATE } from './budgets.js';
 
 type BudgetParams = { budgetId: string };
+
+/** What the app sees of a history import (the walk's internals stay in the bridge). */
+export function publicBackfill(s: BackfillState | null) {
+  if (!s) return null;
+  const { windowEnd: _e, retryAt: _r, emptyStreak: _s, ...rest } = s;
+  return rest;
+}
 type AccountParams = BudgetParams & { id: string };
 
 const mapping = {
@@ -22,11 +30,12 @@ const mapping = {
 export const bankSyncRoutes =
   (deps: Deps): FastifyPluginAsync =>
   async (app) => {
-    const { bankSync, scheduler, store } = deps;
+    const { bankSync, scheduler, store, backfill } = deps;
     const overview = async () => ({
-      simplefin: { ...(await bankSync.status()), requestsToday: bankSync.requestsToday(), dailyQuota: SIMPLEFIN_DAILY_QUOTA },
+      simplefin: { ...(await bankSync.status()), requestsToday: bankSync.requestsToday(), dailyQuota: SIMPLEFIN_DAILY_QUOTA, historyAccess: bankSync.historyAccess },
       schedule: scheduler.state(),
       intervals: [...SYNC_INTERVALS],
+      backfill: publicBackfill(backfill.state()),
     });
 
     // ── Household-wide (the SimpleFIN token is server-wide in Actual) ──
@@ -64,7 +73,38 @@ export const bankSyncRoutes =
       },
     );
 
+    app.delete('/v1/bank-sync/backfill', async (req) => {
+      const { member, device } = requireRole(req, 'owner');
+      const state = backfill.cancel();
+      store.audit({ memberId: member.id, deviceId: device.id, action: 'bank_sync.backfill_cancelled' });
+      return { backfill: publicBackfill(state) };
+    });
+
     // ── Per budget ──
+    app.post<{ Params: BudgetParams; Body: { years: number; accountIds?: string[] } }>(
+      '/v1/budgets/:budgetId/bank-sync/simplefin/backfill',
+      {
+        schema: {
+          body: {
+            type: 'object',
+            required: ['years'],
+            additionalProperties: false,
+            properties: {
+              years: { type: 'integer', minimum: 1, maximum: BACKFILL_MAX_YEARS },
+              accountIds: { type: 'array', items: { type: 'string', minLength: 1 }, maxItems: 100 },
+            },
+          },
+        },
+      },
+      async (req, reply) => {
+        requireRole(req, 'owner'); // spends the household's SimpleFIN quota for days
+        requireBudget(deps, req, req.params.budgetId, 'member');
+        const state = await backfill.start(req.params.budgetId, req.body);
+        audit(deps, req, req.params.budgetId, 'bank_sync.backfill_started', undefined, { years: req.body.years, accounts: state.accountIds.length });
+        return reply.status(202).send(publicBackfill(state));
+      },
+    );
+
     app.get<{ Params: BudgetParams; Querystring: { refresh?: boolean } }>('/v1/budgets/:budgetId/bank-sync/simplefin/accounts', async (req) => {
       requireBudget(deps, req, req.params.budgetId, 'member');
       return { items: await bankSync.listAccounts(req.params.budgetId, req.query.refresh !== false) };

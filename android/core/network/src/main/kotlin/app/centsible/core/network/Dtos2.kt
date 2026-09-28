@@ -129,10 +129,29 @@ import kotlinx.serialization.json.JsonObject
 @Serializable data class NetWorthPointDto(val month: String, val assets: Long, val liabilities: Long, val netWorth: Long)
 @Serializable data class NetWorthDto(val points: List<NetWorthPointDto>)
 
-@Serializable data class SimpleFinStatusDto(val configured: Boolean, val requestsToday: Int = 0, val dailyQuota: Int = 24)
+@Serializable data class SimpleFinStatusDto(val configured: Boolean, val requestsToday: Int = 0, val dailyQuota: Int = 24, val historyAccess: Boolean = false)
 @Serializable data class SyncRunResultDto(val newTransactions: Int = 0, val accounts: Int = 0, val errors: List<String> = emptyList(), val skipped: String? = null)
 @Serializable data class ScheduleStateDto(val intervalHours: Int, val lastRunAt: String? = null, val nextRunAt: String? = null, val lastResult: SyncRunResultDto? = null)
-@Serializable data class BankSyncOverviewDto(val simplefin: SimpleFinStatusDto, val schedule: ScheduleStateDto, val intervals: List<Int> = listOf(0, 2, 4, 6, 12, 24))
+@Serializable data class BankSyncOverviewDto(
+    val simplefin: SimpleFinStatusDto,
+    val schedule: ScheduleStateDto,
+    val intervals: List<Int> = listOf(0, 2, 4, 6, 12, 24),
+    val backfill: BackfillDto? = null,
+)
+@Serializable data class BackfillDto(
+    val budgetId: String,
+    val accountIds: List<String> = emptyList(),
+    val since: String,
+    val status: String,
+    val reachedDate: String,
+    val windowsDone: Int = 0,
+    val windowsTotal: Int = 0,
+    val transactionsFound: Int = 0,
+    val transactionsAdded: Int = 0,
+    val message: String? = null,
+)
+@Serializable data class BackfillRequestDto(val years: Int, val accountIds: List<String>? = null)
+@Serializable data class BackfillCancelledDto(val backfill: BackfillDto? = null)
 @Serializable data class SetupTokenDto(val setupToken: String)
 @Serializable data class ScheduleInputDtoBankSync(val intervalHours: Int)
 @Serializable data class ExternalAccountDto(

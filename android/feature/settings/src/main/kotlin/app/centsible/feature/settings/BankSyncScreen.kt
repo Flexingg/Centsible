@@ -31,6 +31,7 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
@@ -67,6 +68,7 @@ import app.centsible.core.designsystem.component.StatLabel
 import app.centsible.core.designsystem.component.toggleRow
 import app.centsible.core.designsystem.theme.CentsibleTheme
 import app.centsible.core.model.AccountId
+import app.centsible.core.model.Backfill
 import app.centsible.core.model.BankSyncOverview
 import app.centsible.core.model.BankSyncSettings
 import app.centsible.core.model.BankSyncStatus
@@ -93,6 +95,9 @@ fun BankSyncRoute(onBack: () -> Unit, viewModel: BankSyncViewModel = hiltViewMod
             unlink = viewModel::unlink,
             setSchedule = { viewModel.setSchedule(it) },
             syncAll = viewModel::syncAll,
+            historyYears = viewModel::onHistoryYears,
+            startBackfill = { viewModel.startBackfill() },
+            cancelBackfill = { viewModel.cancelBackfill() },
             messageShown = viewModel::messageShown,
         ),
     )
@@ -113,6 +118,9 @@ data class BankSyncActions(
     val unlink: () -> Unit = {},
     val setSchedule: (Int) -> Unit = {},
     val syncAll: () -> Unit = {},
+    val historyYears: (Int) -> Unit = {},
+    val startBackfill: () -> Unit = {},
+    val cancelBackfill: () -> Unit = {},
     val messageShown: () -> Unit = {},
 )
 
@@ -143,6 +151,7 @@ fun BankSyncScreen(state: BankSyncUiState, actions: BankSyncActions) {
                 if (o.value.simplefinConfigured) {
                     item { AccountsCard(state, actions) }
                     item { SyncCard(o.value, state, actions) }
+                    item { HistoryCard(o.value, state, actions) }
                 }
             }
         }
@@ -312,6 +321,80 @@ private fun SyncCard(o: BankSyncOverview, state: BankSyncUiState, actions: BankS
         }
     }
 }
+
+/** Older history than Actual's 90 days, fetched by the bridge 90 days per SimpleFIN request. */
+@Composable
+private fun HistoryCard(o: BankSyncOverview, state: BankSyncUiState, actions: BankSyncActions) {
+    val colors = CentsibleTheme.colors
+    SectionCard("Older history") {
+        val b = o.backfill
+        if (b != null && b.active) {
+            Text("Importing history back to ${b.since}", style = MaterialTheme.typography.bodyLarge)
+            LinearProgressIndicator(
+                progress = { b.progress },
+                modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                color = colors.accent,
+                trackColor = colors.border,
+            )
+            Text(
+                "Reached ${b.reachedDate} · ${plural(b.transactionsAdded, "transaction")} added · ${b.windowsDone} of about ${b.windowsTotal} requests",
+                style = MaterialTheme.typography.bodySmall,
+                color = colors.textSecondary,
+            )
+            b.message?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = if (b.status == Backfill.Status.Waiting) colors.warning else colors.textSecondary, modifier = Modifier.padding(top = 4.dp)) }
+            if (state.isOwner) {
+                OutlinedButton(onClick = actions.cancelBackfill, enabled = !state.busy, modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) { Text("Stop importing") }
+            }
+            return@SectionCard
+        }
+        Text(
+            "Syncing brings in the last 90 days. Import older transactions from your banks here: SimpleFIN hands out 90 days per request, so the bridge walks back a " +
+                "window at a time within its daily limit and keeps going on its own. Ten years can take a few days. Many banks only keep a year or two; the import " +
+                "stops when yours runs out. Opening balances move back so today's balances stay the same.",
+            style = MaterialTheme.typography.bodySmall,
+            color = colors.textSecondary,
+        )
+        b?.message?.let {
+            Text(it, style = MaterialTheme.typography.bodySmall, color = if (b.status == Backfill.Status.Failed) colors.negative else colors.textPrimary, modifier = Modifier.padding(top = 8.dp))
+        }
+        if (!state.isOwner) {
+            Text("Only the owner can import history.", style = MaterialTheme.typography.bodySmall, color = colors.textTertiary, modifier = Modifier.padding(top = 8.dp))
+            return@SectionCard
+        }
+        if (!o.historyAccess) {
+            // Connections made before this existed: the bridge never saw the access, only Actual did.
+            Text(
+                "To import history, reconnect SimpleFIN once: create a new setup token at bridge.simplefin.org (Apps → New connection) and paste it here. If an account then shows as not linked, link it to the same account again; nothing is lost.",
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.padding(top = 8.dp),
+            )
+            OutlinedTextField(
+                state.setupToken, actions.onToken,
+                label = { Text("New setup token") },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                textStyle = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace),
+                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+            )
+            Button(onClick = actions.connect, enabled = state.setupToken.isNotBlank() && !state.connecting, modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
+                Text(if (state.connecting) "Reconnecting…" else "Reconnect")
+            }
+            return@SectionCard
+        }
+        StatLabel("How far back", Modifier.padding(top = 12.dp, bottom = 4.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Backfill.YEARS.forEach { y ->
+                FilterChip(selected = state.historyYears == y, onClick = { actions.historyYears(y) }, label = { Text("${y}y") })
+            }
+        }
+        Button(onClick = actions.startBackfill, enabled = !state.busy && state.simpleFinLinked > 0, modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
+            Text("Import ${plural(state.historyYears, "year")} of history")
+        }
+        if (state.simpleFinLinked == 0) Text("Link an account first.", style = MaterialTheme.typography.bodySmall, color = colors.textTertiary)
+    }
+}
+
+private fun plural(n: Int, word: String) = if (n == 1) "1 $word" else "$n ${word}s"
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

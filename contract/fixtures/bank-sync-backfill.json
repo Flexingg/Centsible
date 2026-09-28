@@ -1,0 +1,16 @@
+{
+  "budgetId": "4f355119-a54e-4637-9019-7d13c808da94",
+  "accountIds": [
+    "03806be3-f950-47f4-bc80-7661a5d01cc5"
+  ],
+  "since": "2024-09-28",
+  "status": "done",
+  "reachedDate": "2024-09-28",
+  "windowsDone": 9,
+  "windowsTotal": 9,
+  "transactionsFound": 5,
+  "transactionsAdded": 4,
+  "message": "Done. Imported 4 older transactions, back to 2024-09-28.",
+  "startedAt": "2026-09-28T11:09:46.963Z",
+  "updatedAt": "2026-09-28T11:09:47.280Z"
+}
