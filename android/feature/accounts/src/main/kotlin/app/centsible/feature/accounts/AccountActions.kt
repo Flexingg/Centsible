@@ -59,6 +59,7 @@ data class AccountActions(
     val reconcile: () -> Unit = {},
     val submitReconcile: (Money, Boolean) -> Unit = { _, _ -> },
     val cancelReconcile: () -> Unit = {},
+    val loadMore: () -> Unit = {},
 )
 
 /** Reads a picked document; statements are small, and the bridge caps them at 10 MB. */

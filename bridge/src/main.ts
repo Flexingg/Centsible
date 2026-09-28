@@ -29,6 +29,7 @@ const host = new ActualHost(config, {
 async function connect() {
   await host.start();
   log?.info({ server: host.actualServerVersion, api: host.apiVersion, compatibility: host.compatibility() }, 'connected to Actual');
+  void host.warmUp(); // background: first phone request shouldn't wait for a download
 }
 const setup = new SetupService(config, store, host, { info: (o, m) => log?.info(o, m), warn: (o, m) => log?.warn(o, m) }, connect);
 const app = await buildServer({ config, store, host, setup, ops: new BudgetOps(host), transactions: new TransactionOps(host), structure: new StructureOps(host), planning: new PlanningOps(host), accountOps: new AccountOps(host), reports: new ReportOps(host), jobs: new JobStore() });

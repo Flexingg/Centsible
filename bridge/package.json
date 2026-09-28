@@ -16,7 +16,8 @@
     "test": "vitest run",
     "test:unit": "vitest run test/unit",
     "test:contract": "vitest run test/contract",
-    "fixtures": "RECORD_FIXTURES=1 vitest run test/contract"
+    "fixtures": "RECORD_FIXTURES=1 vitest run test/contract",
+    "bench": "NODE_ENV=production tsx test/support/bench.ts"
   },
   "dependencies": {
     "@actual-app/api": "26.9.0",

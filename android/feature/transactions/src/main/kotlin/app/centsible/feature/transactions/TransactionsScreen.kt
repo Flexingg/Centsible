@@ -106,8 +106,19 @@ fun TransactionsScreen(
                     }
                     return@Column
                 }
-                val byDate = d.items.groupBy { it.date }
+                // Grouping thousands of loaded rows on every recomposition adds up; only redo it when the list changes.
+                val byDate = androidx.compose.runtime.remember(d.items) { d.items.groupBy { it.date } }
+                val listState = androidx.compose.foundation.lazy.rememberLazyListState()
+                // Infinite scroll: fetch the next page a few rows before the end.
+                androidx.compose.runtime.LaunchedEffect(listState, d.nextCursor) {
+                    if (d.nextCursor == null) return@LaunchedEffect
+                    androidx.compose.runtime.snapshotFlow {
+                        val info = listState.layoutInfo
+                        (info.visibleItemsInfo.lastOrNull()?.index ?: 0) >= info.totalItemsCount - 4
+                    }.collect { nearEnd -> if (nearEnd) onLoadMore() }
+                }
                 LazyColumn(
+                    state = listState,
                     contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 96.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
@@ -125,7 +136,7 @@ fun TransactionsScreen(
                     if (d.nextCursor != null) {
                         item(key = "more") {
                             TextButton(onClick = onLoadMore, enabled = !d.loadingMore, modifier = Modifier.fillMaxWidth()) {
-                                Text(if (d.loadingMore) "Loading…" else "Load more")
+                                Text(if (d.loadingMore) "Loading…" else "Load more") // shown if an automatic load failed
                             }
                         }
                     }

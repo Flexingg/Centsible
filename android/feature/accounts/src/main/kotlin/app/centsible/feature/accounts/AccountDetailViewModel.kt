@@ -37,6 +37,7 @@ data class AccountDetail(
     val nextCursor: String?,
     val otherAccounts: List<Account>,
     val categoryNames: Map<String, String>,
+    val loadingMore: Boolean = false,
 )
 
 /** A statement file picked for import, previewed before anything is written. */
@@ -81,6 +82,19 @@ class AccountDetailViewModel @Inject constructor(
     init {
         refresh()
         viewModelScope.launch { changes.changes.collect { refresh() } }
+    }
+
+    /** Next page of this account's transactions (infinite scroll). */
+    fun loadMore() {
+        val current = state.value.data.valueOrNull ?: return
+        val cursor = current.nextCursor ?: return
+        if (current.loadingMore) return
+        state.update { it.copy(data = Loadable.Ready(current.copy(loadingMore = true))) }
+        viewModelScope.launch {
+            runCatching { engine.transactions(selectedBudget(), TransactionQuery(accountId = id, limit = 50), cursor) }
+                .onSuccess { p -> state.update { it.copy(data = Loadable.Ready(current.copy(transactions = current.transactions + p.items, nextCursor = p.nextCursor))) } }
+                .onFailure { state.update { it.copy(data = Loadable.Ready(current.copy(loadingMore = false))) } }
+        }
     }
 
     fun refresh() = viewModelScope.launch {

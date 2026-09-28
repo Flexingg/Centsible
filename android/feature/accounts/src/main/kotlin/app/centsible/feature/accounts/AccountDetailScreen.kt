@@ -72,6 +72,7 @@ fun AccountDetailRoute(
             reconcile = { viewModel.startReconcile() },
             submitReconcile = { amount, adjust -> viewModel.reconcile(amount, adjust) },
             cancelReconcile = viewModel::cancelReconcile,
+            loadMore = viewModel::loadMore,
         ),
         state = state,
         onBack = onBack,
@@ -128,8 +129,17 @@ fun AccountDetailScreen(
             is Loadable.Ready -> {
                 val d = data.value
                 val accountNames = (d.otherAccounts + d.account).associate { it.id.raw to it.name }
+                val listState = androidx.compose.foundation.lazy.rememberLazyListState()
+                LaunchedEffect(listState, d.nextCursor) {
+                    if (d.nextCursor == null) return@LaunchedEffect
+                    androidx.compose.runtime.snapshotFlow {
+                        val info = listState.layoutInfo
+                        (info.visibleItemsInfo.lastOrNull()?.index ?: 0) >= info.totalItemsCount - 3
+                    }.collect { nearEnd -> if (nearEnd) actions.loadMore() }
+                }
                 LazyColumn(
                     Modifier.fillMaxSize().padding(padding),
+                    state = listState,
                     contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 96.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
@@ -180,7 +190,11 @@ fun AccountDetailScreen(
                         }
                     }
                     if (d.nextCursor != null) {
-                        item { Text("Showing the latest 50. Search on the Transactions tab for older ones.", style = MaterialTheme.typography.bodySmall, color = colors.textTertiary) }
+                        item {
+                            TextButton(onClick = actions.loadMore, enabled = !d.loadingMore, modifier = Modifier.fillMaxWidth()) {
+                                Text(if (d.loadingMore) "Loading…" else "Load more")
+                            }
+                        }
                     }
                 }
             }

@@ -397,6 +397,22 @@ object CategoryIconsModule {
 | 2: Known limits | By design for now | Only transaction writes queue offline. Budget edits, moves and goals need Actual's math, so they need a connection until the embedded engine exists. The scheduled CI job runs the contract suite against Actual's `latest` and `nightly` builds (26.10.0-nightly passed on 2026-09-27). |
 | 3: Polish | In progress | Done: guided first-run setup in the app (setup code from the bridge logs, Actual's password set or entered in-app, first budget); app lock (fingerprint or PIN, re-asks after a minute away, hides balances from screenshots and recents); undo after deleting a transaction; request-contract and end-to-end tests (the app's data layer against a real bridge and Actual, in CI). Next: notifications, tablet layouts, accessibility, performance with 10k+ transactions, R8 for release builds |
 
+Performance, measured with `npm run bench` (12,000 transactions over 24 months, 5 accounts, 60 payees; every read also re-syncs with Actual):
+
+| Request | Median |
+|---|---:|
+| Accounts with balances | 63 ms |
+| Budget month | 8 ms |
+| Transactions, first page / page 21 | 18 / 21 ms |
+| Search "coffee" | 96 ms |
+| Needs category | 64 ms |
+| Cash flow / spending / net worth, 12 months | 14 / 17 / 17 ms |
+| Merchant stats | 21 ms |
+| First open of the budget (one-time download) | 13 s |
+| Open after a bridge restart | 119 ms |
+
+The one-time download happens in the background right after the bridge connects, so phones don't wait for it. Lists load 50 at a time as you scroll.
+
 First-run setup, verified against Actual 26.9.0:
 - A new Actual server reports `bootstrapped: false` at `GET /account/needs-bootstrap`; `POST /account/bootstrap {password}` sets the first password and returns `already-bootstrapped` afterwards. `POST /account/login` answers `invalid-password` for a wrong one.
 - The bridge only accepts a claim with the one-time setup code, because its URL is public. The Actual password entered in the app is kept in `bridge-data/actual-password` (mode 600) and read on restart, so `ACTUAL_PASSWORD` is optional.

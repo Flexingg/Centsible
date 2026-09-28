@@ -56,6 +56,19 @@ export class ActualHost {
     return !!(this.config.actual.password || this.config.actual.sessionToken);
   }
 
+  /**
+   * Downloads every budget the bridge can open, so the first request from a phone
+   * doesn't wait for it (a 12k-transaction budget takes ~13 s the first time, ~0.1 s
+   * after). Runs in the background; failures only mean that budget downloads later.
+   */
+  async warmUp(): Promise<void> {
+    const budgets = await this.listBudgets().catch(() => []);
+    for (const b of budgets) {
+      if (b.encrypted && !this.config.actual.budgetPasswords[b.id]) continue;
+      await this.withBudget(b.id, 'read', async () => undefined).catch((err: unknown) => this.log.warn({ err, budgetId: b.id }, 'warm-up failed'));
+    }
+  }
+
   /** Creates an empty budget on the Actual server and returns its sync id. */
   createBudget(name: string): Promise<RemoteBudget> {
     return this.enqueue(async () => {
