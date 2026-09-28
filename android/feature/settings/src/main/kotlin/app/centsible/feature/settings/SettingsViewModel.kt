@@ -39,6 +39,8 @@ data class SettingsUiState(
     val invite: Pair<Member, PairingInvite>? = null,
     val message: String? = null,
     val appLock: Boolean = false,
+    val reminders: Boolean = false,
+    val reminderDays: Int = 1,
 )
 
 @HiltViewModel
@@ -47,13 +49,26 @@ class SettingsViewModel @Inject constructor(
     private val engine: BudgetEngine,
     private val sessions: SessionStore,
     private val appLock: app.centsible.core.domain.AppLockSettings,
+    private val reminders: app.centsible.core.domain.ReminderSettings,
+    private val reminderScheduler: app.centsible.core.domain.ReminderScheduler,
 ) : ViewModel() {
     private val state = MutableStateFlow(SettingsUiState())
     val uiState: StateFlow<SettingsUiState> = state.asStateFlow()
 
     init {
         viewModelScope.launch { appLock.enabled.collect { on -> state.update { it.copy(appLock = on) } } }
+        viewModelScope.launch { reminders.enabled.collect { on -> state.update { it.copy(reminders = on) } } }
+        viewModelScope.launch { reminders.daysAhead.collect { d -> state.update { it.copy(reminderDays = d) } } }
     }
+
+    fun setReminders(enabled: Boolean) = viewModelScope.launch {
+        reminders.setEnabled(enabled)
+        reminderScheduler.apply(enabled)
+    }
+
+    fun setReminderDays(days: Int) = viewModelScope.launch { reminders.setDaysAhead(days) }
+
+    fun notificationsDenied() = state.update { it.copy(message = "Allow notifications for Centsible in Android settings to get bill reminders.") }
 
     fun setAppLock(enabled: Boolean) = viewModelScope.launch { appLock.setEnabled(enabled) }
 

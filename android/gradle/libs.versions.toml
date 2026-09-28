@@ -58,6 +58,7 @@ compose-material-icons = { module = "androidx.compose.material:material-icons-ex
 # DI
 hilt-android = { module = "com.google.dagger:hilt-android", version.ref = "hilt" }
 hilt-compiler = { module = "com.google.dagger:hilt-compiler", version.ref = "hilt" }
+androidx-work = { module = "androidx.work:work-runtime-ktx", version = "2.12.0" }
 hilt-navigation-compose = { module = "androidx.hilt:hilt-navigation-compose", version.ref = "hilt-navigation-compose" }
 javax-inject = { module = "javax.inject:javax.inject", version = "1" }
 dagger = { module = "com.google.dagger:dagger", version.ref = "hilt" }

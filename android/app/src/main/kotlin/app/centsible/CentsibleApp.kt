@@ -91,7 +91,7 @@ private object Routes {
 }
 
 @Composable
-fun CentsibleApp(pairingLink: String?, viewModel: AppViewModel = hiltViewModel()) {
+fun CentsibleApp(pairingLink: String?, openScreen: String? = null, onOpened: () -> Unit = {}, viewModel: AppViewModel = hiltViewModel()) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val offline by viewModel.offline.collectAsStateWithLifecycle()
     val pending by viewModel.pending.collectAsStateWithLifecycle()
@@ -101,14 +101,26 @@ fun CentsibleApp(pairingLink: String?, viewModel: AppViewModel = hiltViewModel()
             AppState.NeedsPairing -> PairingRoute(deepLink = pairingLink)
             AppState.NeedsBudget -> BudgetPickerRoute()
             // Switching budgets rebuilds navigation and every screen's state.
-            is AppState.Ready -> key(s.budget) { MainScaffold(offline, pending, viewModel.undoOffers) }
+            is AppState.Ready -> key(s.budget) { MainScaffold(offline, pending, viewModel.undoOffers, openScreen, onOpened) }
         }
     }
 }
 
 @Composable
-private fun MainScaffold(offline: Boolean, pending: Int, undoOffers: kotlinx.coroutines.flow.Flow<app.centsible.core.domain.Undoable>) {
+private fun MainScaffold(
+    offline: Boolean,
+    pending: Int,
+    undoOffers: kotlinx.coroutines.flow.Flow<app.centsible.core.domain.Undoable>,
+    openScreen: String?,
+    onOpened: () -> Unit,
+) {
     val nav = rememberNavController()
+    androidx.compose.runtime.LaunchedEffect(openScreen) {
+        if (openScreen == OPEN_RECURRING) {
+            nav.navigate(Routes.RECURRING) { launchSingleTop = true }
+            onOpened()
+        }
+    }
     val snackbar = androidx.compose.runtime.remember { androidx.compose.material3.SnackbarHostState() }
     val scope = androidx.compose.runtime.rememberCoroutineScope()
     androidx.compose.runtime.LaunchedEffect(undoOffers) {

@@ -40,7 +40,7 @@ class SettingsScreenshotTest {
     )
 
     @Test fun settings_light() {
-        compose.setContent { CentsibleTheme(darkTheme = false) { SettingsScreen(SettingsUiState(Loadable.Ready(data)), SettingsActions()) } }
+        compose.setContent { CentsibleTheme(darkTheme = false) { SettingsScreen(SettingsUiState(Loadable.Ready(data), reminders = true, reminderDays = 1), SettingsActions()) } }
         compose.onRoot().captureRoboImage("screenshots/settings_light.png")
     }
 

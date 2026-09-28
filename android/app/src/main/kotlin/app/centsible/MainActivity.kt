@@ -25,6 +25,8 @@ class MainActivity : ComponentActivity() {
     @Inject lateinit var appLock: AppLockSettings
 
     private var pairingLink by mutableStateOf<String?>(null)
+    /** Set by a tapped bill reminder; the app opens Recurring once, then clears it. */
+    private var openScreen by mutableStateOf<String?>(null)
     /** null until the setting is read: show nothing rather than flash balances or a prompt. */
     private var locked by mutableStateOf<Boolean?>(null)
     private var lockEnabled = false
@@ -38,6 +40,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         pairingLink = intent?.pairingLink()
+        openScreen = intent?.getStringExtra(EXTRA_OPEN)
         lifecycleScope.launch {
             locked = AppLockPolicy.shouldLock(appLock.enabled.first(), backgroundedAt = null, now = SystemClock.elapsedRealtime())
             appLock.enabled.collect { enabled ->
@@ -52,7 +55,7 @@ class MainActivity : ComponentActivity() {
             when (locked) {
                 null -> BlankScreen()
                 true -> LockScreen(onUnlock = { DeviceUnlock.prompt(this, confirmCredential) { locked = false } })
-                false -> CentsibleApp(pairingLink = pairingLink)
+                false -> CentsibleApp(pairingLink = pairingLink, openScreen = openScreen, onOpened = { openScreen = null })
             }
         }
     }
@@ -72,6 +75,7 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         intent.pairingLink()?.let { pairingLink = it }
+        intent.getStringExtra(EXTRA_OPEN)?.let { openScreen = it }
     }
 
     private fun Intent.pairingLink(): String? = data?.takeIf { it.scheme == "actualbridge" }?.toString()

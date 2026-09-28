@@ -53,6 +53,16 @@ import app.centsible.core.model.Role
 @Composable
 fun SettingsRoute(viewModel: SettingsViewModel = hiltViewModel()) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val notificationPermission = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.RequestPermission(),
+    ) { granted -> if (granted) viewModel.setReminders(true) else viewModel.notificationsDenied() }
+    // Android 13+ asks before an app may notify; earlier versions allow it by default.
+    val askNotifications = {
+        val needsAsk = android.os.Build.VERSION.SDK_INT >= 33 &&
+            androidx.core.content.ContextCompat.checkSelfPermission(context, android.Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED
+        if (needsAsk) notificationPermission.launch(android.Manifest.permission.POST_NOTIFICATIONS) else viewModel.setReminders(true)
+    }
     SettingsScreen(
         state = state,
         actions = SettingsActions(
@@ -66,6 +76,8 @@ fun SettingsRoute(viewModel: SettingsViewModel = hiltViewModel()) {
             switchBudget = { viewModel.switchBudget(it) },
             messageShown = viewModel::messageShown,
             setAppLock = viewModel::setAppLock,
+            setReminders = { on -> if (on) askNotifications() else viewModel.setReminders(false) },
+            setReminderDays = viewModel::setReminderDays,
         ),
         deviceSecure = run {
             val context = androidx.compose.ui.platform.LocalContext.current
@@ -85,6 +97,8 @@ data class SettingsActions(
     val switchBudget: (app.centsible.core.model.BudgetId) -> Unit = {},
     val messageShown: () -> Unit = {},
     val setAppLock: (Boolean) -> Unit = {},
+    val setReminders: (Boolean) -> Unit = {},
+    val setReminderDays: (Int) -> Unit = {},
 )
 
 @Composable
@@ -137,6 +151,32 @@ fun SettingsScreen(state: SettingsUiState, actions: SettingsActions, renderQr: B
                                         Text("Last seen ${dev.lastSeenAt?.take(10) ?: "never"}", style = MaterialTheme.typography.labelSmall, color = colors.textTertiary)
                                     }
                                     if (dev.id != d.me.device.id && isOwner) TextButton(onClick = { actions.revokeDevice(dev.id) }) { Text("Remove") }
+                                }
+                            }
+                        }
+                    }
+                    item {
+                        SectionCard("Reminders") {
+                            Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Column(Modifier.weight(1f)) {
+                                    Text("Bill reminders", style = MaterialTheme.typography.bodyLarge)
+                                    Text(
+                                        "A notification before each recurring bill is due. Checked once a day, around 8am.",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = colors.textSecondary,
+                                    )
+                                }
+                                androidx.compose.material3.Switch(checked = state.reminders, onCheckedChange = actions.setReminders)
+                            }
+                            if (state.reminders) {
+                                Row(Modifier.padding(top = 8.dp), horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp)) {
+                                    app.centsible.core.domain.BillReminders.LEAD_DAYS.forEach { days ->
+                                        androidx.compose.material3.FilterChip(
+                                            selected = state.reminderDays == days,
+                                            onClick = { actions.setReminderDays(days) },
+                                            label = { Text(when (days) { 0 -> "On the day"; 1 -> "1 day before"; else -> "$days days before" }) },
+                                        )
+                                    }
                                 }
                             }
                         }
