@@ -9,6 +9,8 @@ import app.centsible.core.domain.MoveMoney
 import app.centsible.core.domain.SelectedBudget
 import app.centsible.core.domain.SessionStore
 import app.centsible.core.domain.userMessage
+import app.centsible.core.model.Autopilot
+import app.centsible.core.model.AverageBasis
 import app.centsible.core.model.BudgetId
 import app.centsible.core.model.BudgetMonth
 import app.centsible.core.model.BudgetPot
@@ -43,6 +45,12 @@ data class BudgetUiState(
     /** Note for the open category; goal templates live here as `#template` lines. */
     val note: String? = null,
     val noteLoaded: Boolean = false,
+    /** Autopilot sheet: null when closed. */
+    val autopilot: Loadable<Autopilot>? = null,
+    val autopilotBasis: AverageBasis = AverageBasis.Three,
+    val autopilotSelected: Set<CategoryId> = emptySet(),
+    /** Cover-overspending sheet: the plan comes from the same autopilot call. */
+    val cover: Loadable<Autopilot>? = null,
 ) {
     val hasPrevious get() = availableMonths.any { it < month }
     val hasNext get() = availableMonths.any { it > month }
@@ -57,6 +65,7 @@ class BudgetViewModel @Inject constructor(
     private val sessions: SessionStore,
     private val moveMoney: MoveMoney,
     private val planning: app.centsible.core.domain.PlanningGateway,
+    private val planAhead: app.centsible.core.domain.PlanAheadGateway,
     changes: BudgetChanges,
 ) : ViewModel() {
     private val state = MutableStateFlow(BudgetUiState())
@@ -118,6 +127,62 @@ class BudgetViewModel @Inject constructor(
             .onFailure { e -> state.update { it.copy(saving = false, message = e.userMessage()) } }
     }
     fun messageShown() = state.update { it.copy(message = null) }
+
+    // ── Autopilot ──
+
+    fun openAutopilot(open: Boolean) {
+        state.update { it.copy(autopilot = if (open) Loadable.Loading else null) }
+        if (open) viewModelScope.launch {
+            runCatching { planAhead.autopilot(budget, state.value.month) }
+                .onSuccess { a -> state.update { it.copy(autopilot = Loadable.Ready(a), autopilotSelected = differing(a, it.autopilotBasis)) } }
+                .onFailure { e -> state.update { it.copy(autopilot = Loadable.Failed(e.userMessage())) } }
+        }
+    }
+
+    /** A new basis preselects every category whose suggestion changes. */
+    fun setBasis(basis: AverageBasis) = state.update { s ->
+        s.copy(autopilotBasis = basis, autopilotSelected = (s.autopilot as? Loadable.Ready)?.value?.let { differing(it, basis) } ?: emptySet())
+    }
+
+    fun toggleSuggestion(id: CategoryId) = state.update { s ->
+        s.copy(autopilotSelected = if (id in s.autopilotSelected) s.autopilotSelected - id else s.autopilotSelected + id)
+    }
+
+    fun applyAutopilot() {
+        val selected = state.value.autopilotSelected.toList()
+        if (selected.isEmpty()) return
+        val n = selected.size
+        mutate(if (n == 1) "1 category budgeted" else "$n categories budgeted") {
+            planAhead.applyAutopilot(budget, state.value.month, state.value.autopilotBasis, selected).also { state.update { it.copy(autopilot = null) } }
+        }
+    }
+
+    private fun differing(a: Autopilot, basis: AverageBasis) = a.suggestions.filter { it.differs(basis) && it.monthsOfHistory > 0 }.map { it.categoryId }.toSet()
+
+    // ── Cover overspending ──
+
+    fun openCover(open: Boolean) {
+        state.update { it.copy(cover = if (open) Loadable.Loading else null) }
+        if (open) viewModelScope.launch {
+            runCatching { planAhead.autopilot(budget, state.value.month) }
+                .onSuccess { a -> state.update { it.copy(cover = Loadable.Ready(a)) } }
+                .onFailure { e -> state.update { it.copy(cover = Loadable.Failed(e.userMessage())) } }
+        }
+    }
+
+    fun coverOverspending() = viewModelScope.launch {
+        state.update { it.copy(saving = true) }
+        runCatching { planAhead.coverOverspending(budget, state.value.month) }
+            .onSuccess { res ->
+                val msg = when {
+                    res.moves.isEmpty() -> "Nothing to cover"
+                    res.uncovered.isZero -> "Overspending covered"
+                    else -> "Covered what was available. ${app.centsible.core.designsystem.component.MoneyFormat.format(res.uncovered)} is still overspent."
+                }
+                state.update { it.copy(data = Loadable.Ready(res.month), saving = false, cover = null, message = msg) }
+            }
+            .onFailure { e -> state.update { it.copy(saving = false, message = e.userMessage()) } }
+    }
 
     fun assign(category: CategoryId, amount: Money) = mutate("Budget updated") {
         engine.setBudgeted(budget, state.value.month, category, amount)

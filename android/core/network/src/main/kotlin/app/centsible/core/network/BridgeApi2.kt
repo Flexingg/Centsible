@@ -51,6 +51,24 @@ class PlanningApi(private val client: BridgeClient) {
     suspend fun reconcile(budgetId: String, accountId: String, body: ReconcileRequestDto): ReconcileResultDto =
         client.send(HttpMethod.Post, "${b(budgetId)}/accounts/$accountId/reconcile", body)
 
+    // Plan ahead: autopilot, goals, forecast
+    suspend fun autopilot(budgetId: String, month: String): AutopilotDto = client.get("${b(budgetId)}/months/$month/autopilot")
+    suspend fun applyAutopilot(budgetId: String, month: String, body: ApplyAutopilotDto): AutopilotAppliedDto =
+        client.send(HttpMethod.Post, "${b(budgetId)}/months/$month/autopilot", body)
+    suspend fun coverOverspending(budgetId: String, month: String): CoverResultDto =
+        client.execute(HttpMethod.Post, "${b(budgetId)}/months/$month/cover-overspending").body()
+    suspend fun goals(budgetId: String, month: String?): GoalsDto = client.get("${b(budgetId)}/goals") { month?.let { parameter("month", it) } }
+    suspend fun setGoal(budgetId: String, categoryId: String, body: GoalInputDto) {
+        client.execute(HttpMethod.Put, "${b(budgetId)}/categories/$categoryId/goal") { jsonBody(body) }
+    }
+    suspend fun removeGoal(budgetId: String, categoryId: String) { client.execute(HttpMethod.Delete, "${b(budgetId)}/categories/$categoryId/goal") }
+    suspend fun forecast(budgetId: String, days: Int, accountIds: List<String>, includeTypical: Boolean): ForecastDto =
+        client.get("${b(budgetId)}/forecast") {
+            parameter("days", days)
+            if (accountIds.isNotEmpty()) parameter("accountIds", accountIds.joinToString(","))
+            parameter("includeTypical", includeTypical)
+        }
+
     // Reports
     suspend fun cashFlow(budgetId: String, start: String, end: String): CashFlowDto =
         client.get("${b(budgetId)}/reports/cash-flow") { parameter("start", start); parameter("end", end) }

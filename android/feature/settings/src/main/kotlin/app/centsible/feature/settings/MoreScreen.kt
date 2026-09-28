@@ -29,6 +29,9 @@ import app.centsible.core.designsystem.component.CentsibleCard
 import app.centsible.core.designsystem.theme.CentsibleTheme
 
 enum class MoreItem(val emoji: String, val title: String, val subtitle: String) {
+    Goals("🎯", "Goals", "Save up for the things that matter"),
+    Calendar("📅", "Bill calendar", "What's due, day by day"),
+    Forecast("📈", "Forecast", "Where your balance is headed"),
     Recurring("🔁", "Recurring", "Bills, subscriptions and paychecks"),
     Reports("📊", "Reports", "Cash flow, spending and net worth"),
     Merchants("🏪", "Merchants", "Rename, merge and tidy up"),

@@ -3,6 +3,7 @@ import { BankSyncOps } from './actual/bank-sync-ops.js';
 import { BudgetOps } from './actual/budget-ops.js';
 import type { ActualHost } from './actual/host.js';
 import { PlanningOps } from './actual/planning-ops.js';
+import { PlanOps } from './actual/plan-ops.js';
 import { ReportOps } from './actual/report-ops.js';
 import { StructureOps } from './actual/structure-ops.js';
 import { TransactionOps } from './actual/transaction-ops.js';
@@ -20,6 +21,7 @@ type Logger = { info: (o: unknown, m?: string) => void; warn: (o: unknown, m?: s
 /** Everything the HTTP layer needs, wired once (main.ts and the tests share it). */
 export function createDeps(config: BridgeConfig, store: HouseholdStore, host: ActualHost, setup: SetupService, log: Logger): Deps {
   const jobs = new JobStore();
+  const budgetOps = new BudgetOps(host);
   const keys = new SimpleFinKeyFile(config.dataDir);
   const bankSync = new BankSyncOps(host, store, keys);
   const backfill = new BankSyncBackfill(host, store, keys, log);
@@ -32,7 +34,8 @@ export function createDeps(config: BridgeConfig, store: HouseholdStore, host: Ac
     bankSync,
     backfill,
     scheduler: new BankSyncScheduler(host, store, bankSync, jobs, log, Date.now, backfill),
-    ops: new BudgetOps(host),
+    ops: budgetOps,
+    plan: new PlanOps(host, budgetOps),
     transactions: new TransactionOps(host),
     structure: new StructureOps(host),
     planning: new PlanningOps(host),

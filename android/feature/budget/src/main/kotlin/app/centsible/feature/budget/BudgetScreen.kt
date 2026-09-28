@@ -75,6 +75,14 @@ fun BudgetRoute(onManageCategories: () -> Unit, viewModel: BudgetViewModel = hil
         onApplyGoals = viewModel::applyGoals,
         onSaveNote = viewModel::saveNote,
         onHold = viewModel::hold,
+        plan = BudgetPlanActions(
+            openAutopilot = viewModel::openAutopilot,
+            setBasis = viewModel::setBasis,
+            toggle = viewModel::toggleSuggestion,
+            apply = viewModel::applyAutopilot,
+            openCover = viewModel::openCover,
+            cover = { viewModel.coverOverspending() },
+        ),
     )
 }
 
@@ -93,6 +101,7 @@ fun BudgetScreen(
     onApplyGoals: (Boolean) -> Unit = {},
     onSaveNote: (CategoryId, String) -> Unit = { _, _ -> },
     onHold: (Money?) -> Unit = {},
+    plan: BudgetPlanActions = BudgetPlanActions(),
 ) {
     var goalsMenu by remember { mutableStateOf(false) }
     var holding by remember { mutableStateOf(false) }
@@ -112,20 +121,28 @@ fun BudgetScreen(
                 )
             }
             val menu: @Composable () -> Unit = {
-                if (state.canApplyGoals) {
+                if (state.canEdit || state.canApplyGoals) {
                     androidx.compose.foundation.layout.Box {
                         androidx.compose.material3.IconButton(onClick = { goalsMenu = true }, enabled = !state.saving) {
                             androidx.compose.material3.Icon(androidx.compose.material.icons.Icons.Rounded.MoreVert, contentDescription = "Budget actions")
                         }
                         androidx.compose.material3.DropdownMenu(expanded = goalsMenu, onDismissRequest = { goalsMenu = false }) {
-                            androidx.compose.material3.DropdownMenuItem(
-                                text = { Text("Apply goals") },
-                                onClick = { goalsMenu = false; onApplyGoals(false) },
-                            )
-                            androidx.compose.material3.DropdownMenuItem(
-                                text = { Text("Apply goals, overwriting amounts") },
-                                onClick = { goalsMenu = false; onApplyGoals(true) },
-                            )
+                            if (state.canEdit) {
+                                androidx.compose.material3.DropdownMenuItem(
+                                    text = { Text("Autopilot: budget from past spending") },
+                                    onClick = { goalsMenu = false; plan.openAutopilot(true) },
+                                )
+                            }
+                            if (state.canApplyGoals) {
+                                androidx.compose.material3.DropdownMenuItem(
+                                    text = { Text("Apply goals") },
+                                    onClick = { goalsMenu = false; onApplyGoals(false) },
+                                )
+                                androidx.compose.material3.DropdownMenuItem(
+                                    text = { Text("Apply goals, overwriting amounts") },
+                                    onClick = { goalsMenu = false; onApplyGoals(true) },
+                                )
+                            }
                         }
                     }
                 }
@@ -164,10 +181,16 @@ fun BudgetScreen(
                 onAction = onRetry,
                 modifier = Modifier.padding(padding),
             )
-            is Loadable.Ready -> BudgetContent(data.value, state, onOpenCategory, onManageCategories, onHold = { holding = true }, onRelease = { onHold(null) }, modifier = Modifier.padding(padding))
+            is Loadable.Ready -> BudgetContent(
+                data.value, state, onOpenCategory, onManageCategories,
+                onHold = { holding = true }, onRelease = { onHold(null) }, onCover = { plan.openCover(true) },
+                modifier = Modifier.padding(padding),
+            )
         }
     }
 
+    if (state.autopilot != null) AutopilotSheet(state, plan)
+    if (state.cover != null) CoverSheet(state, plan)
     val month = state.data.valueOrNull
     if (holding && month != null) HoldDialog(month.toBudget, onDismiss = { holding = false }, onHold = { holding = false; onHold(it) })
     val selected = month?.groups?.flatMap { it.categories }?.firstOrNull { it.id == state.selectedCategory }
@@ -193,6 +216,7 @@ private fun BudgetContent(
     onManageCategories: () -> Unit,
     onHold: () -> Unit,
     onRelease: () -> Unit,
+    onCover: () -> Unit,
     modifier: Modifier,
 ) {
     val collapsed = remember { mutableStateMapOf<CategoryGroupId, Boolean>() }
@@ -202,6 +226,10 @@ private fun BudgetContent(
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         item(key = "summary") { SummaryCard(month, state.canHold && !state.saving, onHold, onRelease) }
+        val overspent = month.expenseGroups.filter { !it.hidden }.flatMap { it.categories }.filter { !it.hidden && it.balance.isNegative }
+        if (overspent.isNotEmpty() && state.canMoveMoney) {
+            item(key = "overspent") { OverspentBanner(overspent.size, Money(overspent.sumOf { it.balance.minor }), enabled = !state.saving, onCover = onCover) }
+        }
         items(month.expenseGroups.filter { !it.hidden }, key = { it.id.raw }) { group ->
             GroupCard(
                 group = group,
@@ -284,6 +312,21 @@ private fun SummaryCard(month: BudgetMonth, canHold: Boolean = false, onHold: ()
             if (month.lastMonthOverspent.isNegative) {
                 Text("Overspent last month: ${MoneyFormat.format(month.lastMonthOverspent.abs())}", style = MaterialTheme.typography.bodySmall, color = colors.negative)
             }
+        }
+    }
+}
+
+/** Monarch-style nudge: one tap to cover every overspent category. */
+@Composable
+private fun OverspentBanner(count: Int, total: Money, enabled: Boolean, onCover: () -> Unit) {
+    val colors = CentsibleTheme.colors
+    CentsibleCard(contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text(if (count == 1) "1 category is overspent" else "$count categories are overspent", style = MaterialTheme.typography.bodyLarge, color = colors.negative)
+                Text("${MoneyFormat.format(total.abs())} over in total", style = MaterialTheme.typography.bodySmall, color = colors.textSecondary)
+            }
+            androidx.compose.material3.TextButton(onClick = onCover, enabled = enabled) { Text("Cover") }
         }
     }
 }

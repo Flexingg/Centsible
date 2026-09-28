@@ -538,3 +538,9 @@ A probe ran against a real `@actual-app/sync-server@26.9.0` with `@actual-app/ap
 **Operational notes:**
 - `sync-server` must bind to IPv4 (`ACTUAL_HOSTNAME=0.0.0.0`) in environments without IPv6.
 - The API logs noisily to the console. The bridge routes that output to debug level.
+
+Plan ahead (autopilot, goals, forecast, bill calendar), verified against Actual 26.9.0:
+- Autopilot averages each category's spending over the 3, 6 or 12 months before the month (never past the current month), skipping months before the category's first activity, like Actual's own "set N-month average". Suggestions round up to whole units. Applying uses `setBudgetAmount`; covering overspending uses Actual's `budget/cover-overspending` handler (To Budget first, then the categories with the most left), so Actual records the movement notes.
+- Goals live in category notes as Actual's own template lines: `#goal <amount>` (keep a balance) and `#template <amount> by YYYY-MM` (save by a date). The bridge edits only those lines and keeps the rest of the note, so Actual's web app and "Apply goals" see the same goals. Progress uses the month's category balance; the recent pace is the average budgeted over this month and up to three before.
+- The forecast starts from today's balance of the chosen accounts (default: open, on-budget), adds every schedule occurrence (Actual's `schedule/get-upcoming-dates`, plus an overdue `next_date`, which hasn't been paid yet), skips transfers between two forecast accounts, and optionally adds "everyday" money: the daily average of the last 90 days of transactions not linked to a schedule. The bill calendar is the same data by day.
+- Actual learns payee → category rules; a transaction added with an explicit category can still be recategorized by them.

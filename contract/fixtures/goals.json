@@ -1,0 +1,22 @@
+{
+  "month": "2026-09",
+  "items": [
+    {
+      "categoryId": "d4b0f075-3343-4408-91ed-fae94f74e5bf",
+      "name": "Bills",
+      "groupName": "Usual Expenses",
+      "kind": "by",
+      "target": 120000,
+      "targetMonth": "2027-02",
+      "balance": 0,
+      "budgetedThisMonth": 185000,
+      "progress": 0,
+      "remaining": 120000,
+      "monthlyNeeded": 20000,
+      "avgContribution": 46250,
+      "projectedMonth": "2026-12",
+      "status": "on-track",
+      "line": "#template 1200 by 2027-02"
+    }
+  ]
+}

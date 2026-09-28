@@ -82,6 +82,9 @@ private object Routes {
     const val MERCHANTS = "merchants"
     const val RULES = "rules"
     const val TAGS = "tags"
+    const val GOALS = "goals"
+    const val CALENDAR = "calendar"
+    const val FORECAST = "forecast"
     const val SEARCH = "transactions/search?${TransactionsViewModel.ARG_QUERY}={${TransactionsViewModel.ARG_QUERY}}"
 
     fun search(q: String) = "transactions/search?${TransactionsViewModel.ARG_QUERY}=" + java.net.URLEncoder.encode(q, "UTF-8")
@@ -159,6 +162,9 @@ private fun MainScaffold(
                 MoreScreen(onOpen = { item ->
                     nav.navigate(
                         when (item) {
+                            MoreItem.Goals -> Routes.GOALS
+                            MoreItem.Calendar -> Routes.CALENDAR
+                            MoreItem.Forecast -> Routes.FORECAST
                             MoreItem.Recurring -> Routes.RECURRING
                             MoreItem.Reports -> Routes.REPORTS
                             MoreItem.Merchants -> Routes.MERCHANTS
@@ -173,6 +179,17 @@ private fun MainScaffold(
             composable(Routes.SETTINGS) { SettingsRoute(onOpenBankSync = { nav.navigate(Routes.BANK_SYNC) }) }
             composable(Routes.BANK_SYNC) { app.centsible.feature.settings.BankSyncRoute(onBack = { nav.popBackStack() }) }
             composable(Routes.RECURRING) { RecurringRoute(onBack = { nav.popBackStack() }) }
+            composable(Routes.GOALS) { app.centsible.feature.planning.GoalsRoute(onBack = { nav.popBackStack() }) }
+            composable(Routes.CALENDAR) {
+                app.centsible.feature.planning.BillCalendarRoute(
+                    onBack = { nav.popBackStack() },
+                    onOpenRecurring = { nav.navigate(Routes.RECURRING) { launchSingleTop = true } },
+                    onOpenForecast = { nav.navigate(Routes.FORECAST) { launchSingleTop = true } },
+                )
+            }
+            composable(Routes.FORECAST) {
+                app.centsible.feature.planning.ForecastRoute(onBack = { nav.popBackStack() }, onOpenCalendar = { nav.navigate(Routes.CALENDAR) { launchSingleTop = true } })
+            }
             composable(Routes.REPORTS) { ReportsRoute(onBack = { nav.popBackStack() }) }
             composable(Routes.MERCHANTS) { MerchantsRoute(onBack = { nav.popBackStack() }) }
             composable(Routes.RULES) { RulesRoute(onBack = { nav.popBackStack() }) }

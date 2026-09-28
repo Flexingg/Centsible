@@ -1,0 +1,406 @@
+{
+  "from": "2026-09-28",
+  "to": "2026-11-27",
+  "accountIds": [
+    "f00cb655-7a1c-4aca-8e6e-083ce9bdbaf6",
+    "ee161e56-29e9-4008-8ce0-c69f00f298f8"
+  ],
+  "startingBalance": 834992,
+  "typicalDaily": 0,
+  "events": [
+    {
+      "date": "2026-10-01",
+      "scheduleId": "a111a1c6-12d5-411a-a2e4-54deac594355",
+      "name": "Gym",
+      "payeeName": "Gym",
+      "accountId": "f00cb655-7a1c-4aca-8e6e-083ce9bdbaf6",
+      "accountName": "Joint Checking",
+      "amount": -5000,
+      "internalTransfer": false,
+      "overdue": false
+    },
+    {
+      "date": "2026-11-01",
+      "scheduleId": "a111a1c6-12d5-411a-a2e4-54deac594355",
+      "name": "Gym",
+      "payeeName": "Gym",
+      "accountId": "f00cb655-7a1c-4aca-8e6e-083ce9bdbaf6",
+      "accountName": "Joint Checking",
+      "amount": -5000,
+      "internalTransfer": false,
+      "overdue": false
+    }
+  ],
+  "days": [
+    {
+      "date": "2026-09-28",
+      "balance": 834992,
+      "scheduled": 0,
+      "typical": 0
+    },
+    {
+      "date": "2026-09-29",
+      "balance": 834992,
+      "scheduled": 0,
+      "typical": 0
+    },
+    {
+      "date": "2026-09-30",
+      "balance": 834992,
+      "scheduled": 0,
+      "typical": 0
+    },
+    {
+      "date": "2026-10-01",
+      "balance": 829992,
+      "scheduled": -5000,
+      "typical": 0
+    },
+    {
+      "date": "2026-10-02",
+      "balance": 829992,
+      "scheduled": 0,
+      "typical": 0
+    },
+    {
+      "date": "2026-10-03",
+      "balance": 829992,
+      "scheduled": 0,
+      "typical": 0
+    },
+    {
+      "date": "2026-10-04",
+      "balance": 829992,
+      "scheduled": 0,
+      "typical": 0
+    },
+    {
+      "date": "2026-10-05",
+      "balance": 829992,
+      "scheduled": 0,
+      "typical": 0
+    },
+    {
+      "date": "2026-10-06",
+      "balance": 829992,
+      "scheduled": 0,
+      "typical": 0
+    },
+    {
+      "date": "2026-10-07",
+      "balance": 829992,
+      "scheduled": 0,
+      "typical": 0
+    },
+    {
+      "date": "2026-10-08",
+      "balance": 829992,
+      "scheduled": 0,
+      "typical": 0
+    },
+    {
+      "date": "2026-10-09",
+      "balance": 829992,
+      "scheduled": 0,
+      "typical": 0
+    },
+    {
+      "date": "2026-10-10",
+      "balance": 829992,
+      "scheduled": 0,
+      "typical": 0
+    },
+    {
+      "date": "2026-10-11",
+      "balance": 829992,
+      "scheduled": 0,
+      "typical": 0
+    },
+    {
+      "date": "2026-10-12",
+      "balance": 829992,
+      "scheduled": 0,
+      "typical": 0
+    },
+    {
+      "date": "2026-10-13",
+      "balance": 829992,
+      "scheduled": 0,
+      "typical": 0
+    },
+    {
+      "date": "2026-10-14",
+      "balance": 829992,
+      "scheduled": 0,
+      "typical": 0
+    },
+    {
+      "date": "2026-10-15",
+      "balance": 829992,
+      "scheduled": 0,
+      "typical": 0
+    },
+    {
+      "date": "2026-10-16",
+      "balance": 829992,
+      "scheduled": 0,
+      "typical": 0
+    },
+    {
+      "date": "2026-10-17",
+      "balance": 829992,
+      "scheduled": 0,
+      "typical": 0
+    },
+    {
+      "date": "2026-10-18",
+      "balance": 829992,
+      "scheduled": 0,
+      "typical": 0
+    },
+    {
+      "date": "2026-10-19",
+      "balance": 829992,
+      "scheduled": 0,
+      "typical": 0
+    },
+    {
+      "date": "2026-10-20",
+      "balance": 829992,
+      "scheduled": 0,
+      "typical": 0
+    },
+    {
+      "date": "2026-10-21",
+      "balance": 829992,
+      "scheduled": 0,
+      "typical": 0
+    },
+    {
+      "date": "2026-10-22",
+      "balance": 829992,
+      "scheduled": 0,
+      "typical": 0
+    },
+    {
+      "date": "2026-10-23",
+      "balance": 829992,
+      "scheduled": 0,
+      "typical": 0
+    },
+    {
+      "date": "2026-10-24",
+      "balance": 829992,
+      "scheduled": 0,
+      "typical": 0
+    },
+    {
+      "date": "2026-10-25",
+      "balance": 829992,
+      "scheduled": 0,
+      "typical": 0
+    },
+    {
+      "date": "2026-10-26",
+      "balance": 829992,
+      "scheduled": 0,
+      "typical": 0
+    },
+    {
+      "date": "2026-10-27",
+      "balance": 829992,
+      "scheduled": 0,
+      "typical": 0
+    },
+    {
+      "date": "2026-10-28",
+      "balance": 829992,
+      "scheduled": 0,
+      "typical": 0
+    },
+    {
+      "date": "2026-10-29",
+      "balance": 829992,
+      "scheduled": 0,
+      "typical": 0
+    },
+    {
+      "date": "2026-10-30",
+      "balance": 829992,
+      "scheduled": 0,
+      "typical": 0
+    },
+    {
+      "date": "2026-10-31",
+      "balance": 829992,
+      "scheduled": 0,
+      "typical": 0
+    },
+    {
+      "date": "2026-11-01",
+      "balance": 824992,
+      "scheduled": -5000,
+      "typical": 0
+    },
+    {
+      "date": "2026-11-02",
+      "balance": 824992,
+      "scheduled": 0,
+      "typical": 0
+    },
+    {
+      "date": "2026-11-03",
+      "balance": 824992,
+      "scheduled": 0,
+      "typical": 0
+    },
+    {
+      "date": "2026-11-04",
+      "balance": 824992,
+      "scheduled": 0,
+      "typical": 0
+    },
+    {
+      "date": "2026-11-05",
+      "balance": 824992,
+      "scheduled": 0,
+      "typical": 0
+    },
+    {
+      "date": "2026-11-06",
+      "balance": 824992,
+      "scheduled": 0,
+      "typical": 0
+    },
+    {
+      "date": "2026-11-07",
+      "balance": 824992,
+      "scheduled": 0,
+      "typical": 0
+    },
+    {
+      "date": "2026-11-08",
+      "balance": 824992,
+      "scheduled": 0,
+      "typical": 0
+    },
+    {
+      "date": "2026-11-09",
+      "balance": 824992,
+      "scheduled": 0,
+      "typical": 0
+    },
+    {
+      "date": "2026-11-10",
+      "balance": 824992,
+      "scheduled": 0,
+      "typical": 0
+    },
+    {
+      "date": "2026-11-11",
+      "balance": 824992,
+      "scheduled": 0,
+      "typical": 0
+    },
+    {
+      "date": "2026-11-12",
+      "balance": 824992,
+      "scheduled": 0,
+      "typical": 0
+    },
+    {
+      "date": "2026-11-13",
+      "balance": 824992,
+      "scheduled": 0,
+      "typical": 0
+    },
+    {
+      "date": "2026-11-14",
+      "balance": 824992,
+      "scheduled": 0,
+      "typical": 0
+    },
+    {
+      "date": "2026-11-15",
+      "balance": 824992,
+      "scheduled": 0,
+      "typical": 0
+    },
+    {
+      "date": "2026-11-16",
+      "balance": 824992,
+      "scheduled": 0,
+      "typical": 0
+    },
+    {
+      "date": "2026-11-17",
+      "balance": 824992,
+      "scheduled": 0,
+      "typical": 0
+    },
+    {
+      "date": "2026-11-18",
+      "balance": 824992,
+      "scheduled": 0,
+      "typical": 0
+    },
+    {
+      "date": "2026-11-19",
+      "balance": 824992,
+      "scheduled": 0,
+      "typical": 0
+    },
+    {
+      "date": "2026-11-20",
+      "balance": 824992,
+      "scheduled": 0,
+      "typical": 0
+    },
+    {
+      "date": "2026-11-21",
+      "balance": 824992,
+      "scheduled": 0,
+      "typical": 0
+    },
+    {
+      "date": "2026-11-22",
+      "balance": 824992,
+      "scheduled": 0,
+      "typical": 0
+    },
+    {
+      "date": "2026-11-23",
+      "balance": 824992,
+      "scheduled": 0,
+      "typical": 0
+    },
+    {
+      "date": "2026-11-24",
+      "balance": 824992,
+      "scheduled": 0,
+      "typical": 0
+    },
+    {
+      "date": "2026-11-25",
+      "balance": 824992,
+      "scheduled": 0,
+      "typical": 0
+    },
+    {
+      "date": "2026-11-26",
+      "balance": 824992,
+      "scheduled": 0,
+      "typical": 0
+    },
+    {
+      "date": "2026-11-27",
+      "balance": 824992,
+      "scheduled": 0,
+      "typical": 0
+    }
+  ],
+  "lowest": {
+    "date": "2026-11-01",
+    "balance": 824992
+  }
+}

@@ -1,0 +1,106 @@
+{
+  "month": "2026-09",
+  "toBudget": 773999,
+  "suggestions": [
+    {
+      "categoryId": "541836f1-e756-4473-a5d0-6c1d3f06c7fa",
+      "name": "Food",
+      "groupName": "Usual Expenses",
+      "budgeted": 60000,
+      "balance": 45643,
+      "lastMonthSpent": 30000,
+      "average": {
+        "avg3": 30000,
+        "avg6": 30000,
+        "avg12": 30000
+      },
+      "suggested": {
+        "avg3": 30000,
+        "avg6": 30000,
+        "avg12": 30000
+      },
+      "monthsOfHistory": 3
+    },
+    {
+      "categoryId": "af375fd4-d759-46b3-bffe-74a856151d57",
+      "name": "General",
+      "groupName": "Usual Expenses",
+      "budgeted": 20000,
+      "balance": 15350,
+      "lastMonthSpent": 1001,
+      "average": {
+        "avg3": 1001,
+        "avg6": 1001,
+        "avg12": 1001
+      },
+      "suggested": {
+        "avg3": 1100,
+        "avg6": 1100,
+        "avg12": 1100
+      },
+      "monthsOfHistory": 1
+    },
+    {
+      "categoryId": "d4b0f075-3343-4408-91ed-fae94f74e5bf",
+      "name": "Bills",
+      "groupName": "Usual Expenses",
+      "budgeted": 185000,
+      "balance": 0,
+      "lastMonthSpent": 0,
+      "average": {
+        "avg3": 0,
+        "avg6": 0,
+        "avg12": 0
+      },
+      "suggested": {
+        "avg3": 0,
+        "avg6": 0,
+        "avg12": 0
+      },
+      "monthsOfHistory": 0
+    },
+    {
+      "categoryId": "29ec2c58-8cd3-42fe-9187-7b5dfe0f70a6",
+      "name": "Bills (Flexible)",
+      "groupName": "Usual Expenses",
+      "budgeted": 0,
+      "balance": 0,
+      "lastMonthSpent": 0,
+      "average": {
+        "avg3": 0,
+        "avg6": 0,
+        "avg12": 0
+      },
+      "suggested": {
+        "avg3": 0,
+        "avg6": 0,
+        "avg12": 0
+      },
+      "monthsOfHistory": 0
+    },
+    {
+      "categoryId": "6bbd8472-25d4-4cee-8a11-5bd9f7e83d61",
+      "name": "Savings",
+      "groupName": "Investments and Savings",
+      "budgeted": 0,
+      "balance": 0,
+      "lastMonthSpent": 0,
+      "average": {
+        "avg3": 0,
+        "avg6": 0,
+        "avg12": 0
+      },
+      "suggested": {
+        "avg3": 0,
+        "avg6": 0,
+        "avg12": 0
+      },
+      "monthsOfHistory": 0
+    }
+  ],
+  "overspent": [],
+  "cover": {
+    "moves": [],
+    "uncovered": 0
+  }
+}

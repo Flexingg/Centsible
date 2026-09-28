@@ -1012,6 +1012,158 @@ paths:
               schema: { $ref: '#/components/schemas/BudgetMonth' }
         '423': { $ref: '#/components/responses/Problem' }
 
+  /v1/budgets/{budgetId}/months/{month}/autopilot:
+    get:
+      tags: [plan]
+      operationId: getAutopilot
+      summary: Suggested budgets from past spending (3, 6 and 12-month averages), overspent categories, and a plan to cover them.
+      parameters:
+        - $ref: '#/components/parameters/BudgetId'
+        - $ref: '#/components/parameters/MonthParam'
+      responses:
+        '200':
+          description: Suggestions
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Autopilot' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '423': { $ref: '#/components/responses/Problem' }
+    post:
+      tags: [plan]
+      operationId: applyAutopilot
+      summary: Budget the suggested amounts (default every category whose suggestion differs).
+      parameters:
+        - $ref: '#/components/parameters/BudgetId'
+        - $ref: '#/components/parameters/MonthParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [basis]
+              additionalProperties: false
+              properties:
+                basis: { type: integer, enum: [3, 6, 12] }
+                categoryIds: { type: array, items: { type: string, minLength: 1 }, maxItems: 500 }
+      responses:
+        '200':
+          description: The updated month
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [month, changed]
+                properties:
+                  month: { $ref: '#/components/schemas/BudgetMonth' }
+                  changed: { type: integer }
+        '400': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '423': { $ref: '#/components/responses/Problem' }
+
+  /v1/budgets/{budgetId}/months/{month}/cover-overspending:
+    post:
+      tags: [plan]
+      operationId: coverOverspending
+      summary: Cover every overspent category, from To Budget first and then the categories with the most left.
+      parameters:
+        - $ref: '#/components/parameters/BudgetId'
+        - $ref: '#/components/parameters/MonthParam'
+      responses:
+        '200':
+          description: What moved
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [month, moves, uncovered]
+                properties:
+                  month: { $ref: '#/components/schemas/BudgetMonth' }
+                  moves: { type: array, items: { $ref: '#/components/schemas/CoverMove' } }
+                  uncovered: { $ref: '#/components/schemas/Money' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '423': { $ref: '#/components/responses/Problem' }
+
+  /v1/budgets/{budgetId}/goals:
+    get:
+      tags: [plan]
+      operationId: listGoals
+      summary: Savings goals (categories with a "#goal" or "#template ... by" line in their notes) and how they're going.
+      parameters:
+        - $ref: '#/components/parameters/BudgetId'
+        - { name: month, in: query, schema: { $ref: '#/components/schemas/Month' } }
+      responses:
+        '200':
+          description: Goals
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [month, items]
+                properties:
+                  month: { $ref: '#/components/schemas/Month' }
+                  items: { type: array, items: { $ref: '#/components/schemas/Goal' } }
+        '423': { $ref: '#/components/responses/Problem' }
+
+  /v1/budgets/{budgetId}/categories/{id}/goal:
+    put:
+      tags: [plan]
+      operationId: setGoal
+      summary: Set a category's savings goal. It's written to the category notes as Actual's own template line; other lines stay.
+      parameters:
+        - $ref: '#/components/parameters/BudgetId'
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [kind, target]
+              additionalProperties: false
+              properties:
+                kind: { type: string, enum: [balance, by], description: 'balance: keep at least target ("#goal"); by: save target by targetMonth ("#template ... by")' }
+                target: { type: integer, minimum: 100 }
+                targetMonth: { type: [string, 'null'], pattern: '^\d{4}-\d{2}$' }
+      responses:
+        '204': { description: Saved }
+        '400': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '423': { $ref: '#/components/responses/Problem' }
+    delete:
+      tags: [plan]
+      operationId: removeGoal
+      parameters:
+        - $ref: '#/components/parameters/BudgetId'
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        '204': { description: Removed }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '423': { $ref: '#/components/responses/Problem' }
+
+  /v1/budgets/{budgetId}/forecast:
+    get:
+      tags: [plan]
+      operationId: getForecast
+      summary: Projected daily balance from scheduled bills and income plus typical everyday money. Also feeds the bill calendar.
+      parameters:
+        - $ref: '#/components/parameters/BudgetId'
+        - { name: days, in: query, schema: { type: integer, minimum: 7, maximum: 366, default: 90 } }
+        - { name: accountIds, in: query, description: Comma-separated; default open on-budget accounts, schema: { type: string } }
+        - { name: includeTypical, in: query, schema: { type: boolean, default: true } }
+      responses:
+        '200':
+          description: Forecast
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Forecast' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '423': { $ref: '#/components/responses/Problem' }
+
   /v1/budgets/{budgetId}/schedules:
     get:
       tags: [budgets]
@@ -2018,6 +2170,118 @@ components:
         firstDayOfWeek: { type: integer, minimum: 0, maximum: 6, description: 0 = Sunday }
         hideFraction: { type: boolean }
 
+    Autopilot:
+      type: object
+      required: [month, toBudget, suggestions, overspent, cover]
+      properties:
+        month: { $ref: '#/components/schemas/Month' }
+        toBudget: { $ref: '#/components/schemas/Money' }
+        suggestions:
+          type: array
+          items:
+            type: object
+            required: [categoryId, name, groupName, budgeted, balance, lastMonthSpent, average, suggested, monthsOfHistory]
+            properties:
+              categoryId: { type: string }
+              name: { type: string }
+              groupName: { type: string }
+              budgeted: { $ref: '#/components/schemas/Money' }
+              balance: { $ref: '#/components/schemas/Money' }
+              lastMonthSpent: { $ref: '#/components/schemas/Money' }
+              average: { $ref: '#/components/schemas/Averages' }
+              suggested: { $ref: '#/components/schemas/Averages' }
+              monthsOfHistory: { type: integer }
+        overspent:
+          type: array
+          items:
+            type: object
+            required: [categoryId, name, amount]
+            properties:
+              categoryId: { type: string }
+              name: { type: string }
+              amount: { $ref: '#/components/schemas/Money' }
+        cover:
+          type: object
+          required: [moves, uncovered]
+          properties:
+            moves: { type: array, items: { $ref: '#/components/schemas/CoverMove' } }
+            uncovered: { $ref: '#/components/schemas/Money' }
+    Averages:
+      type: object
+      description: Spending per month (positive = spent), averaged over the last 3, 6 and 12 months with activity. Suggestions are rounded up to whole units.
+      required: [avg3, avg6, avg12]
+      properties:
+        avg3: { $ref: '#/components/schemas/Money' }
+        avg6: { $ref: '#/components/schemas/Money' }
+        avg12: { $ref: '#/components/schemas/Money' }
+    CoverMove:
+      type: object
+      required: [from, fromName, to, toName, amount]
+      properties:
+        from: { type: string, description: A category id or "to-budget" }
+        fromName: { type: string }
+        to: { type: string }
+        toName: { type: string }
+        amount: { $ref: '#/components/schemas/Money' }
+    Goal:
+      type: object
+      required: [categoryId, name, groupName, kind, target, targetMonth, balance, budgetedThisMonth, progress, remaining, monthlyNeeded, avgContribution, projectedMonth, status, line]
+      properties:
+        categoryId: { type: string }
+        name: { type: string }
+        groupName: { type: string }
+        kind: { type: string, enum: [balance, by] }
+        target: { $ref: '#/components/schemas/Money' }
+        targetMonth: { type: [string, 'null'] }
+        balance: { $ref: '#/components/schemas/Money' }
+        budgetedThisMonth: { $ref: '#/components/schemas/Money' }
+        progress: { type: number, minimum: 0, maximum: 1 }
+        remaining: { $ref: '#/components/schemas/Money' }
+        monthlyNeeded: { type: [integer, 'null'], description: For "by" goals, what to budget each month from now to make it }
+        avgContribution: { type: integer, description: Average budgeted per month lately }
+        projectedMonth: { type: [string, 'null'], description: When the balance reaches the target at the recent pace }
+        status: { type: string, enum: [reached, on-track, behind, stalled] }
+        line: { type: string, description: The note line it came from }
+    Forecast:
+      type: object
+      required: [from, to, accountIds, startingBalance, typicalDaily, events, days, lowest]
+      properties:
+        from: { $ref: '#/components/schemas/Date' }
+        to: { $ref: '#/components/schemas/Date' }
+        accountIds: { type: array, items: { type: string } }
+        startingBalance: { $ref: '#/components/schemas/Money' }
+        typicalDaily: { type: integer, description: Average daily money in or out that isn't scheduled (last 90 days) }
+        events:
+          type: array
+          items:
+            type: object
+            required: [date, scheduleId, name, payeeName, accountId, accountName, amount, internalTransfer, overdue]
+            properties:
+              date: { $ref: '#/components/schemas/Date' }
+              scheduleId: { type: string }
+              name: { type: string }
+              payeeName: { type: [string, 'null'] }
+              accountId: { type: [string, 'null'] }
+              accountName: { type: [string, 'null'] }
+              amount: { $ref: '#/components/schemas/Money' }
+              internalTransfer: { type: boolean, description: Between two forecast accounts, so the total doesn't change }
+              overdue: { type: boolean }
+        days:
+          type: array
+          items:
+            type: object
+            required: [date, balance, scheduled, typical]
+            properties:
+              date: { $ref: '#/components/schemas/Date' }
+              balance: { $ref: '#/components/schemas/Money' }
+              scheduled: { $ref: '#/components/schemas/Money' }
+              typical: { $ref: '#/components/schemas/Money' }
+        lowest:
+          type: object
+          required: [date, balance]
+          properties:
+            date: { $ref: '#/components/schemas/Date' }
+            balance: { $ref: '#/components/schemas/Money' }
     BudgetMonth:
       type: object
       required: [month, budgetType, toBudget, incomeAvailable, lastMonthOverspent, forNextMonth,

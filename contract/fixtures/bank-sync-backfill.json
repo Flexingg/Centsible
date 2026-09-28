@@ -1,7 +1,7 @@
 {
-  "budgetId": "4f355119-a54e-4637-9019-7d13c808da94",
+  "budgetId": "4abff089-d98d-452c-8f01-339e252d6a15",
   "accountIds": [
-    "03806be3-f950-47f4-bc80-7661a5d01cc5"
+    "11373d54-a0fe-43cb-9cd8-9084fb3959de"
   ],
   "since": "2024-09-28",
   "status": "done",
@@ -11,6 +11,6 @@
   "transactionsFound": 5,
   "transactionsAdded": 4,
   "message": "Done. Imported 4 older transactions, back to 2024-09-28.",
-  "startedAt": "2026-09-28T11:09:46.963Z",
-  "updatedAt": "2026-09-28T11:09:47.280Z"
+  "startedAt": "2026-09-28T20:20:58.213Z",
+  "updatedAt": "2026-09-28T20:20:58.562Z"
 }

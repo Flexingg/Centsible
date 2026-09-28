@@ -104,7 +104,8 @@ export class BudgetOps {
     });
   }
 
-  private async readMonth(month: string) {
+  /** The month as the app sees it. Other ops return it after changing budget amounts. */
+  async readMonth(month: string) {
     const months = await api.getBudgetMonths();
     if (!months.includes(month)) throw ApiError.notFound(`No budget data for ${month}`);
     const [raw, prefs] = await Promise.all([api.getBudgetMonth(month), api.getPreferences()]);
