@@ -1,5 +1,11 @@
 package app.centsible.feature.dashboard
 
+import androidx.compose.material.icons.rounded.Home
+import androidx.compose.material.icons.rounded.AccountBalance
+import androidx.compose.material.icons.rounded.PieChart
+import androidx.compose.material.icons.rounded.Menu
+import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.automirrored.rounded.ReceiptLong
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onRoot
 import app.centsible.core.designsystem.component.Loadable
@@ -47,6 +53,39 @@ class DashboardScreenshotTest {
             }
         }
         compose.onRoot().captureRoboImage("screenshots/dashboard_light.png")
+        app.centsible.core.uitesting.A11y.assertOk(compose)
+    }
+
+    /** A 10" tablet in landscape: navigation rail, content kept to a readable width. */
+    @Test
+    @Config(sdk = [35], qualifiers = "w1280dp-h800dp-xhdpi")
+    fun dashboard_tablet() {
+        compose.setContent {
+            CentsibleTheme(darkTheme = false) {
+                app.centsible.core.designsystem.component.AdaptiveNavScaffold(
+                    tabs = listOf(
+                        app.centsible.core.designsystem.component.NavTab("home", "Home", androidx.compose.material.icons.Icons.Rounded.Home),
+                        app.centsible.core.designsystem.component.NavTab("accounts", "Accounts", androidx.compose.material.icons.Icons.Rounded.AccountBalance),
+                        app.centsible.core.designsystem.component.NavTab("transactions", "Transactions", androidx.compose.material.icons.Icons.AutoMirrored.Rounded.ReceiptLong),
+                        app.centsible.core.designsystem.component.NavTab("budget", "Budget", androidx.compose.material.icons.Icons.Rounded.PieChart),
+                        app.centsible.core.designsystem.component.NavTab("more", "More", androidx.compose.material.icons.Icons.Rounded.Menu),
+                    ),
+                    selected = "home",
+                    onSelect = {},
+                    addButton = {
+                        androidx.compose.material3.FloatingActionButton(onClick = {}) {
+                            androidx.compose.material3.Icon(androidx.compose.material.icons.Icons.Rounded.Add, contentDescription = "Add transaction")
+                        }
+                    },
+                ) {
+                    DashboardScreen(
+                        DashboardUiState("Jo", Loadable.Ready(context), listOf(NetWorthWidget(), BudgetSummaryWidget(), RecentTransactionsWidget())),
+                        onNavigate = {}, onRetry = {}, now = LocalTime.of(9, 0),
+                    )
+                }
+            }
+        }
+        compose.onRoot().captureRoboImage("screenshots/dashboard_tablet.png")
         app.centsible.core.uitesting.A11y.assertOk(compose)
     }
 }

@@ -135,38 +135,19 @@ private fun MainScaffold(
     val current = backStack?.destination?.route
     val tab = Tab.entries.firstOrNull { it.route == current }
     val colors = CentsibleTheme.colors
-    Scaffold(
-        containerColor = colors.canvas,
+    app.centsible.core.designsystem.component.AdaptiveNavScaffold(
+        tabs = Tab.entries.map { app.centsible.core.designsystem.component.NavTab(it.route, it.label, it.icon) },
+        selected = tab?.route,
+        onSelect = { nav.goToTab(it) },
         snackbarHost = { androidx.compose.material3.SnackbarHost(snackbar) },
         topBar = { if (offline || pending > 0) OfflineBanner(offline, pending) },
-        floatingActionButton = {
-            if (tab?.canAdd == true) {
+        addButton = if (tab?.canAdd == true) {
+            {
                 FloatingActionButton(onClick = { nav.navigate(Routes.transaction(null)) }, containerColor = colors.accent, contentColor = colors.card) {
                     Icon(Icons.Rounded.Add, contentDescription = "Add transaction")
                 }
             }
-        },
-        bottomBar = {
-            if (tab != null) {
-                NavigationBar(containerColor = colors.card) {
-                    Tab.entries.forEach { t ->
-                        NavigationBarItem(
-                            selected = t == tab,
-                            onClick = { nav.goToTab(t.route) },
-                            icon = { Icon(t.icon, contentDescription = null) },
-                            label = { Text(t.label) },
-                            colors = NavigationBarItemDefaults.colors(
-                                selectedIconColor = colors.accent,
-                                selectedTextColor = colors.accent,
-                                indicatorColor = colors.accentSoft,
-                                unselectedIconColor = colors.textTertiary,
-                                unselectedTextColor = colors.textTertiary,
-                            ),
-                        )
-                    }
-                }
-            }
-        },
+        } else null,
     ) { padding ->
         NavHost(nav, startDestination = Tab.Dashboard.route, modifier = Modifier.padding(padding)) {
             composable(Tab.Dashboard.route) { DashboardRoute(onNavigate = { nav.go(it) }) }
