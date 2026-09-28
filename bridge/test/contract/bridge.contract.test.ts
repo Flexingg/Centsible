@@ -6,17 +6,11 @@ import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import type { FastifyInstance } from 'fastify';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { BudgetOps } from '../../src/actual/budget-ops.js';
-import { AccountOps } from '../../src/actual/account-ops.js';
-import { PlanningOps } from '../../src/actual/planning-ops.js';
-import { ReportOps } from '../../src/actual/report-ops.js';
-import { JobStore } from '../../src/jobs.js';
-import { StructureOps } from '../../src/actual/structure-ops.js';
-import { TransactionOps } from '../../src/actual/transaction-ops.js';
 import { ActualHost } from '../../src/actual/host.js';
 import { HouseholdStore } from '../../src/auth/store.js';
 import type { BridgeConfig } from '../../src/config.js';
 import { buildServer } from '../../src/http/server.js';
+import { createDeps } from '../../src/deps.js';
 import { SetupService } from '../../src/setup.js';
 import { startSeededActual, type SeededActual } from '../support/actual-server.js';
 import { expectContract, recordFixture } from '../support/contract.js';
@@ -96,7 +90,7 @@ beforeAll(async () => {
   store = new HouseholdStore(join(bridgeData, 'bridge.sqlite'));
   host = new ActualHost(config, silent);
   await host.start();
-  app = await buildServer({ config, store, host, setup: new SetupService(config, store, host, silent, () => host.start()), ops: new BudgetOps(host), transactions: new TransactionOps(host), structure: new StructureOps(host), planning: new PlanningOps(host), accountOps: new AccountOps(host), reports: new ReportOps(host), jobs: new JobStore() }, { logger: false });
+  app = await buildServer(createDeps(config, store, host, new SetupService(config, store, host, silent, () => host.start()), silent), { logger: false });
 
   const jo = store.createMember({ displayName: 'Jo', role: 'owner' });
   owner = await pair(jo.id, 'Pixel 9');

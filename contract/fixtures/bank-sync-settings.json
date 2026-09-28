@@ -1,0 +1,19 @@
+{
+  "importTransactions": true,
+  "importPending": false,
+  "importNotes": true,
+  "reimportDeleted": true,
+  "updateDates": false,
+  "mapping": {
+    "payment": {
+      "date": "postedDate",
+      "payee": "notes",
+      "notes": "payeeName"
+    },
+    "deposit": {
+      "date": "date",
+      "payee": "payeeName",
+      "notes": "notes"
+    }
+  }
+}

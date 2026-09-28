@@ -63,6 +63,11 @@ const MIGRATIONS: string[] = [
      target TEXT,
      detail TEXT
    );`,
+  // 2: bridge-wide settings (bank sync schedule) and a log of SimpleFIN requests, which
+  // SimpleFIN Bridge caps at ~24 a day.
+  `CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+   CREATE TABLE simplefin_requests (at INTEGER NOT NULL);
+   CREATE INDEX simplefin_requests_at ON simplefin_requests(at);`,
 ];
 
 const sha256 = (s: string) => createHash('sha256').update(s).digest('hex');
@@ -106,6 +111,28 @@ export class HouseholdStore {
         this.db.pragma(`user_version = ${v + 1}`);
       })();
     }
+  }
+
+  // ── Settings and SimpleFIN request log ───────────────────────────────────
+
+  getSetting<T>(key: string): T | null {
+    const row = this.db.prepare('SELECT value FROM settings WHERE key = ?').get(key) as { value: string } | undefined;
+    return row ? (JSON.parse(row.value) as T) : null;
+  }
+
+  setSetting(key: string, value: unknown) {
+    if (value === null || value === undefined) this.db.prepare('DELETE FROM settings WHERE key = ?').run(key);
+    else this.db.prepare('INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value').run(key, JSON.stringify(value));
+  }
+
+  recordSimpleFinRequest() {
+    this.db.prepare('INSERT INTO simplefin_requests (at) VALUES (?)').run(this.now());
+    this.db.prepare('DELETE FROM simplefin_requests WHERE at < ?').run(this.now() - 7 * 24 * 3600 * 1000);
+  }
+
+  /** SimpleFIN requests in the last 24 hours (their quota is ~24 a day). */
+  simpleFinRequestsToday(): number {
+    return (this.db.prepare('SELECT COUNT(*) AS n FROM simplefin_requests WHERE at >= ?').get(this.now() - 24 * 3600 * 1000) as { n: number }).n;
   }
 
   // ── Members ──────────────────────────────────────────────────────────────

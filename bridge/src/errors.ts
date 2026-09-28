@@ -8,6 +8,7 @@ export type ErrorCode =
   | 'feature_unavailable'
   | 'actual_unavailable'
   | 'budget_encrypted'
+  | 'bank_sync_failed'
   | 'internal';
 
 export class ApiError extends Error {

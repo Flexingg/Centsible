@@ -9,19 +9,13 @@
 import { mkdirSync, rmSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { BudgetOps } from '../../src/actual/budget-ops.js';
-import { AccountOps } from '../../src/actual/account-ops.js';
-import { PlanningOps } from '../../src/actual/planning-ops.js';
-import { ReportOps } from '../../src/actual/report-ops.js';
-import { StructureOps } from '../../src/actual/structure-ops.js';
-import { TransactionOps } from '../../src/actual/transaction-ops.js';
 import { ActualHost } from '../../src/actual/host.js';
 import { HouseholdStore } from '../../src/auth/store.js';
 import { pairingUri } from '../../src/auth/pairing.js';
 import type { BridgeConfig } from '../../src/config.js';
 import { buildServer } from '../../src/http/server.js';
+import { createDeps } from '../../src/deps.js';
 import { SetupService } from '../../src/setup.js';
-import { JobStore } from '../../src/jobs.js';
 import { startActual, startSeededActual } from './actual-server.js';
 
 const port = Number(process.argv[2] ?? 8787);
@@ -53,7 +47,7 @@ const host = new ActualHost(config, silent);
 if (!fresh) await host.start(); // fresh: the app's setup signs the bridge in
 const setup = new SetupService(config, store, host, silent, () => host.start());
 const app = await buildServer(
-  { config, store, host, setup, ops: new BudgetOps(host), transactions: new TransactionOps(host), structure: new StructureOps(host), planning: new PlanningOps(host), accountOps: new AccountOps(host), reports: new ReportOps(host), jobs: new JobStore() },
+  createDeps(config, store, host, setup, silent),
   { logger: false },
 );
 await app.listen({ port, host: '127.0.0.1' });

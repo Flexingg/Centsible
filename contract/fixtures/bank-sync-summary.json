@@ -1,0 +1,23 @@
+{
+  "accounts": 2,
+  "newTransactions": 1,
+  "results": [
+    {
+      "accountId": "c67aefb9-5065-42ce-a8d5-9229cf8ebda6",
+      "name": "Everyday Checking",
+      "newTransactions": 0,
+      "matchedTransactions": 1,
+      "error": null,
+      "status": "ok"
+    },
+    {
+      "accountId": "e52a1914-e616-4507-85b0-00b497d363bb",
+      "name": "Visa",
+      "newTransactions": 1,
+      "matchedTransactions": 0,
+      "error": null,
+      "status": "ok"
+    }
+  ],
+  "simplefinRequests": 1
+}

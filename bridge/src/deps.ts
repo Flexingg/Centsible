@@ -1,0 +1,37 @@
+import { AccountOps } from './actual/account-ops.js';
+import { BankSyncOps } from './actual/bank-sync-ops.js';
+import { BudgetOps } from './actual/budget-ops.js';
+import type { ActualHost } from './actual/host.js';
+import { PlanningOps } from './actual/planning-ops.js';
+import { ReportOps } from './actual/report-ops.js';
+import { StructureOps } from './actual/structure-ops.js';
+import { TransactionOps } from './actual/transaction-ops.js';
+import type { HouseholdStore } from './auth/store.js';
+import { BankSyncScheduler } from './bank-sync-scheduler.js';
+import type { BridgeConfig } from './config.js';
+import type { Deps } from './http/server.js';
+import { JobStore } from './jobs.js';
+import type { SetupService } from './setup.js';
+
+type Logger = { info: (o: unknown, m?: string) => void; warn: (o: unknown, m?: string) => void };
+
+/** Everything the HTTP layer needs, wired once (main.ts and the tests share it). */
+export function createDeps(config: BridgeConfig, store: HouseholdStore, host: ActualHost, setup: SetupService, log: Logger): Deps {
+  const jobs = new JobStore();
+  const bankSync = new BankSyncOps(host, store);
+  return {
+    config,
+    store,
+    host,
+    setup,
+    jobs,
+    bankSync,
+    scheduler: new BankSyncScheduler(host, store, bankSync, jobs, log),
+    ops: new BudgetOps(host),
+    transactions: new TransactionOps(host),
+    structure: new StructureOps(host),
+    planning: new PlanningOps(host),
+    accountOps: new AccountOps(host),
+    reports: new ReportOps(host),
+  };
+}

@@ -1,11 +1,11 @@
 {
   "items": [
     {
-      "id": "e1238b4f-365a-4a6f-aad0-229524013541",
-      "accountId": "4c3cac6c-491e-4776-a69e-364ec9118707",
+      "id": "a7964b75-2858-45cd-ba3a-36e946d25543",
+      "accountId": "fddff526-ec8c-4347-ae80-443b9d56757c",
       "date": "2026-09-28",
       "amount": 1250000,
-      "payeeId": "714f8981-c958-4491-9f80-e135a66ed6dd",
+      "payeeId": "f3832448-466f-42fe-af42-85e3199736c2",
       "payeeName": "Starting Balance",
       "categoryId": null,
       "notes": null,
@@ -17,11 +17,11 @@
       "subtransactions": []
     },
     {
-      "id": "96da5c5b-8896-456a-886f-42b868105302",
-      "accountId": "60f9795e-2883-4803-9d9d-9adf4e1af7e8",
+      "id": "0e3b5ab6-7dff-484b-8f8f-8c6e8d453c63",
+      "accountId": "e44e28a1-54c5-4e6b-9341-b3ad4795ad41",
       "date": "2026-09-28",
       "amount": 520000,
-      "payeeId": "714f8981-c958-4491-9f80-e135a66ed6dd",
+      "payeeId": "f3832448-466f-42fe-af42-85e3199736c2",
       "payeeName": "Starting Balance",
       "categoryId": "506e8d9d-7ed0-4397-84e4-07a9185dc6b2",
       "notes": null,

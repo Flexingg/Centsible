@@ -271,6 +271,196 @@ paths:
         '400': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
 
+  /v1/bank-sync:
+    get:
+      tags: [bank-sync]
+      operationId: bankSyncOverview
+      summary: SimpleFIN connection, request count against its daily quota, and the background schedule.
+      responses:
+        '200':
+          description: Overview
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BankSyncOverview' }
+
+  /v1/bank-sync/simplefin:
+    put:
+      tags: [bank-sync]
+      operationId: connectSimpleFin
+      summary: Owners. Stores a SimpleFIN setup token and claims it right away.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [setupToken]
+              additionalProperties: false
+              properties:
+                setupToken: { type: string, minLength: 10, maxLength: 4096 }
+      responses:
+        '200':
+          description: Connected
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BankSyncOverview' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '502': { $ref: '#/components/responses/Problem' }
+    delete:
+      tags: [bank-sync]
+      operationId: resetSimpleFin
+      summary: Owners. Forgets the SimpleFIN credentials (linked accounts stop syncing).
+      responses:
+        '204': { description: Reset }
+        '403': { $ref: '#/components/responses/Problem' }
+
+  /v1/bank-sync/schedule:
+    put:
+      tags: [bank-sync]
+      operationId: setBankSyncSchedule
+      summary: Owners. How often the bridge syncs every linked account in the background (0 = off).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [intervalHours]
+              additionalProperties: false
+              properties:
+                intervalHours: { type: integer, enum: [0, 2, 4, 6, 12, 24] }
+      responses:
+        '200':
+          description: Schedule
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ScheduleState' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+
+  /v1/budgets/{budgetId}/bank-sync/simplefin/accounts:
+    get:
+      tags: [bank-sync]
+      operationId: listSimpleFinAccounts
+      summary: Accounts in the SimpleFIN connection, and which account in this budget each is linked to. Costs one SimpleFIN request.
+      parameters:
+        - $ref: '#/components/parameters/BudgetId'
+        - { name: refresh, in: query, schema: { type: boolean, default: true } }
+      responses:
+        '200':
+          description: Accounts
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/ExternalAccount' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '502': { $ref: '#/components/responses/Problem' }
+        '423': { $ref: '#/components/responses/Problem' }
+
+  /v1/budgets/{budgetId}/bank-sync/simplefin/link:
+    post:
+      tags: [bank-sync]
+      operationId: linkSimpleFinAccount
+      summary: Link a SimpleFIN account to an existing account (accountId) or a new one; imports recent transactions.
+      parameters:
+        - $ref: '#/components/parameters/BudgetId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [externalId]
+              additionalProperties: false
+              properties:
+                externalId: { type: string, minLength: 1 }
+                accountId: { type: string, description: Existing account to link; omit to create one }
+                offBudget: { type: boolean }
+                startDate: { $ref: '#/components/schemas/Date' }
+      responses:
+        '201':
+          description: Linked
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [accountId]
+                properties:
+                  accountId: { type: string }
+        '400': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '502': { $ref: '#/components/responses/Problem' }
+        '423': { $ref: '#/components/responses/Problem' }
+
+  /v1/budgets/{budgetId}/accounts/{id}/unlink:
+    post:
+      tags: [bank-sync]
+      operationId: unlinkAccount
+      summary: Stop bank sync for an account. Its transactions stay.
+      parameters:
+        - $ref: '#/components/parameters/BudgetId'
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        '204': { description: Unlinked }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '423': { $ref: '#/components/responses/Problem' }
+
+  /v1/budgets/{budgetId}/accounts/{id}/bank-sync-settings:
+    get:
+      tags: [bank-sync]
+      operationId: getBankSyncSettings
+      parameters:
+        - $ref: '#/components/parameters/BudgetId'
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: Settings
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BankSyncSettings' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '423': { $ref: '#/components/responses/Problem' }
+    patch:
+      tags: [bank-sync]
+      operationId: updateBankSyncSettings
+      parameters:
+        - $ref: '#/components/parameters/BudgetId'
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                importTransactions: { type: boolean }
+                importPending: { type: boolean }
+                importNotes: { type: boolean }
+                reimportDeleted: { type: boolean }
+                updateDates: { type: boolean }
+                mapping: { $ref: '#/components/schemas/SyncMappings' }
+      responses:
+        '200':
+          description: Settings
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BankSyncSettings' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '423': { $ref: '#/components/responses/Problem' }
+
   /v1/budgets/{budgetId}/accounts:
     get:
       tags: [budgets]
@@ -1367,6 +1557,91 @@ components:
           schema: { $ref: '#/components/schemas/Problem' }
 
   schemas:
+    BankSyncOverview:
+      type: object
+      required: [simplefin, schedule, intervals]
+      properties:
+        simplefin:
+          type: object
+          required: [configured, requestsToday, dailyQuota]
+          properties:
+            configured: { type: boolean }
+            requestsToday: { type: integer, description: SimpleFIN requests the bridge made in the last 24 hours }
+            dailyQuota: { type: integer, description: SimpleFIN Bridge asks for 24 or fewer a day }
+        schedule: { $ref: '#/components/schemas/ScheduleState' }
+        intervals: { type: array, items: { type: integer } }
+    ScheduleState:
+      type: object
+      required: [intervalHours, lastRunAt, nextRunAt, lastResult]
+      properties:
+        intervalHours: { type: integer }
+        lastRunAt: { type: [string, 'null'], format: date-time }
+        nextRunAt: { type: [string, 'null'], format: date-time }
+        lastResult:
+          oneOf:
+            - type: 'null'
+            - type: object
+              required: [newTransactions, accounts, errors, skipped]
+              properties:
+                newTransactions: { type: integer }
+                accounts: { type: integer }
+                errors: { type: array, items: { type: string } }
+                skipped: { type: [string, 'null'] }
+    ExternalAccount:
+      type: object
+      required: [id, name, institution, balance, currency, linkedAccountId, linkedAccountName]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        institution: { type: [string, 'null'] }
+        balance: { $ref: '#/components/schemas/Money' }
+        currency: { type: string }
+        linkedAccountId: { type: [string, 'null'] }
+        linkedAccountName: { type: [string, 'null'] }
+    SyncFieldMapping:
+      type: object
+      required: [date, payee, notes]
+      additionalProperties: false
+      properties:
+        date: { type: string, enum: [date, postedDate, transactedDate] }
+        payee: { type: string, enum: [payeeName, notes] }
+        notes: { type: string, enum: [notes, payeeName] }
+    SyncMappings:
+      type: object
+      required: [payment, deposit]
+      additionalProperties: false
+      properties:
+        payment: { $ref: '#/components/schemas/SyncFieldMapping' }
+        deposit: { $ref: '#/components/schemas/SyncFieldMapping' }
+    BankSyncSettings:
+      type: object
+      required: [importTransactions, importPending, importNotes, reimportDeleted, updateDates, mapping]
+      properties:
+        importTransactions: { type: boolean, description: Import transactions at all (off = balances only) }
+        importPending: { type: boolean }
+        importNotes: { type: boolean }
+        reimportDeleted: { type: boolean, description: Bring back bank transactions you deleted }
+        updateDates: { type: boolean, description: Update dates of already-imported transactions }
+        mapping: { $ref: '#/components/schemas/SyncMappings' }
+    SyncSummary:
+      type: object
+      required: [accounts, newTransactions, results, simplefinRequests]
+      properties:
+        accounts: { type: integer }
+        newTransactions: { type: integer }
+        simplefinRequests: { type: integer }
+        results:
+          type: array
+          items:
+            type: object
+            required: [accountId, name, newTransactions, matchedTransactions, error, status]
+            properties:
+              accountId: { type: string }
+              name: { type: string }
+              newTransactions: { type: integer }
+              matchedTransactions: { type: integer }
+              error: { type: [string, 'null'] }
+              status: { type: [string, 'null'] }
     SetupStatus:
       type: object
       required: [needsOwner]
@@ -1414,7 +1689,7 @@ components:
         status: { type: integer }
         code:
           type: string
-          description: Stable machine-readable code, e.g. `unauthorized`, `forbidden`, `not_found`, `validation`, `feature_unavailable`, `actual_unavailable`, `budget_encrypted`, `conflict`, `rate_limited`
+          description: Stable machine-readable code, e.g. `unauthorized`, `forbidden`, `not_found`, `validation`, `feature_unavailable`, `actual_unavailable`, `budget_encrypted`, `bank_sync_failed`, `conflict`, `rate_limited`
         detail: { type: string }
 
     Health:
@@ -1550,6 +1825,9 @@ components:
         accountGroupId: { type: [string, 'null'] }
         syncSource: { type: [string, 'null'], description: "Bank sync provider once linked in Actual (goCardless, simpleFin, pluggyai)" }
         lastSync: { type: [string, 'null'], format: date-time }
+        bankSyncStatus:
+          type: [string, 'null']
+          description: Actual's result of the last bank sync for this account (ok, reauth-required, attention-required, rate-limit-exceeded, timed-out, account-missing, failed)
 
     Category:
       type: object
@@ -1870,7 +2148,7 @@ components:
         status: { type: string, enum: [running, succeeded, failed] }
         startedAt: { type: string, format: date-time }
         finishedAt: { type: [string, 'null'] }
-        result: { description: "For bank-sync: { accounts, newTransactions }" }
+        result: { description: "For bank-sync: SyncSummary" }
         error: { type: [string, 'null'] }
 
     ImportRequest:

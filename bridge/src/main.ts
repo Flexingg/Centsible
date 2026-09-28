@@ -1,17 +1,11 @@
 import { join } from 'node:path';
 import type { FastifyBaseLogger } from 'fastify';
-import { BudgetOps } from './actual/budget-ops.js';
-import { AccountOps } from './actual/account-ops.js';
-import { PlanningOps } from './actual/planning-ops.js';
-import { ReportOps } from './actual/report-ops.js';
-import { JobStore } from './jobs.js';
-import { StructureOps } from './actual/structure-ops.js';
-import { TransactionOps } from './actual/transaction-ops.js';
 import { ActualHost } from './actual/host.js';
 import { HouseholdStore } from './auth/store.js';
 import { loadConfig } from './config.js';
 import { buildServer } from './http/server.js';
 import { SetupService } from './setup.js';
+import { createDeps } from './deps.js';
 
 const config = loadConfig();
 const store = new HouseholdStore(join(config.dataDir, 'bridge.sqlite'), {
@@ -32,7 +26,9 @@ async function connect() {
   void host.warmUp(); // background: first phone request shouldn't wait for a download
 }
 const setup = new SetupService(config, store, host, { info: (o, m) => log?.info(o, m), warn: (o, m) => log?.warn(o, m) }, connect);
-const app = await buildServer({ config, store, host, setup, ops: new BudgetOps(host), transactions: new TransactionOps(host), structure: new StructureOps(host), planning: new PlanningOps(host), accountOps: new AccountOps(host), reports: new ReportOps(host), jobs: new JobStore() });
+const logProxy = { info: (o: unknown, m?: string) => log?.info(o, m), warn: (o: unknown, m?: string) => log?.warn(o, m) };
+const deps = createDeps(config, store, host, setup, logProxy);
+const app = await buildServer(deps);
 log = app.log;
 
 if (!host.hasCredentials) {
@@ -70,6 +66,8 @@ if (setupCode) {
   ];
   process.stdout.write(`${lines.join('\n')}\n`);
 }
+
+deps.scheduler.start(); // background bank sync, if the owner turned it on
 
 setInterval(() => store.pruneIdempotency(), 6 * 3600 * 1000).unref();
 

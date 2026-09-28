@@ -37,12 +37,12 @@ const IMPORT_LIMIT = 16 * 1024 * 1024;
 export const operationRoutes =
   (deps: Deps): FastifyPluginAsync =>
   async (app) => {
-    const { accountOps, reports, ops, jobs } = deps;
+    const { accountOps, reports, ops, jobs, bankSync } = deps;
 
-    // ── Bank sync (async: 202 + job polling) ──
+    // ── Bank sync (async: 202 + job polling). All accounts: SimpleFIN in one batched request. ──
     const startSync = (budgetId: string, accountId: string | null) => {
       const running = jobs.running('bank-sync', budgetId);
-      return running ?? jobs.start('bank-sync', budgetId, () => accountOps.bankSync(budgetId, accountId));
+      return running ?? jobs.start('bank-sync', budgetId, () => (accountId ? bankSync.syncOne(budgetId, accountId) : bankSync.syncAll(budgetId)));
     };
     app.post<{ Params: IdParams }>('/v1/budgets/:budgetId/accounts/:id/bank-sync', async (req, reply) => {
       requireBudget(deps, req, req.params.budgetId, 'member');

@@ -1,0 +1,22 @@
+{
+  "items": [
+    {
+      "id": "SF-CHK",
+      "name": "Everyday Checking",
+      "institution": "Example Bank",
+      "balance": 123456,
+      "currency": "USD",
+      "linkedAccountId": null,
+      "linkedAccountName": null
+    },
+    {
+      "id": "SF-CARD",
+      "name": "Rewards Card",
+      "institution": "Card Co",
+      "balance": -30000,
+      "currency": "USD",
+      "linkedAccountId": null,
+      "linkedAccountName": null
+    }
+  ]
+}

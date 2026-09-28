@@ -4,7 +4,7 @@ import type { BridgeConfig } from '../config.js';
 import { ApiError } from '../errors.js';
 import { ACTUAL_API_VERSION, compareVersions, type Compatibility } from './versions.js';
 
-type Lib = Awaited<ReturnType<typeof api.init>>;
+export type Lib = Awaited<ReturnType<typeof api.init>>;
 type Logger = { debug: (o: unknown, m?: string) => void; info: (o: unknown, m?: string) => void; warn: (o: unknown, m?: string) => void };
 
 export type RemoteBudget = { id: string; name: string; encrypted: boolean };
@@ -67,6 +67,11 @@ export class ActualHost {
       if (b.encrypted && !this.config.actual.budgetPasswords[b.id]) continue;
       await this.withBudget(b.id, 'read', async () => undefined).catch((err: unknown) => this.log.warn({ err, budgetId: b.id }, 'warm-up failed'));
     }
+  }
+
+  /** Runs against the Actual server itself, not a budget (e.g. server-wide secrets). */
+  withServer<T>(fn: (lib: Lib) => Promise<T>): Promise<T> {
+    return this.enqueue(async () => fn(this.requireLib()));
   }
 
   /** Creates an empty budget on the Actual server and returns its sync id. */

@@ -31,14 +31,15 @@ export class AccountOps {
   constructor(private readonly host: ActualHost) {}
 
   /** Account id → sync info. `account_sync_source` is set once linked in Actual. */
-  static async syncInfo(): Promise<Map<string, { syncSource: string | null; lastSync: string | null }>> {
-    const { data } = (await api.aqlQuery(api.q('accounts').select(['id', 'account_sync_source', 'last_sync']))) as { data: Raw[] };
+  static async syncInfo(): Promise<Map<string, { syncSource: string | null; lastSync: string | null; bankSyncStatus: string | null }>> {
+    const { data } = (await api.aqlQuery(api.q('accounts').select(['id', 'account_sync_source', 'last_sync', 'bank_sync_status']))) as { data: Raw[] };
     return new Map(
       data.map((a) => [
         String(a.id),
         {
           syncSource: typeof a.account_sync_source === 'string' && a.account_sync_source ? a.account_sync_source : null,
           lastSync: a.last_sync ? new Date(Number(a.last_sync)).toISOString() : null,
+          bankSyncStatus: typeof a.bank_sync_status === 'string' && a.bank_sync_status ? a.bank_sync_status : null,
         },
       ]),
     );

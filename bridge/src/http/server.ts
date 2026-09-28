@@ -8,6 +8,8 @@ import type { PlanningOps } from '../actual/planning-ops.js';
 import type { ReportOps } from '../actual/report-ops.js';
 import type { JobStore } from '../jobs.js';
 import type { SetupService } from '../setup.js';
+import type { BankSyncOps } from '../actual/bank-sync-ops.js';
+import type { BankSyncScheduler } from '../bank-sync-scheduler.js';
 import type { HouseholdStore, Member, Device, Role } from '../auth/store.js';
 import type { BridgeConfig } from '../config.js';
 import { ApiError } from '../errors.js';
@@ -20,6 +22,7 @@ import { planningRoutes } from './routes/planning.js';
 import { operationRoutes } from './routes/operations.js';
 import { systemRoutes } from './routes/system.js';
 import { setupRoutes } from './routes/setup.js';
+import { bankSyncRoutes } from './routes/bank-sync.js';
 
 export type Deps = {
   config: BridgeConfig;
@@ -33,6 +36,8 @@ export type Deps = {
   reports: ReportOps;
   jobs: JobStore;
   setup: SetupService;
+  bankSync: BankSyncOps;
+  scheduler: BankSyncScheduler;
 };
 
 declare module 'fastify' {
@@ -101,6 +106,7 @@ export async function buildServer(deps: Deps, opts: { logger?: boolean | object 
   await app.register(structureRoutes(deps));
   await app.register(planningRoutes(deps));
   await app.register(operationRoutes(deps));
+  await app.register(bankSyncRoutes(deps));
   return app;
 }
 
