@@ -48,7 +48,7 @@ class NetWorthWidget @Inject constructor() : DashboardWidget {
         val open = context.accounts.filter { !it.closed }
         val assets = open.filter { !it.balance.isNegative }.map { it.balance }.sum()
         val debts = open.filter { it.balance.isNegative }.map { it.balance }.sum()
-        CentsibleCard(onClick = { context.navigate(Destination.Accounts) }, contentPadding = PaddingValues(20.dp)) {
+        CentsibleCard(onClick = { context.navigate(Destination.NetWorth) }, contentPadding = PaddingValues(20.dp)) {
             StatLabel("Net worth")
             MoneyText(assets + debts, style = MaterialTheme.typography.displaySmall, showCents = false)
             Spacer(Modifier.height(12.dp))

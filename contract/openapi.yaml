@@ -1164,6 +1164,77 @@ paths:
         '400': { $ref: '#/components/responses/Problem' }
         '423': { $ref: '#/components/responses/Problem' }
 
+  /v1/budgets/{budgetId}/insights:
+    get:
+      tags: [insights]
+      operationId: getInsights
+      summary: Spending by category against the last three months (projected to month end), and alerts - categories well above or below usual, unusual charges, big first visits to a merchant, price changes on recurring bills.
+      parameters:
+        - $ref: '#/components/parameters/BudgetId'
+        - { name: month, in: query, schema: { $ref: '#/components/schemas/Month' } }
+      responses:
+        '200':
+          description: Insights
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Insights' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '423': { $ref: '#/components/responses/Problem' }
+
+  /v1/budgets/{budgetId}/subscriptions:
+    get:
+      tags: [insights]
+      operationId: findSubscriptions
+      summary: Recurring payments found in the history that have no schedule yet (Actual's own discovery), and price changes on existing schedules. Create a schedule from a candidate with POST /schedules.
+      parameters:
+        - $ref: '#/components/parameters/BudgetId'
+      responses:
+        '200':
+          description: Candidates
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Subscriptions' }
+        '423': { $ref: '#/components/responses/Problem' }
+        '501': { $ref: '#/components/responses/Problem' }
+
+  /v1/budgets/{budgetId}/subscriptions/dismiss:
+    post:
+      tags: [insights]
+      operationId: dismissSubscription
+      summary: Stop suggesting a merchant as a recurring payment.
+      parameters:
+        - $ref: '#/components/parameters/BudgetId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [payeeId]
+              additionalProperties: false
+              properties:
+                payeeId: { type: string, minLength: 1 }
+      responses:
+        '204': { description: Dismissed }
+        '403': { $ref: '#/components/responses/Problem' }
+
+  /v1/budgets/{budgetId}/reports/year-in-review:
+    get:
+      tags: [insights]
+      operationId: yearInReview
+      summary: A year's story - totals, top categories and merchants, biggest purchase, busiest month, no-spend streaks. Default year is this one from November, otherwise last year.
+      parameters:
+        - $ref: '#/components/parameters/BudgetId'
+        - { name: year, in: query, schema: { type: integer, minimum: 2000, maximum: 2100 } }
+      responses:
+        '200':
+          description: Year in review
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/YearInReview' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '423': { $ref: '#/components/responses/Problem' }
+
   /v1/budgets/{budgetId}/schedules:
     get:
       tags: [budgets]
@@ -2282,6 +2353,158 @@ components:
           properties:
             date: { $ref: '#/components/schemas/Date' }
             balance: { $ref: '#/components/schemas/Money' }
+    Insights:
+      type: object
+      required: [month, daysElapsed, daysInMonth, spent, typical, projected, categories, alerts]
+      properties:
+        month: { $ref: '#/components/schemas/Month' }
+        daysElapsed: { type: integer }
+        daysInMonth: { type: integer }
+        spent: { $ref: '#/components/schemas/Money' }
+        typical: { $ref: '#/components/schemas/Money' }
+        projected: { $ref: '#/components/schemas/Money' }
+        categories:
+          type: array
+          items:
+            type: object
+            required: [categoryId, name, spent, typical, projected, changePct]
+            properties:
+              categoryId: { type: [string, 'null'] }
+              name: { type: string }
+              spent: { $ref: '#/components/schemas/Money' }
+              typical: { $ref: '#/components/schemas/Money', description: Average of the three months before }
+              projected: { $ref: '#/components/schemas/Money' }
+              changePct: { type: [integer, 'null'] }
+        alerts: { type: array, items: { $ref: '#/components/schemas/Insight' } }
+    Insight:
+      type: object
+      required: [id, kind, severity, title, detail, amount, date, categoryId, transactionId, scheduleId]
+      properties:
+        id: { type: string, description: Stable, for "already notified" tracking }
+        kind: { type: string, enum: [category-pace, unusual-transaction, new-merchant, price-change] }
+        severity: { type: string, enum: [good, info, warning] }
+        title: { type: string }
+        detail: { type: string }
+        amount: { $ref: '#/components/schemas/Money' }
+        date: { $ref: '#/components/schemas/Date' }
+        categoryId: { type: [string, 'null'] }
+        transactionId: { type: [string, 'null'] }
+        scheduleId: { type: [string, 'null'] }
+    Subscriptions:
+      type: object
+      required: [candidates, priceChanges]
+      properties:
+        candidates:
+          type: array
+          items:
+            type: object
+            required: [payeeId, payeeName, accountId, accountName, amount, approximateAmount, recurrence, lastDate, yearlyAmount, income]
+            properties:
+              payeeId: { type: string }
+              payeeName: { type: string }
+              accountId: { type: string }
+              accountName: { type: [string, 'null'] }
+              amount: { $ref: '#/components/schemas/Money' }
+              approximateAmount: { type: boolean }
+              recurrence: { $ref: '#/components/schemas/Recurrence' }
+              lastDate: { type: [string, 'null'] }
+              yearlyAmount: { $ref: '#/components/schemas/Money' }
+              income: { type: boolean }
+        priceChanges:
+          type: array
+          items:
+            type: object
+            required: [scheduleId, name, previous, latest, changePct, date]
+            properties:
+              scheduleId: { type: string }
+              name: { type: string }
+              previous: { $ref: '#/components/schemas/Money' }
+              latest: { $ref: '#/components/schemas/Money' }
+              changePct: { type: integer }
+              date: { $ref: '#/components/schemas/Date' }
+    YearInReview:
+      type: object
+      required: [year, complete, availableYears, empty, income, spending, saved, savingsRate, purchases, dailyAverage, topCategories, topMerchants, mostVisited, biggestPurchase, months, biggestMonth, smallestMonth, noSpendDays, longestNoSpendStreak, newMerchants, merchantsVisited, previousYear]
+      properties:
+        year: { type: integer }
+        complete: { type: boolean, description: False while the year is still going }
+        availableYears: { type: array, items: { type: integer } }
+        empty: { type: boolean }
+        income: { $ref: '#/components/schemas/Money' }
+        spending: { $ref: '#/components/schemas/Money' }
+        saved: { $ref: '#/components/schemas/Money' }
+        savingsRate: { type: [integer, 'null'] }
+        purchases: { type: integer }
+        dailyAverage: { $ref: '#/components/schemas/Money' }
+        topCategories:
+          type: array
+          items:
+            type: object
+            required: [categoryId, name, amount, share]
+            properties:
+              categoryId: { type: [string, 'null'] }
+              name: { type: string }
+              amount: { $ref: '#/components/schemas/Money' }
+              share: { type: number }
+        topMerchants: { type: array, items: { $ref: '#/components/schemas/MerchantTotal' } }
+        mostVisited:
+          oneOf:
+            - type: 'null'
+            - $ref: '#/components/schemas/MerchantTotal'
+        biggestPurchase:
+          oneOf:
+            - type: 'null'
+            - type: object
+              required: [transactionId, date, payeeName, categoryName, amount]
+              properties:
+                transactionId: { type: string }
+                date: { $ref: '#/components/schemas/Date' }
+                payeeName: { type: [string, 'null'] }
+                categoryName: { type: [string, 'null'] }
+                amount: { $ref: '#/components/schemas/Money' }
+        months: { type: array, items: { $ref: '#/components/schemas/MonthTotals' } }
+        biggestMonth:
+          oneOf:
+            - type: 'null'
+            - $ref: '#/components/schemas/MonthTotals'
+        smallestMonth:
+          oneOf:
+            - type: 'null'
+            - $ref: '#/components/schemas/MonthTotals'
+        noSpendDays: { type: integer }
+        longestNoSpendStreak:
+          type: object
+          required: [days, start, end]
+          properties:
+            days: { type: integer }
+            start: { type: [string, 'null'] }
+            end: { type: [string, 'null'] }
+        newMerchants: { type: integer }
+        merchantsVisited: { type: integer }
+        previousYear:
+          oneOf:
+            - type: 'null'
+            - type: object
+              required: [spending, income, spendingChangePct]
+              properties:
+                spending: { $ref: '#/components/schemas/Money' }
+                income: { $ref: '#/components/schemas/Money' }
+                spendingChangePct: { type: [integer, 'null'] }
+    MerchantTotal:
+      type: object
+      required: [payeeId, name, amount, visits]
+      properties:
+        payeeId: { type: string }
+        name: { type: string }
+        amount: { $ref: '#/components/schemas/Money' }
+        visits: { type: integer }
+    MonthTotals:
+      type: object
+      required: [month, spending, income]
+      properties:
+        month: { $ref: '#/components/schemas/Month' }
+        spending: { $ref: '#/components/schemas/Money' }
+        income: { $ref: '#/components/schemas/Money' }
     BudgetMonth:
       type: object
       required: [month, budgetType, toBudget, incomeAvailable, lastMonthOverspent, forNextMonth,
@@ -2609,6 +2832,18 @@ components:
               assets: { $ref: '#/components/schemas/Money' }
               liabilities: { $ref: '#/components/schemas/Money' }
               netWorth: { $ref: '#/components/schemas/Money' }
+        accounts:
+          type: array
+          description: Each account's end-of-month balance, aligned with points
+          items:
+            type: object
+            required: [accountId, name, offBudget, closed, balances]
+            properties:
+              accountId: { type: string }
+              name: { type: string }
+              offBudget: { type: boolean }
+              closed: { type: boolean }
+              balances: { type: array, items: { $ref: '#/components/schemas/Money' } }
 
     TemplatesResult:
       type: object

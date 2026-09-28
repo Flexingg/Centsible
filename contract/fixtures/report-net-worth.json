@@ -18,5 +18,51 @@
       "liabilities": -19872,
       "netWorth": 2153301
     }
+  ],
+  "accounts": [
+    {
+      "accountId": "a125b3dd-dee1-4712-8bf7-d34f375f9dc9",
+      "name": "Brokerage",
+      "offBudget": true,
+      "closed": false,
+      "balances": [
+        0,
+        0,
+        1250000
+      ]
+    },
+    {
+      "accountId": "e4092280-45ac-4ee8-a010-aa1731712fc3",
+      "name": "Joint Checking",
+      "offBudget": false,
+      "closed": false,
+      "balances": [
+        0,
+        0,
+        923173
+      ]
+    },
+    {
+      "accountId": "8cfd965b-2ed9-426b-a9f4-92919082530a",
+      "name": "Visa",
+      "offBudget": false,
+      "closed": false,
+      "balances": [
+        0,
+        0,
+        -19872
+      ]
+    },
+    {
+      "accountId": "69a9e71d-389b-41c8-8fa6-aea40d8d934d",
+      "name": "Kid Savings",
+      "offBudget": false,
+      "closed": false,
+      "balances": [
+        0,
+        0,
+        0
+      ]
+    }
   ]
 }

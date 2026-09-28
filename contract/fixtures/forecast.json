@@ -2,18 +2,18 @@
   "from": "2026-09-28",
   "to": "2026-11-27",
   "accountIds": [
-    "f00cb655-7a1c-4aca-8e6e-083ce9bdbaf6",
-    "ee161e56-29e9-4008-8ce0-c69f00f298f8"
+    "dd92f776-a758-403b-a655-b2ea1a123369",
+    "37a9c5ff-8f76-4e05-9642-1e955d99e872"
   ],
   "startingBalance": 834992,
   "typicalDaily": 0,
   "events": [
     {
       "date": "2026-10-01",
-      "scheduleId": "a111a1c6-12d5-411a-a2e4-54deac594355",
+      "scheduleId": "1534fefa-7b31-4e06-843d-8692207a65ea",
       "name": "Gym",
       "payeeName": "Gym",
-      "accountId": "f00cb655-7a1c-4aca-8e6e-083ce9bdbaf6",
+      "accountId": "dd92f776-a758-403b-a655-b2ea1a123369",
       "accountName": "Joint Checking",
       "amount": -5000,
       "internalTransfer": false,
@@ -21,10 +21,10 @@
     },
     {
       "date": "2026-11-01",
-      "scheduleId": "a111a1c6-12d5-411a-a2e4-54deac594355",
+      "scheduleId": "1534fefa-7b31-4e06-843d-8692207a65ea",
       "name": "Gym",
       "payeeName": "Gym",
-      "accountId": "f00cb655-7a1c-4aca-8e6e-083ce9bdbaf6",
+      "accountId": "dd92f776-a758-403b-a655-b2ea1a123369",
       "accountName": "Joint Checking",
       "amount": -5000,
       "internalTransfer": false,

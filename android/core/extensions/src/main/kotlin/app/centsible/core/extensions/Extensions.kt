@@ -56,6 +56,9 @@ sealed interface Destination {
     data object Settings : Destination
     data object Recurring : Destination
     data object Reports : Destination
+    data object NetWorth : Destination
+    data object Trends : Destination
+    data object YearInReview : Destination
     data class Account(val id: app.centsible.core.model.AccountId) : Destination
     /** Opens the editor; a null id starts a new transaction. */
     data class Transaction(val id: app.centsible.core.model.TransactionId?, val account: app.centsible.core.model.AccountId? = null) : Destination

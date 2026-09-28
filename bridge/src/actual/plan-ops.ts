@@ -2,6 +2,7 @@ import * as api from '@actual-app/api';
 import { ApiError } from '../errors.js';
 import type { BudgetOps } from './budget-ops.js';
 import type { ActualHost } from './host.js';
+import { dateRange } from './report-ops.js';
 
 type Raw = Record<string, unknown>;
 type MonthCategory = { id: string; name: string; groupName: string; budgeted: number; spent: number; balance: number };
@@ -254,7 +255,7 @@ export class PlanOps {
         const { data } = (await api.aqlQuery(
           api
             .q('transactions')
-            .filter({ account: { $oneof: [...ids] }, date: { $gte: since, $lt: from }, schedule: null, starting_balance_flag: false })
+            .filter({ account: { $oneof: [...ids] }, ...dateRange(since, from, false), schedule: null, starting_balance_flag: false })
             .select(['amount', 'transfer_id', 'payee.transfer_acct']),
         )) as { data: Raw[] };
         const flow = data.filter((r) => !(r['payee.transfer_acct'] && ids.has(String(r['payee.transfer_acct'])))).reduce((s, r) => s + num(r.amount), 0);

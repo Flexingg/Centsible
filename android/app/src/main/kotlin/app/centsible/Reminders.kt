@@ -39,6 +39,8 @@ import kotlinx.coroutines.flow.first
 internal const val BILLS_CHANNEL = "bills"
 internal const val EXTRA_OPEN = "open"
 internal const val OPEN_RECURRING = "recurring"
+internal const val OPEN_INSIGHTS = "insights"
+internal const val ALERTS_CHANNEL = "alerts"
 
 /** Once a day (around 8am, when the phone has a network), checks for bills coming up. */
 class BillReminderWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
@@ -49,15 +51,20 @@ class BillReminderWorker(context: Context, params: WorkerParameters) : Coroutine
         fun planning(): PlanningGateway
         fun engine(): BudgetEngine
         fun reminders(): ReminderSettings
+        fun insights(): app.centsible.core.domain.InsightsGateway
     }
 
     override suspend fun doWork(): Result {
         val deps = EntryPointAccessors.fromApplication(applicationContext, Deps::class.java)
         val settings = deps.reminders()
-        if (!settings.enabled.first()) return Result.success()
+        val bills = settings.enabled.first()
+        val alerts = settings.alerts.first()
+        if (!bills && !alerts) return Result.success()
         val budget = deps.sessions().current()?.selectedBudget ?: return Result.success()
         val notifications = NotificationManagerCompat.from(applicationContext)
         if (!notifications.areNotificationsEnabled()) return Result.success()
+        if (alerts) notifyAlerts(deps, budget, notifications)
+        if (!bills) return Result.success()
 
         val today = LocalDate.now()
         val schedules = runCatching { deps.planning().schedules(budget, upcoming = 3) }.getOrElse { return Result.retry() }
@@ -81,7 +88,36 @@ class BillReminderWorker(context: Context, params: WorkerParameters) : Coroutine
         return Result.success()
     }
 
+    /** At most three new warnings a day, each sent once. */
+    private suspend fun notifyAlerts(deps: Deps, budget: app.centsible.core.model.BudgetId, notifications: NotificationManagerCompat) {
+        val settings = deps.reminders()
+        val insights = runCatching { deps.insights().insights(budget) }.getOrNull() ?: return
+        val fresh = BillReminders.newAlerts(insights.alerts, settings.sent()).take(3)
+        if (fresh.isEmpty()) return
+        val today = LocalDate.now()
+        fresh.forEach { alert ->
+            val notification = NotificationCompat.Builder(applicationContext, ALERTS_CHANNEL)
+                .setSmallIcon(android.R.drawable.ic_dialog_info)
+                .setContentTitle(alert.title)
+                .setContentText(alert.detail)
+                .setStyle(NotificationCompat.BigTextStyle().bigText(alert.detail))
+                .setContentIntent(open(applicationContext, OPEN_INSIGHTS, 2))
+                .setAutoCancel(true)
+                .setGroup(ALERTS_CHANNEL)
+                .build()
+            @Suppress("MissingPermission") // checked with areNotificationsEnabled before this runs
+            notifications.notify(alert.id.hashCode(), notification)
+        }
+        settings.markSent(fresh.map { BillReminders.alertKey(it, today) }, today)
+    }
+
     companion object {
+        fun open(context: Context, screen: String, requestCode: Int): PendingIntent = PendingIntent.getActivity(
+            context, requestCode,
+            Intent(context, MainActivity::class.java).putExtra(EXTRA_OPEN, screen).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+
         fun openRecurring(context: Context): PendingIntent = PendingIntent.getActivity(
             context, 1,
             Intent(context, MainActivity::class.java).putExtra(EXTRA_OPEN, OPEN_RECURRING).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP),
@@ -92,6 +128,9 @@ class BillReminderWorker(context: Context, params: WorkerParameters) : Coroutine
             val channel = NotificationChannel(BILLS_CHANNEL, "Bill reminders", NotificationManager.IMPORTANCE_DEFAULT)
                 .apply { description = "Upcoming bills from your recurring schedules" }
             context.getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
+            val alerts = NotificationChannel(ALERTS_CHANNEL, "Spending alerts", NotificationManager.IMPORTANCE_DEFAULT)
+                .apply { description = "Spending well above usual, unusual charges and price increases" }
+            context.getSystemService(NotificationManager::class.java).createNotificationChannel(alerts)
         }
     }
 }

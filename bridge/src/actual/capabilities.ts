@@ -35,6 +35,7 @@ export function capabilities(host: ActualHost) {
     'schedules.write': has('createSchedule') && has('updateSchedule') && has('deleteSchedule'),
     'schedules.skip': !host.isFeatureDisabled('schedules.skip'),
     'schedules.post': !host.isFeatureDisabled('schedules.post'),
+    'schedules.discover': !host.isFeatureDisabled('schedules.discover'),
     tags: has('getTags') && has('createTag'),
     'bankSync.run': has('runBankSync'),
     'import.files': !host.isFeatureDisabled('import.files') && has('importTransactions'),

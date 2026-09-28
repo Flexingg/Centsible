@@ -55,14 +55,21 @@ import app.centsible.core.model.Role
 fun SettingsRoute(onOpenBankSync: () -> Unit = {}, viewModel: SettingsViewModel = hiltViewModel()) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val context = androidx.compose.ui.platform.LocalContext.current
+    // What to turn on once notifications are allowed: bill reminders or spending alerts.
+    var pending by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf<() -> Unit>({}) }
     val notificationPermission = androidx.activity.compose.rememberLauncherForActivityResult(
         androidx.activity.result.contract.ActivityResultContracts.RequestPermission(),
-    ) { granted -> if (granted) viewModel.setReminders(true) else viewModel.notificationsDenied() }
+    ) { granted -> if (granted) pending() else viewModel.notificationsDenied() }
     // Android 13+ asks before an app may notify; earlier versions allow it by default.
-    val askNotifications = {
+    val askNotifications = { then: () -> Unit ->
         val needsAsk = android.os.Build.VERSION.SDK_INT >= 33 &&
             androidx.core.content.ContextCompat.checkSelfPermission(context, android.Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED
-        if (needsAsk) notificationPermission.launch(android.Manifest.permission.POST_NOTIFICATIONS) else viewModel.setReminders(true)
+        if (needsAsk) {
+            pending = then
+            notificationPermission.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+        } else {
+            then()
+        }
     }
     SettingsScreen(
         state = state,
@@ -77,7 +84,8 @@ fun SettingsRoute(onOpenBankSync: () -> Unit = {}, viewModel: SettingsViewModel 
             switchBudget = { viewModel.switchBudget(it) },
             messageShown = viewModel::messageShown,
             setAppLock = viewModel::setAppLock,
-            setReminders = { on -> if (on) askNotifications() else viewModel.setReminders(false) },
+            setReminders = { on -> if (on) askNotifications { viewModel.setReminders(true) } else viewModel.setReminders(false) },
+            setAlerts = { on -> if (on) askNotifications { viewModel.setAlerts(true) } else viewModel.setAlerts(false) },
             setReminderDays = viewModel::setReminderDays,
             openBankSync = onOpenBankSync,
         ),
@@ -101,6 +109,7 @@ data class SettingsActions(
     val setAppLock: (Boolean) -> Unit = {},
     val setReminders: (Boolean) -> Unit = {},
     val setReminderDays: (Int) -> Unit = {},
+    val setAlerts: (Boolean) -> Unit = {},
     val openBankSync: () -> Unit = {},
 )
 
@@ -190,6 +199,17 @@ fun SettingsScreen(state: SettingsUiState, actions: SettingsActions, renderQr: B
                                         )
                                     }
                                 }
+                            }
+                            Row(Modifier.fillMaxWidth().toggleRow(state.alerts, onChange = actions.setAlerts).padding(top = 12.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Column(Modifier.weight(1f)) {
+                                    Text("Spending alerts", style = MaterialTheme.typography.bodyLarge)
+                                    Text(
+                                        "When a category is heading well over usual, a charge looks unusual, or a subscription gets more expensive.",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = colors.textSecondary,
+                                    )
+                                }
+                                androidx.compose.material3.Switch(checked = state.alerts, onCheckedChange = null)
                             }
                         }
                     }

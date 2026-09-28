@@ -43,4 +43,20 @@ class BillRemindersTest {
         val kept = BillReminders.prune(setOf("a@2026-09-01", "b@2026-09-20", "junk"), today)
         assertEquals(setOf("b@2026-09-20"), kept)
     }
+
+    private fun alert(id: String, severity: app.centsible.core.model.Insight.Severity) = app.centsible.core.model.Insight(
+        id, app.centsible.core.model.Insight.Kind.CategoryPace, severity, "t", "d", app.centsible.core.model.Money.Zero, "2026-09-20", null, null, null,
+    )
+
+    @Test fun `spending alerts are sent once, warnings only, and remembered for weeks`() {
+        val today = java.time.LocalDate.of(2026, 9, 20)
+        val alerts = listOf(alert("pace:food", app.centsible.core.model.Insight.Severity.Warning), alert("pace:gas", app.centsible.core.model.Insight.Severity.Good))
+        val first = BillReminders.newAlerts(alerts, emptySet())
+        org.junit.Assert.assertEquals(listOf("pace:food"), first.map { it.id })
+        val sent = first.map { BillReminders.alertKey(it, today) }.toSet()
+        org.junit.Assert.assertEquals(emptyList<String>(), BillReminders.newAlerts(alerts, sent).map { it.id })
+        // Still remembered a month later (a pace alert can stay true all month), gone after 45 days.
+        org.junit.Assert.assertEquals(sent, BillReminders.prune(sent, today.plusDays(30)))
+        org.junit.Assert.assertEquals(emptySet<String>(), BillReminders.prune(sent, today.plusDays(46)))
+    }
 }

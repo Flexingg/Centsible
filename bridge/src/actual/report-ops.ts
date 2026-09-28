@@ -4,7 +4,7 @@ import type { ActualHost } from './host.js';
 
 type Row = Record<string, unknown>;
 
-const monthRange = (start: string, end: string) => {
+export const monthRange = (start: string, end: string) => {
   const out: string[] = [];
   let [y, m] = start.split('-').map(Number) as [number, number];
   const [ey, em] = end.split('-').map(Number) as [number, number];
@@ -15,7 +15,7 @@ const monthRange = (start: string, end: string) => {
   }
   return out;
 };
-const lastDay = (month: string) => {
+export const lastDay = (month: string) => {
   const [y, m] = month.split('-').map(Number) as [number, number];
   return `${month}-${String(new Date(Date.UTC(y, m, 0)).getUTCDate()).padStart(2, '0')}`;
 };
@@ -24,7 +24,15 @@ const lastDay = (month: string) => {
  * Money that actually came in or went out of the budget: on-budget accounts, no
  * transfers, no starting balances, split children instead of parents (AQL's default).
  */
-const BUDGET_FLOW = { 'account.offbudget': false, transfer_id: null, starting_balance_flag: false };
+/**
+ * A date range for AQL. Actual's query engine only applies the first operator of
+ * `date: { $gte, $lte }`, so each bound gets its own condition.
+ */
+export const dateRange = (from: string, to: string, inclusive = true) => ({
+  $and: [{ date: { $gte: from } }, { date: inclusive ? { $lte: to } : { $lt: to } }],
+});
+
+export const BUDGET_FLOW = { 'account.offbudget': false, transfer_id: null, starting_balance_flag: false };
 
 /** Tier 2: reports are AQL aggregations, computed by Actual's query engine. */
 export class ReportOps {
@@ -36,7 +44,7 @@ export class ReportOps {
       const { data } = (await api.aqlQuery(
         api
           .q('transactions')
-          .filter({ ...BUDGET_FLOW, date: { $gte: `${start}-01`, $lte: lastDay(end) } })
+          .filter({ ...BUDGET_FLOW, ...dateRange(`${start}-01`, lastDay(end)) })
           .groupBy([{ $month: '$date' }, 'category.is_income'])
           .select([{ month: { $month: '$date' } }, { isIncome: 'category.is_income' }, { amount: { $sum: '$amount' } }]),
       )) as { data: Row[] };
@@ -57,7 +65,7 @@ export class ReportOps {
         api.aqlQuery(
           api
             .q('transactions')
-            .filter({ ...BUDGET_FLOW, date: { $gte: `${start}-01`, $lte: lastDay(end) }, $or: [{ category: null }, { 'category.is_income': false }] })
+            .filter({ ...BUDGET_FLOW, ...dateRange(`${start}-01`, lastDay(end)), $or: [{ category: null }, { 'category.is_income': false }] })
             .groupBy(['category'])
             .select(['category', { amount: { $sum: '$amount' } }]),
         ) as Promise<{ data: Row[] }>,
@@ -76,31 +84,43 @@ export class ReportOps {
     });
   }
 
-  /** End-of-month balances across every account, including off-budget ones. */
+  /**
+   * End-of-month balances across every account, including off-budget ones, in total
+   * and per account (accounts that were closed and empty the whole time are left out).
+   */
   netWorth(budgetId: string, months: number) {
     return this.host.withBudget(budgetId, 'read', async () => {
       const now = new Date();
       const endMonth = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}`;
       const startDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - (months - 1), 1));
       const startMonth = startDate.toISOString().slice(0, 7);
-      const { data } = (await api.aqlQuery(
-        api
-          .q('transactions')
-          .options({ splits: 'none' })
-          .groupBy(['account', { $month: '$date' }])
-          .select(['account', { month: { $month: '$date' } }, { amount: { $sum: '$amount' } }]),
-      )) as { data: Row[] };
+      const [{ data }, accounts] = await Promise.all([
+        api.aqlQuery(
+          api
+            .q('transactions')
+            .options({ splits: 'none' })
+            .groupBy(['account', { $month: '$date' }])
+            .select(['account', { month: { $month: '$date' } }, { amount: { $sum: '$amount' } }]),
+        ) as Promise<{ data: Row[] }>,
+        api.getAccounts(),
+      ]);
       const balances = new Map<string, number>();
       // Everything before the window becomes the opening balance.
       for (const r of data) if (String(r.month) < startMonth) balances.set(String(r.account), (balances.get(String(r.account)) ?? 0) + Number(r.amount));
+      const series = new Map<string, number[]>(accounts.map((a) => [a.id, []]));
+      const points = monthRange(startMonth, endMonth).map((month) => {
+        for (const r of data) if (r.month === month) balances.set(String(r.account), (balances.get(String(r.account)) ?? 0) + Number(r.amount));
+        let assets = 0;
+        let liabilities = 0;
+        for (const v of balances.values()) v >= 0 ? (assets += v) : (liabilities += v);
+        for (const [id, list] of series) list.push(balances.get(id) ?? 0);
+        return { month, assets, liabilities, netWorth: assets + liabilities };
+      });
       return {
-        points: monthRange(startMonth, endMonth).map((month) => {
-          for (const r of data) if (r.month === month) balances.set(String(r.account), (balances.get(String(r.account)) ?? 0) + Number(r.amount));
-          let assets = 0;
-          let liabilities = 0;
-          for (const v of balances.values()) v >= 0 ? (assets += v) : (liabilities += v);
-          return { month, assets, liabilities, netWorth: assets + liabilities };
-        }),
+        points,
+        accounts: accounts
+          .map((a) => ({ accountId: a.id, name: a.name, offBudget: Boolean(a.offbudget), closed: Boolean(a.closed), balances: series.get(a.id) ?? [] }))
+          .filter((a) => !(a.closed && a.balances.every((b) => b === 0))),
       };
     });
   }

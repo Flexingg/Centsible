@@ -121,6 +121,7 @@ class RequestContractTest {
         call { planning.applyAutopilot(b, "2026-09", ApplyAutopilotDto(12, listOf("c1"))) }
         call { planning.setGoal(b, "c1", GoalInputDto("by", 120000, "2027-03")) }
         call { planning.setGoal(b, "c1", GoalInputDto("balance", 500000)) }
+        call { planning.dismissSubscription(b, "p1") }
         call { planning.startBackfill(b, BackfillRequestDto(years = 2, accountIds = listOf("acc"))) }
 
         val withBodies = sent.filter { it.body != null }

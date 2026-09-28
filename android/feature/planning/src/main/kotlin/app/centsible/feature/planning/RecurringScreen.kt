@@ -50,7 +50,7 @@ import app.centsible.core.model.sum
 import java.time.LocalDate
 
 @Composable
-fun RecurringRoute(onBack: () -> Unit, viewModel: RecurringViewModel = hiltViewModel()) {
+fun RecurringRoute(onBack: () -> Unit, onFind: () -> Unit = {}, viewModel: RecurringViewModel = hiltViewModel()) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     RecurringScreen(
         state = state,
@@ -63,6 +63,7 @@ fun RecurringRoute(onBack: () -> Unit, viewModel: RecurringViewModel = hiltViewM
         onPost = { viewModel.postNow(it) },
         onDelete = { viewModel.delete(it) },
         onMessageShown = viewModel::messageShown,
+        onFind = onFind,
     )
 }
 
@@ -79,6 +80,7 @@ fun RecurringScreen(
     onDelete: (Schedule) -> Unit = {},
     onMessageShown: () -> Unit = {},
     today: LocalDate = LocalDate.now(),
+    onFind: (() -> Unit)? = null,
 ) {
     val colors = CentsibleTheme.colors
     val snackbar = remember { SnackbarHostState() }
@@ -90,6 +92,7 @@ fun RecurringScreen(
             Row(Modifier.fillMaxWidth().padding(4.dp), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Back") }
                 Text("Recurring", style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
+                onFind?.let { TextButton(onClick = it) { Text("Find") } }
                 if (state.canEdit) TextButton(onClick = { onOpen(null) }) { Text("Add") }
             }
         },
@@ -106,6 +109,8 @@ fun RecurringScreen(
                         "Nothing recurring yet",
                         "Add bills and paychecks so you can see what's coming up. Actual can also find them from your history.",
                         emoji = "🔁",
+                        actionLabel = onFind?.let { "Find them from my history" },
+                        onAction = onFind,
                         modifier = Modifier.padding(padding),
                     )
                     return@Scaffold

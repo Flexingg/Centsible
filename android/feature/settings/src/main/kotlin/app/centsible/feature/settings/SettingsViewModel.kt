@@ -41,6 +41,7 @@ data class SettingsUiState(
     val appLock: Boolean = false,
     val reminders: Boolean = false,
     val reminderDays: Int = 1,
+    val alerts: Boolean = false,
 )
 
 @HiltViewModel
@@ -59,16 +60,23 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch { appLock.enabled.collect { on -> state.update { it.copy(appLock = on) } } }
         viewModelScope.launch { reminders.enabled.collect { on -> state.update { it.copy(reminders = on) } } }
         viewModelScope.launch { reminders.daysAhead.collect { d -> state.update { it.copy(reminderDays = d) } } }
+        viewModelScope.launch { reminders.alerts.collect { on -> state.update { it.copy(alerts = on) } } }
     }
 
     fun setReminders(enabled: Boolean) = viewModelScope.launch {
         reminders.setEnabled(enabled)
-        reminderScheduler.apply(enabled)
+        reminderScheduler.apply(enabled || state.value.alerts)
+    }
+
+    /** Spending alerts share the daily background check with bill reminders. */
+    fun setAlerts(enabled: Boolean) = viewModelScope.launch {
+        reminders.setAlerts(enabled)
+        reminderScheduler.apply(enabled || state.value.reminders)
     }
 
     fun setReminderDays(days: Int) = viewModelScope.launch { reminders.setDaysAhead(days) }
 
-    fun notificationsDenied() = state.update { it.copy(message = "Allow notifications for Centsible in Android settings to get bill reminders.") }
+    fun notificationsDenied() = state.update { it.copy(message = "Allow notifications for Centsible in Android settings to get reminders and alerts.") }
 
     fun setAppLock(enabled: Boolean) = viewModelScope.launch { appLock.setEnabled(enabled) }
 

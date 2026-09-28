@@ -1,0 +1,76 @@
+{
+  "month": "2026-08",
+  "daysElapsed": 31,
+  "daysInMonth": 31,
+  "spent": 305599,
+  "typical": 31566,
+  "projected": 305599,
+  "categories": [
+    {
+      "categoryId": "af375fd4-d759-46b3-bffe-74a856151d57",
+      "name": "General",
+      "spent": 255599,
+      "typical": 1566,
+      "projected": 255599,
+      "changePct": 16222
+    },
+    {
+      "categoryId": "541836f1-e756-4473-a5d0-6c1d3f06c7fa",
+      "name": "Food",
+      "spent": 50000,
+      "typical": 30000,
+      "projected": 50000,
+      "changePct": 67
+    }
+  ],
+  "alerts": [
+    {
+      "id": "pace:af375fd4-d759-46b3-bffe-74a856151d57:2026-08",
+      "kind": "category-pace",
+      "severity": "warning",
+      "title": "General is 16222% above usual",
+      "detail": "$2,555.99 this month. You usually spend about $15.66.",
+      "amount": 254033,
+      "date": "2026-09-28",
+      "categoryId": "af375fd4-d759-46b3-bffe-74a856151d57",
+      "transactionId": null,
+      "scheduleId": null
+    },
+    {
+      "id": "pace:541836f1-e756-4473-a5d0-6c1d3f06c7fa:2026-08",
+      "kind": "category-pace",
+      "severity": "warning",
+      "title": "Food is 67% above usual",
+      "detail": "$500 this month. You usually spend about $300.",
+      "amount": 20000,
+      "date": "2026-09-28",
+      "categoryId": "541836f1-e756-4473-a5d0-6c1d3f06c7fa",
+      "transactionId": null,
+      "scheduleId": null
+    },
+    {
+      "id": "unusual:1f88d70b-bca9-4eb4-b848-0b066a7c83bb",
+      "kind": "unusual-transaction",
+      "severity": "warning",
+      "title": "Bigger than usual at Coffee Cart",
+      "detail": "$40 on 2026-08-12. It's usually about $5.",
+      "amount": -4000,
+      "date": "2026-08-12",
+      "categoryId": "af375fd4-d759-46b3-bffe-74a856151d57",
+      "transactionId": "1f88d70b-bca9-4eb4-b848-0b066a7c83bb",
+      "scheduleId": null
+    },
+    {
+      "id": "new:6bf2e561-8d77-41f8-9df9-4cdaee3026a6",
+      "kind": "new-merchant",
+      "severity": "info",
+      "title": "First time at Jeweler",
+      "detail": "$2,500 on 2026-08-20. Worth a look if you don't recognize it.",
+      "amount": -250000,
+      "date": "2026-08-20",
+      "categoryId": "af375fd4-d759-46b3-bffe-74a856151d57",
+      "transactionId": "6bf2e561-8d77-41f8-9df9-4cdaee3026a6",
+      "scheduleId": null
+    }
+  ]
+}

@@ -31,6 +31,7 @@
     "schedules.write": true,
     "schedules.skip": true,
     "schedules.post": true,
+    "schedules.discover": true,
     "tags": true,
     "bankSync.run": true,
     "import.files": true,

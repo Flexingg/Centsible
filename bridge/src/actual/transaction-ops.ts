@@ -84,10 +84,11 @@ export class TransactionOps {
       const filter: Record<string, unknown> = {};
       if (f.accountId) filter.account = f.accountId;
       if (f.categoryId) filter.category = f.categoryId;
-      const date: Record<string, string> = {};
-      if (f.since) date.$gte = f.since;
-      if (f.until) date.$lte = f.until;
-      if (Object.keys(date).length) filter.date = date;
+      // One condition per bound: Actual's AQL applies only the first operator in `date: { $gte, $lte }`.
+      const dates: Record<string, unknown>[] = [];
+      if (f.since) dates.push({ date: { $gte: f.since } });
+      if (f.until) dates.push({ date: { $lte: f.until } });
+      if (dates.length) filter.$and = dates;
       if (f.uncategorized) {
         // Needs a category: on-budget, not a transfer, not a split parent.
         filter.category = null;

@@ -1,0 +1,37 @@
+{
+  "candidates": [
+    {
+      "payeeId": "d80c0da9-676d-4d6c-b901-99280870e348",
+      "payeeName": "Grocer",
+      "accountId": "966784a9-82cb-4d6d-b435-8043555abce0",
+      "accountName": "Joint Checking",
+      "amount": -30000,
+      "approximateAmount": false,
+      "recurrence": {
+        "frequency": "monthly",
+        "interval": 1,
+        "start": "2026-05-10"
+      },
+      "lastDate": "2026-08-10",
+      "yearlyAmount": -360000,
+      "income": false
+    },
+    {
+      "payeeId": "201637b3-c429-42f2-ad58-0885335d06c0",
+      "payeeName": "Netflix",
+      "accountId": "29dbd2d4-722f-4131-a7ec-f45cbba0c3c1",
+      "accountName": "Visa",
+      "amount": -1599,
+      "approximateAmount": false,
+      "recurrence": {
+        "frequency": "monthly",
+        "interval": 1,
+        "start": "2026-06-12"
+      },
+      "lastDate": "2026-08-12",
+      "yearlyAmount": -19188,
+      "income": false
+    }
+  ],
+  "priceChanges": []
+}

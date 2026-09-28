@@ -97,5 +97,9 @@ abstract class DataModule {
         @Singleton
         fun planAhead(api: PlanningApi, changes: NotifyingBudgetEngine): app.centsible.core.domain.PlanAheadGateway =
             app.centsible.core.engine.bridge.BridgePlanAhead(api, changes::notifyChanged)
+
+        @Provides
+        @Singleton
+        fun insights(api: PlanningApi): app.centsible.core.domain.InsightsGateway = app.centsible.core.engine.bridge.BridgeInsights(api)
     }
 }

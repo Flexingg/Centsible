@@ -69,6 +69,15 @@ class PlanningApi(private val client: BridgeClient) {
             parameter("includeTypical", includeTypical)
         }
 
+    // Insights
+    suspend fun netWorthDetail(budgetId: String, months: Int): NetWorthDetailDto = client.get("${b(budgetId)}/reports/net-worth") { parameter("months", months) }
+    suspend fun insights(budgetId: String, month: String?): InsightsDto = client.get("${b(budgetId)}/insights") { month?.let { parameter("month", it) } }
+    suspend fun subscriptions(budgetId: String): SubscriptionsDto = client.get("${b(budgetId)}/subscriptions")
+    suspend fun dismissSubscription(budgetId: String, payeeId: String) {
+        client.execute(HttpMethod.Post, "${b(budgetId)}/subscriptions/dismiss") { jsonBody(DismissDto(payeeId)) }
+    }
+    suspend fun yearInReview(budgetId: String, year: Int?): YearInReviewDto = client.get("${b(budgetId)}/reports/year-in-review") { year?.let { parameter("year", it) } }
+
     // Reports
     suspend fun cashFlow(budgetId: String, start: String, end: String): CashFlowDto =
         client.get("${b(budgetId)}/reports/cash-flow") { parameter("start", start); parameter("end", end) }

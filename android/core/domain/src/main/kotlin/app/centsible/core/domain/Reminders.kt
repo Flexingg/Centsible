@@ -50,15 +50,28 @@ object BillReminders {
     /** Keeps the sent-keys list from growing forever: drops entries for dates long gone. */
     fun prune(sent: Set<String>, today: LocalDate, keepDays: Long = 14): Set<String> = sent.filterTo(mutableSetOf()) { key ->
         val date = runCatching { LocalDate.parse(key.substringAfterLast('@')) }.getOrNull()
-        date != null && !date.isBefore(today.minusDays(keepDays))
+        // Spending alerts can stay current for a whole month; remember them longer so they're sent once.
+        val keep = if (key.startsWith(ALERT_PREFIX)) 45L else keepDays
+        date != null && !date.isBefore(today.minusDays(keep))
     }
+
+    const val ALERT_PREFIX = "alert:"
+
+    /** Warnings worth a notification that haven't been sent yet (keys are "alert:<id>@<sent date>"). */
+    fun newAlerts(alerts: List<app.centsible.core.model.Insight>, sent: Set<String>): List<app.centsible.core.model.Insight> =
+        alerts.filter { a -> a.severity == app.centsible.core.model.Insight.Severity.Warning && sent.none { it.startsWith("$ALERT_PREFIX${a.id}@") } }
+
+    fun alertKey(alert: app.centsible.core.model.Insight, today: LocalDate) = "$ALERT_PREFIX${alert.id}@$today"
 }
 
 /** "Remind me about bills": kept on the phone, per device. */
 interface ReminderSettings {
     val enabled: Flow<Boolean>
     val daysAhead: Flow<Int>
+    /** Spending alerts (categories well over usual, unusual charges, price increases). */
+    val alerts: Flow<Boolean>
     suspend fun setEnabled(enabled: Boolean)
+    suspend fun setAlerts(enabled: Boolean)
     suspend fun setDaysAhead(days: Int)
     suspend fun sent(): Set<String>
     suspend fun markSent(keys: Collection<String>, today: LocalDate)

@@ -4,6 +4,7 @@ import { BudgetOps } from './actual/budget-ops.js';
 import type { ActualHost } from './actual/host.js';
 import { PlanningOps } from './actual/planning-ops.js';
 import { PlanOps } from './actual/plan-ops.js';
+import { InsightsOps } from './actual/insights-ops.js';
 import { ReportOps } from './actual/report-ops.js';
 import { StructureOps } from './actual/structure-ops.js';
 import { TransactionOps } from './actual/transaction-ops.js';
@@ -36,6 +37,7 @@ export function createDeps(config: BridgeConfig, store: HouseholdStore, host: Ac
     scheduler: new BankSyncScheduler(host, store, bankSync, jobs, log, Date.now, backfill),
     ops: budgetOps,
     plan: new PlanOps(host, budgetOps),
+    insights: new InsightsOps(host, store),
     transactions: new TransactionOps(host),
     structure: new StructureOps(host),
     planning: new PlanningOps(host),
