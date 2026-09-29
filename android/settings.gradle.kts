@@ -23,7 +23,7 @@ rootProject.name = "centsible"
 
 include(":app")
 include(":core:model", ":core:domain", ":core:network", ":core:engine-bridge")
-include(":core:data", ":core:designsystem", ":core:extensions", ":core:testing", ":core:ui-testing")
+include(":core:data", ":core:designsystem", ":core:extensions", ":core:testing", ":core:ui-testing", ":core:ui")
 include(":feature:onboarding", ":feature:dashboard", ":feature:accounts")
 include(":feature:transactions", ":feature:budget", ":feature:settings")
 include(":feature:planning", ":feature:reports")

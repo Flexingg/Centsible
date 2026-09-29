@@ -39,9 +39,13 @@ data class ReviewUiState(
     val categorizing: Transaction? = null,
     val confirmAll: Boolean = false,
     val message: String? = null,
+    /** Just categorized a merchant's transaction: offer a rule so the next ones are done too. */
+    val rulePrompt: RulePrompt? = null,
 ) {
     val left get() = (data as? Loadable.Ready)?.value?.let { (it.total - it.done).coerceAtLeast(it.queue.size) } ?: 0
 }
+
+data class RulePrompt(val payeeId: app.centsible.core.model.PayeeId, val payeeName: String, val categoryId: CategoryId, val categoryName: String?)
 
 /** The review inbox: new and uncategorized transactions as a stack of cards. */
 @HiltViewModel
@@ -103,7 +107,12 @@ class ReviewViewModel @Inject constructor(
     /** Setting the category reviews it too (the bridge counts your edits as reviewed). */
     fun setCategory(category: CategoryId?) {
         val t = state.value.categorizing ?: return
-        state.update { it.copy(categorizing = null) }
+        val prompt = if (category != null && t.payeeId != null && t.payeeName != null) {
+            RulePrompt(t.payeeId!!, t.payeeName!!, category, state.value.data.valueOrNull?.categoryNames?.get(category.raw))
+        } else {
+            null
+        }
+        state.update { it.copy(categorizing = null, rulePrompt = prompt) }
         pop(t)
         viewModelScope.launch {
             runCatching {
@@ -125,6 +134,7 @@ class ReviewViewModel @Inject constructor(
     }
 
     fun messageShown() = state.update { it.copy(message = null) }
+    fun rulePromptShown() = state.update { it.copy(rulePrompt = null) }
 
     private fun pop(t: Transaction) {
         updateData { d -> d.copy(queue = d.queue - t, done = d.done + 1) }

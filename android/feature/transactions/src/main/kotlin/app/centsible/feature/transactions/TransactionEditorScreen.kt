@@ -274,15 +274,18 @@ fun TransactionEditorScreen(state: EditorUiState, actions: EditorActions) {
 
     when (val p = picker) {
         Picker.Category, is Picker.SplitCategory -> {
-            val incomeFirst = form.kind == TxKind.Income
-            val groups = state.groups.filter { !it.hidden }.sortedBy { if (it.isIncome == incomeFirst) 0 else 1 }
-            val items = groups.flatMap { g -> g.categories.filter { !it.hidden }.map { PickerItem(it.id.raw, it.name, section = g.name, emoji = true) } }
             val selected = if (p is Picker.SplitCategory) form.splits.firstOrNull { it.key == p.key }?.categoryId else form.categoryId
-            PickerSheet("Category", items, selected?.raw, onDismiss = { picker = null }, onPick = { item ->
-                val id = CategoryId(item.key)
-                if (p is Picker.SplitCategory) actions.updateSplit(p.key) { it.copy(categoryId = id) } else actions.edit { it.copy(categoryId = id) }
-                picker = null
-            })
+            app.centsible.core.ui.CategoryPickerSheet(
+                title = "Category",
+                selected = selected,
+                onDismiss = { picker = null },
+                onPick = { id ->
+                    if (id != null) {
+                        if (p is Picker.SplitCategory) actions.updateSplit(p.key) { it.copy(categoryId = id) } else actions.edit { it.copy(categoryId = id) }
+                    }
+                    picker = null
+                },
+            )
         }
         Picker.Account, Picker.TransferAccount -> {
             val exclude = if (p == Picker.TransferAccount) form.accountId else form.transferAccountId

@@ -42,6 +42,48 @@ class ReviewScreenshotTest {
         app.centsible.core.uitesting.A11y.assertOk(compose)
     }
 
+    @Test fun review_rule_prompt() {
+        // Just put a merchant's transaction in a category: offer a rule for the next ones.
+        val queue = SampleHousehold.transactions.filter { !it.isTransfer && !it.isParent && it.payeeId != null }.take(3)
+        val t = queue.first()
+        val prompt = RulePrompt(t.payeeId!!, t.payeeName ?: "Merchant", SampleHousehold.budgetMonth.groups.first().categories.first().id, "Groceries")
+        compose.setContent {
+            CentsibleTheme(darkTheme = false) { ReviewScreen(ReviewUiState(Loadable.Ready(data(queue, done = 1)), rulePrompt = prompt), ReviewActions(), today = LocalDate.of(2026, 9, 26)) }
+        }
+        compose.onRoot().captureRoboImage("screenshots/review_rule_prompt.png")
+        app.centsible.core.uitesting.A11y.assertOk(compose)
+    }
+
+    @Test fun category_picker_create() {
+        val state = app.centsible.core.ui.CategoryPickerState(groups = SampleHousehold.budgetMonth.groups.map { g ->
+            app.centsible.core.model.CategoryGroup(g.id, g.name, isIncome = g.isIncome, hidden = g.hidden, categories = g.categories.map { app.centsible.core.model.Category(it.id, it.name, g.id, isIncome = g.isIncome, hidden = it.hidden) })
+        }, loading = false, canEdit = true)
+        compose.setContent {
+            CentsibleTheme(darkTheme = false) {
+                app.centsible.core.ui.CategoryPickerContent(
+                    "Category", state, selected = null, allowNone = false, includeIncome = true, exclude = emptySet(),
+                    onPick = {}, onDismiss = {}, onCreate = { _, _, _ -> }, onRename = { _, _ -> }, onHide = {}, startCreating = true,
+                )
+            }
+        }
+        com.github.takahirom.roborazzi.captureScreenRoboImage("screenshots/category_picker_create.png")
+    }
+
+    @Test fun category_picker_list() {
+        val state = app.centsible.core.ui.CategoryPickerState(groups = SampleHousehold.budgetMonth.groups.map { g ->
+            app.centsible.core.model.CategoryGroup(g.id, g.name, isIncome = g.isIncome, hidden = g.hidden, categories = g.categories.map { app.centsible.core.model.Category(it.id, it.name, g.id, isIncome = g.isIncome, hidden = it.hidden) })
+        }, loading = false, canEdit = true)
+        compose.setContent {
+            CentsibleTheme(darkTheme = true) {
+                app.centsible.core.ui.CategoryPickerContent(
+                    "Category", state, selected = state.groups.first().categories.first().id, allowNone = true, includeIncome = true, exclude = emptySet(),
+                    onPick = {}, onDismiss = {}, onCreate = { _, _, _ -> }, onRename = { _, _ -> }, onHide = {},
+                )
+            }
+        }
+        com.github.takahirom.roborazzi.captureScreenRoboImage("screenshots/category_picker_list_dark.png")
+    }
+
     @Test fun review_caught_up_dark() {
         compose.setContent {
             CentsibleTheme(darkTheme = true) { ReviewScreen(ReviewUiState(Loadable.Ready(data(emptyList(), done = 5))), ReviewActions(), today = LocalDate.of(2026, 9, 26)) }

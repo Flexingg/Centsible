@@ -323,7 +323,7 @@ private fun MainScaffold(
             }
             composable(Routes.APPEARANCE) { app.centsible.feature.budget.AppearanceRoute(onBack = { nav.popBackStack() }) }
             composable(Routes.REVIEW) {
-                app.centsible.feature.transactions.ReviewRoute(onBack = { nav.popBackStack() }, onOpen = { nav.navigate(Routes.transaction(it)) })
+                app.centsible.feature.transactions.ReviewRoute(onBack = { nav.popBackStack() }, onOpen = { nav.navigate(Routes.transaction(it)) }, onMakeRule = { p, c -> nav.navigate(Routes.rule(null, p.raw, c?.raw)) })
             }
             composable(
                 Routes.TRANSACTIONS_FOR,

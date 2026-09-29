@@ -11,6 +11,7 @@ dependencies {
     "implementation"(project(":core:domain"))
     "implementation"(project(":core:designsystem"))
     "implementation"(project(":core:extensions"))
+    "implementation"(project(":core:ui"))
     "implementation"(libs.lib("hilt-navigation-compose"))
     "implementation"(libs.lib("androidx-lifecycle-runtime-compose"))
     "implementation"(libs.lib("androidx-lifecycle-viewmodel-compose"))

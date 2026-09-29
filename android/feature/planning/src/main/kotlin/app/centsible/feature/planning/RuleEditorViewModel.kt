@@ -63,6 +63,7 @@ class RuleEditorViewModel @Inject constructor(
     private val engine: BudgetEngine,
     private val selectedBudget: SelectedBudget,
     private val sessions: SessionStore,
+    changes: app.centsible.core.domain.BudgetChanges,
 ) : ViewModel() {
     private val ruleId = saved.get<String>(ARG_ID)?.takeIf { it.isNotBlank() }
     private val prefillPayee = saved.get<String>(ARG_PAYEE)?.takeIf { it.isNotBlank() }
@@ -74,6 +75,16 @@ class RuleEditorViewModel @Inject constructor(
 
     init {
         load()
+        // A category made from the picker: refresh names and choices, keep the form.
+        viewModelScope.launch { changes.changes.collect { refreshCategories() } }
+    }
+
+    private suspend fun refreshCategories() {
+        val d = state.value.data.valueOrNull ?: return
+        runCatching { engine.categoryGroups(selectedBudget()) }.onSuccess { g ->
+            val names = d.names.copy(categories = g.flatMap { it.categories }.associate { it.id.raw to it.name })
+            state.update { it.copy(data = Loadable.Ready(d.copy(groups = g, names = names))) }
+        }
     }
 
     fun load() = viewModelScope.launch {

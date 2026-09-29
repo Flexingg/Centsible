@@ -86,10 +86,18 @@ data class ReviewActions(
     val reviewAll: () -> Unit = {},
     val retry: () -> Unit = {},
     val messageShown: () -> Unit = {},
+    /** Opens a new rule for this merchant (and category, if it has one). */
+    val makeRule: (app.centsible.core.model.PayeeId, CategoryId?) -> Unit = { _, _ -> },
+    val rulePromptShown: () -> Unit = {},
 )
 
 @Composable
-fun ReviewRoute(onBack: () -> Unit, onOpen: (TransactionId) -> Unit, viewModel: ReviewViewModel = hiltViewModel()) {
+fun ReviewRoute(
+    onBack: () -> Unit,
+    onOpen: (TransactionId) -> Unit,
+    onMakeRule: (app.centsible.core.model.PayeeId, CategoryId?) -> Unit = { _, _ -> },
+    viewModel: ReviewViewModel = hiltViewModel(),
+) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     ReviewScreen(
         state,
@@ -105,6 +113,8 @@ fun ReviewRoute(onBack: () -> Unit, onOpen: (TransactionId) -> Unit, viewModel: 
             reviewAll = viewModel::reviewAll,
             retry = { viewModel.load() },
             messageShown = viewModel::messageShown,
+            makeRule = { p, c -> viewModel.rulePromptShown(); onMakeRule(p, c) },
+            rulePromptShown = viewModel::rulePromptShown,
         ),
     )
 }
@@ -174,11 +184,10 @@ fun ReviewScreen(state: ReviewUiState, actions: ReviewActions, today: LocalDate 
                     modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
                 )
                 state.categorizing?.let { t ->
-                    PickerSheet(
+                    app.centsible.core.ui.CategoryPickerSheet(
                         title = t.payeeName?.let { "Category for $it" } ?: "Category",
-                        items = d.categories.map { PickerItem(it.id.raw, it.name, section = it.group, emoji = true) },
-                        selectedKey = t.categoryId?.raw,
-                        onPick = { item -> actions.setCategory(CategoryId(item.key)) },
+                        selected = t.categoryId,
+                        onPick = { id -> if (id != null) actions.setCategory(id) },
                         onDismiss = actions.dismissPicker,
                     )
                 }
@@ -193,6 +202,9 @@ fun ReviewScreen(state: ReviewUiState, actions: ReviewActions, today: LocalDate 
             confirmButton = { TextButton(onClick = actions.reviewAll) { Text("Mark all") } },
             dismissButton = { TextButton(onClick = { actions.askReviewAll(false) }) { Text("Cancel") } },
         )
+    }
+    state.rulePrompt?.let { p ->
+        RulePromptBar(p, onMake = { actions.makeRule(p.payeeId, p.categoryId) }, onDismiss = actions.rulePromptShown)
     }
     state.message?.let { msg ->
         LaunchedEffect(msg) {
@@ -293,7 +305,13 @@ private fun ReviewCard(t: Transaction, d: ReviewData, depth: Int, today: LocalDa
                 }
                 Spacer(Modifier.height(8.dp))
                 // Kept on the cards behind (invisible) so every card is the same height.
-                TextButton(onClick = { actions.open(t.id) }, enabled = isTop, modifier = Modifier.graphicsLayer { alpha = if (isTop) 1f else 0f }) { Text("Edit details") }
+                Row(Modifier.graphicsLayer { alpha = if (isTop) 1f else 0f }) {
+                    TextButton(onClick = { actions.open(t.id) }, enabled = isTop) { Text("Edit details") }
+                    // So the next one from this merchant sorts itself out.
+                    if (t.payeeId != null && !t.isTransfer) {
+                        TextButton(onClick = { actions.makeRule(t.payeeId!!, t.categoryId) }, enabled = isTop) { Text("Make rule") }
+                    }
+                }
             }
             // What letting go will do.
             if (isTop && offset.value != 0f) {
@@ -337,6 +355,28 @@ private fun CaughtUp(done: Int) {
             color = colors.textSecondary,
             textAlign = TextAlign.Center,
         )
+    }
+}
+
+/** "Always put Trader Joe's in Groceries?" after a categorize, for a few seconds. */
+@Composable
+private fun RulePromptBar(p: RulePrompt, onMake: () -> Unit, onDismiss: () -> Unit) {
+    val colors = CentsibleTheme.colors
+    LaunchedEffect(p) {
+        kotlinx.coroutines.delay(6_000)
+        onDismiss()
+    }
+    Box(Modifier.fillMaxSize().padding(start = 16.dp, end = 16.dp, bottom = 132.dp), contentAlignment = Alignment.BottomCenter) {
+        Surface(shape = RoundedCornerShape(14.dp), color = colors.textPrimary, contentColor = colors.card, shadowElevation = 6.dp) {
+            Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    "Always put ${p.payeeName} in ${p.categoryName ?: "this category"}?",
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.weight(1f).padding(vertical = 12.dp),
+                )
+                TextButton(onClick = onMake) { Text("Make rule", color = colors.accent) }
+            }
+        }
     }
 }
 

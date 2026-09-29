@@ -228,8 +228,20 @@ private fun GoalSheet(editor: GoalEditor, state: GoalsUiState, actions: GoalsAct
     val thisMonth = LocalDate.now().let { YearMonth.of(it.year, it.monthValue) }
     var month by remember { mutableStateOf(existing?.targetMonth ?: thisMonth.plus(12)) }
     var confirmRemove by remember { mutableStateOf(false) }
+    var creating by remember { mutableStateOf(false) }
     val parsed = MoneyInput.parse(amount)?.takeIf { it.minor >= 100 }
 
+    if (creating) {
+        app.centsible.core.ui.CategoryPickerSheet(
+            title = "Save in",
+            selected = category?.id,
+            includeIncome = false,
+            startCreating = true,
+            onPick = { creating = false },
+            onPickNamed = { id, name, group -> category = GoalCategory(id, name, group) },
+            onDismiss = { creating = false },
+        )
+    }
     ModalBottomSheet(onDismissRequest = { actions.edit(null) }, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true), containerColor = colors.card) {
         Column(
             Modifier.fillMaxWidth().padding(horizontal = 20.dp).navigationBarsPadding().verticalScroll(rememberScrollState()),
@@ -238,9 +250,11 @@ private fun GoalSheet(editor: GoalEditor, state: GoalsUiState, actions: GoalsAct
             Text(if (existing == null) "New goal" else existing.name, style = MaterialTheme.typography.titleLarge)
             if (existing == null) {
                 StatLabel("Save in")
-                if (state.available.isEmpty()) Text("Every category already has a goal.", style = MaterialTheme.typography.bodyMedium)
+                // A category made just now shows here (and chosen) before the list reloads.
+                val choices = state.available + listOfNotNull(category?.takeIf { c -> state.available.none { it.id == c.id } })
+                if (choices.isEmpty()) Text("Every category already has a goal.", style = MaterialTheme.typography.bodyMedium)
                 Column {
-                    state.available.forEach { c ->
+                    choices.forEach { c ->
                         Row(
                             Modifier.fillMaxWidth().selectable(category?.id == c.id, role = Role.RadioButton) { category = c }.padding(vertical = 2.dp),
                             verticalAlignment = Alignment.CenterVertically,
@@ -250,6 +264,11 @@ private fun GoalSheet(editor: GoalEditor, state: GoalsUiState, actions: GoalsAct
                             Text(c.name, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
                             Text(c.groupName, style = MaterialTheme.typography.bodySmall, color = colors.textTertiary)
                         }
+                    }
+                    TextButton(onClick = { creating = true }) {
+                        Icon(Icons.Rounded.Add, contentDescription = null)
+                        Spacer(Modifier.width(6.dp))
+                        Text("Create a category")
                     }
                 }
             }

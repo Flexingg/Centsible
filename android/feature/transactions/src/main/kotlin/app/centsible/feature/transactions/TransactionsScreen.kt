@@ -275,13 +275,12 @@ fun TransactionsScreen(
     val d = state.data.valueOrNull
     if (state.categorizing != null && d != null) {
         val current = state.categorizing.singleOrNull()?.let { id -> d.items.firstOrNull { it.id == id }?.categoryId?.raw }
-        app.centsible.core.designsystem.component.PickerSheet(
+        app.centsible.core.ui.CategoryPickerSheet(
             title = if (state.categorizing.size == 1) "Category" else "Category for ${state.categorizing.size}",
-            items = listOf(app.centsible.core.designsystem.component.PickerItem(NO_CATEGORY, "No category")) +
-                d.categories.map { app.centsible.core.designsystem.component.PickerItem(it.id.raw, it.name, section = it.group, emoji = true) },
-            selectedKey = current,
-            onPick = { item -> actions.pickCategory(item.key.takeIf { it != NO_CATEGORY }?.let { app.centsible.core.model.CategoryId(it) }) },
+            selected = current?.let { app.centsible.core.model.CategoryId(it) },
+            onPick = actions.pickCategory,
             onDismiss = actions.dismissPicker,
+            allowNone = true,
         )
     }
     if (state.moving != null && d != null) {
@@ -296,7 +295,6 @@ fun TransactionsScreen(
     }
 }
 
-private const val NO_CATEGORY = "__none__"
 
 /** Multi-select: what's chosen, and what to do with it. */
 @Composable

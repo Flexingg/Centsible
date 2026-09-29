@@ -131,6 +131,7 @@ actual-monarch-android/
    ├─ core/engine-bridge/    BudgetEngine over the /v1 contract
    ├─ core/data/             encrypted session store, DI bindings (the engine seam)
    ├─ core/designsystem/     theme + components (MoneyText, progress bars, avatars, cards)
+   ├─ core/ui/               shared screens-with-data pieces (CategoryPickerSheet), used by every feature
    ├─ core/extensions/       extension points (DashboardWidget, …)
    ├─ core/testing/          FakeBudgetEngine + sample household for tests and screenshots
    └─ feature/               onboarding, dashboard, accounts, transactions, budget, settings
@@ -573,6 +574,8 @@ Programmable budgets (automations)
 
 Transactions: review, bulk edits, running balance, tap-through
 - Review inbox, per person: transactions added since that person last caught up, plus anything uncategorized, minus what they reviewed one by one. "Added since" uses Actual's `sort_order`, which defaults to the creation time in ms (verified in 26.9.0's schema), and a per-member watermark kept in the bridge's household.sqlite (`review_state`, `reviewed`); Actual has no reviewed flag. Your own new or edited transactions count as reviewed for you. The first look starts two weeks back. Mark all moves the watermark to now. The app shows it as a stack of cards (swipe right: looks right; left: later) and a Home card with the count.
+- Make rule from the queue: a card with a merchant has Make rule, and choosing a category for one offers "Always put X in Y?" for a few seconds. Both open the rule editor filled in (payee is X → set category Y), with its live preview of what else it would change.
+- Categories wherever one is chosen (transaction list and editor, splits, review queue, rule editor, goals): one shared picker (`core/ui/CategoryPicker.kt`) that searches, creates a category (in a group or a new group) and chooses it, renames or hides one in place. Creating needs write access and `categories.write`. Screens that hold categories reload them on `BudgetChanges`, so a new one shows by name without losing the form.
 - Bulk edit and delete (`POST /transactions/batch`): one change to many rows; a split's parent can't take a category, a split's part can't move or be deleted on its own, and those are skipped and reported rather than failing the lot. In the list: long-press to select, swipe right to set a category, swipe left to delete. Deletes wait four seconds for Undo before they are sent.
 - Running balance: for one account's unfiltered list, the bridge returns the balance after each row (today's balance, less everything newer), in the same order Actual shows (date, then sort_order, newest first). Any other filter turns it off, since a running balance of a filtered list means nothing.
 - Tap-through: dial segments (category group), budget categories, spending and trend rows, Year in Review categories and merchants, merchants and subscriptions open the transactions behind the number (new `groupId` and `payeeId` filters).

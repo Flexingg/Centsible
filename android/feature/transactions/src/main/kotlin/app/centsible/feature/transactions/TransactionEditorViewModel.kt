@@ -78,6 +78,7 @@ class TransactionEditorViewModel @Inject constructor(
     private val sessions: SessionStore,
     private val planning: app.centsible.core.domain.PlanningGateway,
     private val undo: app.centsible.core.domain.UndoCenter,
+    changes: app.centsible.core.domain.BudgetChanges,
 ) : ViewModel() {
     private val transactionId: String? = savedState.get<String>(ARG_ID)?.takeIf { it.isNotBlank() }
     private val presetAccount: String? = savedState.get<String>(ARG_ACCOUNT)?.takeIf { it.isNotBlank() }
@@ -87,7 +88,16 @@ class TransactionEditorViewModel @Inject constructor(
     val uiState: StateFlow<EditorUiState> = state.asStateFlow()
     private var budget: BudgetId? = null
 
-    init { load() }
+    init {
+        load()
+        // A category made from the picker shows up by name without losing the form.
+        viewModelScope.launch {
+            changes.changes.collect {
+                val b = budget ?: return@collect
+                runCatching { engine.categoryGroups(b) }.onSuccess { g -> state.update { it.copy(groups = g) } }
+            }
+        }
+    }
 
     fun load() = viewModelScope.launch {
         state.update { it.copy(loading = true, loadError = null) }

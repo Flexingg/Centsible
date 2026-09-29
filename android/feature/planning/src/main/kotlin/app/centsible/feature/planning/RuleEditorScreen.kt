@@ -437,7 +437,14 @@ private fun IdPick(kind: IdKind, selected: String?, data: RuleEditorData, enable
     OutlinedButton(onClick = { open = true }, enabled = enabled, modifier = Modifier.fillMaxWidth()) {
         Text(selected?.let { nameOf(kind, it, data) } ?: "Choose ${kindLabel(kind)}", maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
-    if (open) PickerSheet("Choose ${kindLabel(kind)}", pickerItems(kind, data), selected, onPick = { onPick(it.key); open = false }, onDismiss = { open = false })
+    if (open && kind == IdKind.Category) {
+        app.centsible.core.ui.CategoryPickerSheet(
+            title = "Choose category",
+            selected = selected?.let { app.centsible.core.model.CategoryId(it) },
+            onPick = { id -> id?.let { onPick(it.raw) }; open = false },
+            onDismiss = { open = false },
+        )
+    } else if (open) PickerSheet("Choose ${kindLabel(kind)}", pickerItems(kind, data), selected, onPick = { onPick(it.key); open = false }, onDismiss = { open = false })
 }
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -451,7 +458,15 @@ private fun IdList(kind: IdKind, ids: List<String>, data: RuleEditorData, enable
         }
         if (enabled) AssistChip(onClick = { open = true }, label = { Text("Add ${kindLabel(kind)}") }, leadingIcon = { Icon(Icons.Rounded.Add, contentDescription = null) })
     }
-    if (open) PickerSheet("Add ${kindLabel(kind)}", pickerItems(kind, data).filter { it.key !in ids }, null, onPick = { onChange(ids + it.key); open = false }, onDismiss = { open = false })
+    if (open && kind == IdKind.Category) {
+        app.centsible.core.ui.CategoryPickerSheet(
+            title = "Add category",
+            selected = null,
+            exclude = ids.map { app.centsible.core.model.CategoryId(it) }.toSet(),
+            onPick = { id -> id?.let { onChange(ids + it.raw) }; open = false },
+            onDismiss = { open = false },
+        )
+    } else if (open) PickerSheet("Add ${kindLabel(kind)}", pickerItems(kind, data).filter { it.key !in ids }, null, onPick = { onChange(ids + it.key); open = false }, onDismiss = { open = false })
 }
 
 @Composable
