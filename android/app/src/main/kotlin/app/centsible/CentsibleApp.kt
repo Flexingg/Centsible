@@ -51,6 +51,8 @@ import app.centsible.core.designsystem.component.LoadingState
 import app.centsible.core.designsystem.theme.CentsibleTheme
 import app.centsible.core.extensions.Destination
 import app.centsible.core.model.AccountId
+import app.centsible.core.model.CategoryId
+import app.centsible.core.model.YearMonth
 import app.centsible.core.model.TransactionId
 import app.centsible.feature.accounts.AccountDetailRoute
 import app.centsible.feature.accounts.AccountDetailViewModel
@@ -105,6 +107,10 @@ private object Routes {
     const val SEARCH = "transactions/search?${TransactionsViewModel.ARG_QUERY}={${TransactionsViewModel.ARG_QUERY}}"
 
     const val REVIEW = "review"
+    const val AUTOMATIONS = "automations?month={month}"
+    fun automations(month: YearMonth) = "automations?month=${month.raw}"
+    const val AUTOMATION = "automation/{category}?month={month}"
+    fun automation(category: CategoryId, month: YearMonth) = "automation/${category.raw}?month=${month.raw}"
     const val TRANSACTIONS_FOR = "transactions/for?${TransactionsViewModel.ARG_TITLE}={${TransactionsViewModel.ARG_TITLE}}" +
         "&${TransactionsViewModel.ARG_CATEGORY}={${TransactionsViewModel.ARG_CATEGORY}}&${TransactionsViewModel.ARG_GROUP}={${TransactionsViewModel.ARG_GROUP}}" +
         "&${TransactionsViewModel.ARG_PAYEE}={${TransactionsViewModel.ARG_PAYEE}}&${TransactionsViewModel.ARG_SINCE}={${TransactionsViewModel.ARG_SINCE}}" +
@@ -229,7 +235,11 @@ private fun MainScaffold(
             composable(Tab.Dashboard.route) { DashboardRoute(onNavigate = { nav.go(it) }) }
             composable(Tab.Accounts.route) { AccountsRoute(onOpenAccount = { nav.navigate(Routes.account(it)) }) }
             composable(Tab.Transactions.route) { TransactionsRoute(onOpen = { nav.navigate(Routes.transaction(it)) }, onOpenReview = { nav.navigate(Routes.REVIEW) }) }
-            composable(Tab.Budget.route) { BudgetRoute(onManageCategories = { nav.navigate(Routes.CATEGORIES) }, onOpenTransactions = { nav.go(it) }) }
+            composable(Tab.Budget.route) { BudgetRoute(
+                    onManageCategories = { nav.navigate(Routes.CATEGORIES) },
+                    onOpenTransactions = { nav.go(it) },
+                    onOpenAutomations = { c, m -> nav.navigate(if (c == null) Routes.automations(m) else Routes.automation(c, m)) },
+                ) }
             composable(Tab.More.route) {
                 MoreScreen(onOpen = { item ->
                     nav.navigate(
@@ -289,6 +299,15 @@ private fun MainScaffold(
             composable(Routes.MERCHANTS) { MerchantsRoute(onBack = { nav.popBackStack() }, onOpenTransactions = { nav.go(it) }) }
             composable(Routes.RULES) { RulesRoute(onBack = { nav.popBackStack() }) }
             composable(Routes.TAGS) { TagsRoute(onBack = { nav.popBackStack() }, onSearch = { nav.navigate(Routes.search(it)) }) }
+            composable(Routes.AUTOMATIONS, arguments = listOf(navArgument("month") { type = NavType.StringType; defaultValue = "" })) {
+                app.centsible.feature.budget.AutomationsRoute(onBack = { nav.popBackStack() }, onOpen = { c, m -> nav.navigate(Routes.automation(c, m)) })
+            }
+            composable(
+                Routes.AUTOMATION,
+                arguments = listOf(navArgument("category") { type = NavType.StringType }, navArgument("month") { type = NavType.StringType; defaultValue = "" }),
+            ) {
+                app.centsible.feature.budget.AutomationEditorRoute(onDone = { nav.popBackStack() })
+            }
             composable(Routes.REVIEW) {
                 app.centsible.feature.transactions.ReviewRoute(onBack = { nav.popBackStack() }, onOpen = { nav.navigate(Routes.transaction(it)) })
             }

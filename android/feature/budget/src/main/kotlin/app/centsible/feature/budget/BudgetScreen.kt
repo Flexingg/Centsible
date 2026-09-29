@@ -62,6 +62,7 @@ import app.centsible.core.model.Money
 fun BudgetRoute(
     onManageCategories: () -> Unit,
     onOpenTransactions: (app.centsible.core.extensions.Destination.TransactionsFor) -> Unit = {},
+    onOpenAutomations: (app.centsible.core.model.CategoryId?, app.centsible.core.model.YearMonth) -> Unit = { _, _ -> },
     viewModel: BudgetViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -87,6 +88,7 @@ fun BudgetRoute(
             openCover = viewModel::openCover,
             cover = { viewModel.coverOverspending() },
             openTransactions = onOpenTransactions,
+            openAutomations = onOpenAutomations,
         ),
     )
 }
@@ -140,11 +142,15 @@ fun BudgetScreen(
                             }
                             if (state.canApplyGoals) {
                                 androidx.compose.material3.DropdownMenuItem(
-                                    text = { Text("Apply goals") },
+                                    text = { Text("Automations…") },
+                                    onClick = { goalsMenu = false; plan.openAutomations(null, state.month) },
+                                )
+                                androidx.compose.material3.DropdownMenuItem(
+                                    text = { Text("Run automations") },
                                     onClick = { goalsMenu = false; onApplyGoals(false) },
                                 )
                                 androidx.compose.material3.DropdownMenuItem(
-                                    text = { Text("Apply goals, overwriting amounts") },
+                                    text = { Text("Run automations, overwriting amounts") },
                                     onClick = { goalsMenu = false; onApplyGoals(true) },
                                 )
                             }
@@ -209,6 +215,7 @@ fun BudgetScreen(
             onMove = onMove,
             onRollover = { onRollover(selected.id, it) },
             onSaveNote = { onSaveNote(selected.id, it) },
+            onAutomations = { onOpenCategory(null); plan.openAutomations(selected.id, month.month) }.takeIf { state.canApplyGoals },
             onSeeTransactions = {
                 onOpenCategory(null)
                 plan.openTransactions(app.centsible.core.extensions.Destination.TransactionsFor.month(selected.name, month.month, categoryId = selected.id))

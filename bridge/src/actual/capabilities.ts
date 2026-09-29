@@ -44,6 +44,7 @@ export function capabilities(host: ActualHost) {
     'reports.spending': has('aqlQuery'),
     'reports.netWorth': has('aqlQuery'),
     'budget.templates': !host.isFeatureDisabled('budget.templates'),
+    'budget.automations': !host.isFeatureDisabled('budget.automations'),
     'notes.categories': has('getNote') && has('updateNote'),
     'budget.envelope': has('getBudgetMonth') && has('setBudgetAmount'),
     'budget.tracking': false, // not implemented in the bridge yet

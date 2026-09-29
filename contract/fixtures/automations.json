@@ -1,0 +1,167 @@
+{
+  "month": "2026-09",
+  "categories": [
+    {
+      "categoryId": "541836f1-e756-4473-a5d0-6c1d3f06c7fa",
+      "name": "Food",
+      "groupId": "fc3825fd-b982-4b72-b768-5b30844cf832",
+      "groupName": "Usual Expenses",
+      "isIncome": false,
+      "hidden": false,
+      "source": "ui",
+      "automations": [
+        {
+          "type": "average",
+          "priority": 1,
+          "months": 3,
+          "adjustment": {
+            "kind": "percent",
+            "value": 10
+          }
+        },
+        {
+          "type": "refill",
+          "priority": 2,
+          "limit": {
+            "amount": 60000,
+            "hold": true,
+            "period": "monthly",
+            "start": null
+          }
+        },
+        {
+          "type": "goal",
+          "amount": 100000
+        }
+      ],
+      "projected": 60000
+    },
+    {
+      "categoryId": "af375fd4-d759-46b3-bffe-74a856151d57",
+      "name": "General",
+      "groupId": "fc3825fd-b982-4b72-b768-5b30844cf832",
+      "groupName": "Usual Expenses",
+      "isIncome": false,
+      "hidden": false,
+      "source": "ui",
+      "automations": [
+        {
+          "type": "periodic",
+          "priority": 0,
+          "amount": 2500,
+          "every": {
+            "unit": "week",
+            "count": 1
+          },
+          "starting": "2026-09-01",
+          "limit": null
+        },
+        {
+          "type": "copy",
+          "priority": 3,
+          "monthsAgo": 12
+        },
+        {
+          "type": "percentage",
+          "priority": 4,
+          "percent": 5,
+          "of": "all income",
+          "previous": true
+        },
+        {
+          "type": "remainder",
+          "weight": 2,
+          "limit": {
+            "amount": 5000,
+            "hold": false,
+            "period": "weekly",
+            "start": "2026-09-01"
+          }
+        }
+      ],
+      "projected": 25000
+    },
+    {
+      "categoryId": "d4b0f075-3343-4408-91ed-fae94f74e5bf",
+      "name": "Bills",
+      "groupId": "fc3825fd-b982-4b72-b768-5b30844cf832",
+      "groupName": "Usual Expenses",
+      "isIncome": false,
+      "hidden": false,
+      "source": "ui",
+      "automations": [
+        {
+          "type": "by",
+          "priority": 0,
+          "amount": 120000,
+          "month": "2027-03",
+          "repeat": {
+            "unit": "year",
+            "count": 1
+          },
+          "spendFrom": null
+        },
+        {
+          "type": "by",
+          "priority": 0,
+          "amount": 30000,
+          "month": "2026-12",
+          "repeat": null,
+          "spendFrom": "2026-10"
+        },
+        {
+          "type": "simple",
+          "priority": 5,
+          "monthly": 1000,
+          "limit": null,
+          "description": "Buffer"
+        }
+      ],
+      "projected": 25643
+    },
+    {
+      "categoryId": "29ec2c58-8cd3-42fe-9187-7b5dfe0f70a6",
+      "name": "Bills (Flexible)",
+      "groupId": "fc3825fd-b982-4b72-b768-5b30844cf832",
+      "groupName": "Usual Expenses",
+      "isIncome": false,
+      "hidden": false,
+      "source": "none",
+      "automations": [],
+      "projected": null
+    },
+    {
+      "categoryId": "6bbd8472-25d4-4cee-8a11-5bd9f7e83d61",
+      "name": "Savings",
+      "groupId": "a137772f-cf2f-4089-9432-822d2ddc1466",
+      "groupName": "Investments and Savings",
+      "isIncome": false,
+      "hidden": false,
+      "source": "none",
+      "automations": [],
+      "projected": null
+    },
+    {
+      "categoryId": "3c1699a5-522a-435e-86dc-93d900a14f0e",
+      "name": "Income",
+      "groupId": "2E1F5BDB-209B-43F9-AF2C-3CE28E380C00",
+      "groupName": "Income",
+      "isIncome": true,
+      "hidden": false,
+      "source": "none",
+      "automations": [],
+      "projected": null
+    },
+    {
+      "categoryId": "506e8d9d-7ed0-4397-84e4-07a9185dc6b2",
+      "name": "Starting Balances",
+      "groupId": "2E1F5BDB-209B-43F9-AF2C-3CE28E380C00",
+      "groupName": "Income",
+      "isIncome": true,
+      "hidden": false,
+      "source": "none",
+      "automations": [],
+      "projected": null
+    }
+  ]
+}

@@ -3,6 +3,7 @@ import { ApiError } from '../errors.js';
 import type { BudgetOps } from './budget-ops.js';
 import type { ActualHost } from './host.js';
 import { dateRange } from './report-ops.js';
+import { fromActual, toActual, type AutomationDto } from './automation-ops.js';
 
 type Raw = Record<string, unknown>;
 type MonthCategory = { id: string; name: string; groupName: string; budgeted: number; spent: number; balance: number };
@@ -156,10 +157,13 @@ export class PlanOps {
       const [current, ...history] = (await Promise.all([at, ...past].map((m) => api.getBudgetMonth(m)))) as Raw[];
       const cats = expenseCategories(current!);
       const historyCats = history.map(expenseCategories);
+      const automated = await automatedGoals();
       const items = [];
       for (const c of cats) {
-        const note = ((await api.getNote(c.id)) as { note?: string | null } | null)?.note ?? '';
-        const goal = parseGoal(note);
+        // Categories saved as automations keep their goal there; the rest in #goal/#template notes.
+        const goal = automated.has(c.id)
+          ? automated.get(c.id)!
+          : parseGoal(((await api.getNote(c.id)) as { note?: string | null } | null)?.note ?? '');
         if (!goal) continue;
         // What's been going in lately: the average budgeted over up to three earlier months, and this one.
         const contributions = [c.budgeted, ...historyCats.map((h) => h.find((x) => x.id === c.id)?.budgeted ?? 0)];
@@ -172,13 +176,27 @@ export class PlanOps {
 
   /** Writes the goal as a line in the category's notes (where Actual keeps templates); other lines stay. */
   setGoal(budgetId: string, categoryId: string, goal: GoalInput | null) {
-    return this.host.withBudget(budgetId, 'write', async () => {
+    return this.host.withBudget(budgetId, 'write', async (lib) => {
       const cat = (await api.getCategories()).find((c) => c.id === categoryId);
       if (!cat) throw ApiError.notFound(`Category ${categoryId} not found`);
       if (cat.is_income) throw ApiError.validation('Income categories can’t have savings goals.');
       if (goal?.kind === 'by') {
         if (!goal.targetMonth) throw ApiError.validation('Choose the month to reach the goal by.');
         if (goal.targetMonth < currentMonth()) throw ApiError.validation('Choose a month from now on.');
+      }
+      const automated = await automationsIfUi(categoryId);
+      if (automated) {
+        // Swap the goal in the category's automations; the rest stay as they are.
+        const kept = fromActual(automated).filter((a) => a.type !== 'goal' && a.type !== 'by' && a.type !== 'error');
+        const next: AutomationDto[] = goal
+          ? [...kept, goal.kind === 'balance' ? { type: 'goal', amount: goal.target } : { type: 'by', priority: 0, amount: goal.target, month: goal.targetMonth!, repeat: null, spendFrom: null }]
+          : kept;
+        await this.host.internal('budget.automations', lib, 'budget/set-category-automations', {
+          categoriesWithTemplates: [{ id: categoryId, templates: toActual(next) }],
+          source: 'ui',
+        });
+        await settle();
+        return;
       }
       const note = ((await api.getNote(categoryId)) as { note?: string | null } | null)?.note ?? '';
       const kept = note.split('\n').filter((line) => !GOAL_LINE.test(line) && !BY_LINE.test(line));
@@ -319,6 +337,49 @@ type ForecastEvent = {
 
 export type GoalInput = { kind: 'balance' | 'by'; target: number; targetMonth?: string | null };
 type ParsedGoal = { kind: 'balance' | 'by'; target: number; targetMonth: string | null; line: string };
+
+/** Categories whose automations were saved as data ('ui'), with their goal if they have one. */
+async function automatedGoals(): Promise<Map<string, ParsedGoal | null>> {
+  const { data } = (await api.aqlQuery(api.q('categories').select(['id', 'goal_def', 'template_settings']))) as { data: Raw[] };
+  const out = new Map<string, ParsedGoal | null>();
+  for (const r of data) {
+    const list = uiList(r);
+    if (!list) continue;
+    const automations = fromActual(list);
+    const g = automations.find((a) => a.type === 'goal');
+    const by = automations.find((a) => a.type === 'by');
+    out.set(
+      String(r.id),
+      g && g.type === 'goal'
+        ? { kind: 'balance', target: g.amount, targetMonth: null, line: '' }
+        : by && by.type === 'by'
+          ? { kind: 'by', target: by.amount, targetMonth: by.month, line: '' }
+          : null,
+    );
+  }
+  return out;
+}
+
+async function automationsIfUi(categoryId: string): Promise<Raw[] | null> {
+  const { data } = (await api.aqlQuery(api.q('categories').filter({ id: categoryId }).select(['id', 'goal_def', 'template_settings']))) as { data: Raw[] };
+  return data[0] ? uiList(data[0]) : null;
+}
+
+/** The stored automation list when the category's source is 'ui', else null. */
+function uiList(r: Raw): Raw[] | null {
+  const settings = typeof r.template_settings === 'string' ? safeParse(r.template_settings) : (r.template_settings as Raw | null);
+  if ((settings as Raw | null)?.source !== 'ui') return null;
+  const def = typeof r.goal_def === 'string' ? safeParse(r.goal_def) : r.goal_def;
+  return Array.isArray(def) ? (def as Raw[]) : [];
+}
+
+function safeParse(s: string): unknown {
+  try {
+    return JSON.parse(s);
+  } catch {
+    return null;
+  }
+}
 
 /** `#goal 5000`: keep a balance of at least this. */
 const GOAL_LINE = /^\s*#goal\s+\$?([\d,]+(?:\.\d+)?)\s*$/i;

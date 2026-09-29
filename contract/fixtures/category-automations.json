@@ -1,0 +1,37 @@
+{
+  "categoryId": "541836f1-e756-4473-a5d0-6c1d3f06c7fa",
+  "source": "ui",
+  "automations": [
+    {
+      "type": "average",
+      "priority": 1,
+      "months": 3,
+      "adjustment": {
+        "kind": "percent",
+        "value": 10
+      }
+    },
+    {
+      "type": "refill",
+      "priority": 2,
+      "limit": {
+        "amount": 60000,
+        "hold": true,
+        "period": "monthly",
+        "start": null
+      }
+    },
+    {
+      "type": "goal",
+      "amount": 100000
+    }
+  ],
+  "notesHaveTemplates": false,
+  "month": "2026-09",
+  "projected": 60000,
+  "perAutomation": [
+    33000,
+    27000,
+    0
+  ]
+}

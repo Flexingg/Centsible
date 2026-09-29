@@ -1,3 +1,4 @@
+import type { AutomationOps } from '../actual/automation-ops.js';
 import type { ReviewOps } from '../actual/review-ops.js';
 import Fastify, { type FastifyError, type FastifyInstance, type FastifyRequest } from 'fastify';
 import type { ActualHost } from '../actual/host.js';
@@ -24,6 +25,7 @@ import { budgetRoutes } from './routes/budgets.js';
 import { householdRoutes } from './routes/household.js';
 import { structureRoutes } from './routes/structure.js';
 import { transactionRoutes } from './routes/transactions.js';
+import { automationRoutes } from './routes/automations.js';
 import { planningRoutes } from './routes/planning.js';
 import { planRoutes } from './routes/plan.js';
 import { insightsRoutes } from './routes/insights.js';
@@ -40,6 +42,7 @@ export type Deps = {
   ops: BudgetOps;
   transactions: TransactionOps;
   review: ReviewOps;
+  automations: AutomationOps;
   structure: StructureOps;
   planning: PlanningOps;
   plan: PlanOps;
@@ -118,6 +121,7 @@ export async function buildServer(deps: Deps, opts: { logger?: boolean | object 
   await app.register(householdRoutes(deps));
   await app.register(budgetRoutes(deps));
   await app.register(transactionRoutes(deps));
+  await app.register(automationRoutes(deps));
   await app.register(structureRoutes(deps));
   await app.register(planningRoutes(deps));
   await app.register(planRoutes(deps));

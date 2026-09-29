@@ -65,6 +65,7 @@ internal fun CategorySheet(
     onRollover: (Boolean) -> Unit,
     onSaveNote: (String) -> Unit = {},
     onSeeTransactions: (() -> Unit)? = null,
+    onAutomations: (() -> Unit)? = null,
 ) {
     var mode by remember { mutableStateOf(SheetMode.Details) }
     ModalBottomSheet(
@@ -75,7 +76,7 @@ internal fun CategorySheet(
         Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp).navigationBarsPadding().padding(bottom = 16.dp)) {
             when (mode) {
                 SheetMode.Details -> {
-                    CategoryDetails(category, state, onAssign, onRollover, onMoveMoney = { mode = SheetMode.Move }, onSeeTransactions = onSeeTransactions)
+                    CategoryDetails(category, state, onAssign, onRollover, onMoveMoney = { mode = SheetMode.Move }, onSeeTransactions = onSeeTransactions, onAutomations = onAutomations)
                     if (state.canEditNotes) NoteEditor(category.id, state, onSaveNote)
                 }
                 SheetMode.Move -> MoveMoneyForm(category, month, onBack = { mode = SheetMode.Details }, onMove = { from, to, amount ->
@@ -95,6 +96,7 @@ private fun CategoryDetails(
     onRollover: (Boolean) -> Unit,
     onMoveMoney: () -> Unit,
     onSeeTransactions: (() -> Unit)? = null,
+    onAutomations: (() -> Unit)? = null,
 ) {
     val colors = CentsibleTheme.colors
     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -141,6 +143,9 @@ private fun CategoryDetails(
         Spacer(Modifier.height(12.dp))
         if (state.canMoveMoney) {
             OutlinedButton(onClick = onMoveMoney, modifier = Modifier.fillMaxWidth()) { Text("Move money") }
+        }
+        onAutomations?.let { open ->
+            androidx.compose.material3.TextButton(onClick = open, modifier = Modifier.fillMaxWidth()) { Text("Automations") }
         }
         onSeeTransactions?.let { see ->
             androidx.compose.material3.TextButton(onClick = see, modifier = Modifier.fillMaxWidth()) { Text("See this month's transactions") }

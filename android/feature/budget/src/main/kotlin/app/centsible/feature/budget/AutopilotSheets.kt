@@ -50,6 +50,8 @@ data class BudgetPlanActions(
     val cover: () -> Unit = {},
     /** Tap-through to the transactions behind a number. */
     val openTransactions: (app.centsible.core.extensions.Destination.TransactionsFor) -> Unit = {},
+    /** The automations screen, or one category's automations. */
+    val openAutomations: (app.centsible.core.model.CategoryId?, app.centsible.core.model.YearMonth) -> Unit = { _, _ -> },
 )
 
 /**
