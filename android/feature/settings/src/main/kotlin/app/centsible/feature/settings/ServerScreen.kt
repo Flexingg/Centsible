@@ -337,7 +337,7 @@ private fun BackupsCard(b: Loadable<BackupOverview>, state: ServerUiState, actio
                     androidx.compose.animation.AnimatedContent(state.backedUp, label = "backup") { done ->
                         if (done != null) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                app.centsible.core.designsystem.component.AnimatedCheck(size = 20.dp, key = done, description = null)
+                                app.centsible.core.designsystem.component.AnimatedCheck(size = 20.dp, key = done, description = null, haptic = true)
                                 Spacer(Modifier.width(8.dp))
                                 Text("Backed up")
                             }

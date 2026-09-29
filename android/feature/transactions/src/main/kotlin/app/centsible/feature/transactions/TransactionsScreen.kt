@@ -346,6 +346,13 @@ private fun SwipeActions(enabled: Boolean, onCategorize: (() -> Unit)?, onDelete
             }
         },
     )
+    // A bump as the swipe passes the point where letting go will act.
+    val haptics = app.centsible.core.designsystem.motion.rememberHaptics()
+    androidx.compose.runtime.LaunchedEffect(state) {
+        androidx.compose.runtime.snapshotFlow { state.targetValue }.collect { v ->
+            if (v != androidx.compose.material3.SwipeToDismissBoxValue.Settled) haptics.threshold()
+        }
+    }
     androidx.compose.material3.SwipeToDismissBox(
         state = state,
         enableDismissFromStartToEnd = onCategorize != null,

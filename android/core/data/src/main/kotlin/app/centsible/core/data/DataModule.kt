@@ -104,6 +104,11 @@ abstract class DataModule {
 
         @Provides
         @Singleton
+        fun personal(client: BridgeClient, changes: NotifyingBudgetEngine): app.centsible.core.domain.PersonalGateway =
+            app.centsible.core.engine.bridge.BridgePersonal(app.centsible.core.network.PersonalApi(client), changes::notifyChanged)
+
+        @Provides
+        @Singleton
         fun ruleTools(client: BridgeClient, changes: NotifyingBudgetEngine): app.centsible.core.domain.RuleTools =
             app.centsible.core.engine.bridge.BridgeRuleTools(app.centsible.core.network.RuleToolsApi(client), changes::notifyChanged)
 

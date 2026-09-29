@@ -103,4 +103,43 @@ class DashboardScreenshotTest {
         compose.onRoot().captureRoboImage("screenshots/budget_dial_dark.png")
         app.centsible.core.uitesting.A11y.assertOk(compose)
     }
+
+    @Test fun dashboard_arranging() {
+        val list = listOf(ReviewWidget() to true, BudgetDialWidget() to true, NetWorthWidget() to false, BudgetSummaryWidget() to true, RecentTransactionsWidget() to true)
+        compose.setContent {
+            CentsibleTheme(darkTheme = false) {
+                DashboardScreen(DashboardUiState("Jo", Loadable.Ready(context), emptyList(), arranging = list), onNavigate = {}, onRetry = {}, now = LocalTime.of(9, 0))
+            }
+        }
+        compose.onRoot().captureRoboImage("screenshots/dashboard_arranging.png")
+        app.centsible.core.uitesting.A11y.assertOk(compose)
+    }
+
+    /** The household chose colors and emoji: the dial and avatars follow them. */
+    @Test fun budget_dial_custom_colors() {
+        val groups = SampleHousehold.budgetMonth.expenseGroups
+        val home = groups.first { it.name == "Home" }
+        val food = groups.first { it.name == "Food" }
+        val look = app.centsible.core.designsystem.component.CategoryLook.of(
+            mapOf(
+                home.id.raw to app.centsible.core.model.Appearance(0xFFB79CE8),
+                food.id.raw to app.centsible.core.model.Appearance(0xFFEFA3C1),
+                food.categories.first().id.raw to app.centsible.core.model.Appearance(0xFFEFA3C1, "🥑"),
+            ),
+            groups.flatMap { g -> listOf(g.id.raw to g.name) + g.categories.map { it.id.raw to it.name } }.toMap(),
+        )
+        compose.setContent {
+            androidx.compose.runtime.CompositionLocalProvider(app.centsible.core.designsystem.component.LocalCategoryLook provides look) {
+                CentsibleTheme(darkTheme = false) {
+                    androidx.compose.foundation.layout.Column(androidx.compose.ui.Modifier.padding(16.dp)) {
+                        BudgetDialWidget().Content(context)
+                        androidx.compose.foundation.layout.Spacer(androidx.compose.ui.Modifier.padding(6.dp))
+                        BudgetSummaryWidget().Content(context)
+                    }
+                }
+            }
+        }
+        compose.onRoot().captureRoboImage("screenshots/budget_dial_custom_colors.png")
+        app.centsible.core.uitesting.A11y.assertOk(compose)
+    }
 }

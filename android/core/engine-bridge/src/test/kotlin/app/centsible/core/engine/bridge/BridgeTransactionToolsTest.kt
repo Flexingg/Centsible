@@ -85,3 +85,12 @@ class BridgeTransactionToolsTest {
         for (i in 1 until balances.size) assertEquals(balances[i - 1].minor - page.items[i - 1].amount.minor, balances[i].minor)
     }
 }
+
+class AppearanceColorTest {
+    @Test
+    fun `colors go to the bridge and back`() {
+        assertEquals(0xFF7FD1A8L, parseColor("#7FD1A8"))
+        assertEquals("#7FD1A8", formatColor(0xFF7FD1A8L))
+        assertEquals(null, parseColor("#123"))
+    }
+}

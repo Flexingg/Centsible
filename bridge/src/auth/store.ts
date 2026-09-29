@@ -83,6 +83,21 @@ const MIGRATIONS: string[] = [
      at TEXT NOT NULL,
      PRIMARY KEY (member_id, budget_id, transaction_id)
    );`,
+  // 4: each person's Home layout, and category colors/emoji shared by the household
+  // (Actual has neither).
+  `CREATE TABLE member_prefs (
+     member_id TEXT NOT NULL REFERENCES members(id) ON DELETE CASCADE,
+     key TEXT NOT NULL,
+     value TEXT NOT NULL,
+     PRIMARY KEY (member_id, key)
+   );
+   CREATE TABLE category_appearance (
+     budget_id TEXT NOT NULL,
+     category_id TEXT NOT NULL,
+     color TEXT,
+     emoji TEXT,
+     PRIMARY KEY (budget_id, category_id)
+   );`,
 ];
 
 const sha256 = (s: string) => createHash('sha256').update(s).digest('hex');
@@ -126,6 +141,40 @@ export class HouseholdStore {
         this.db.pragma(`user_version = ${v + 1}`);
       })();
     }
+  }
+
+  // ── Personal preferences and category appearance ─────────────────────────
+
+  getMemberPref<T>(memberId: string, key: string): T | null {
+    const row = this.db.prepare('SELECT value FROM member_prefs WHERE member_id = ? AND key = ?').get(memberId, key) as { value: string } | undefined;
+    return row ? (JSON.parse(row.value) as T) : null;
+  }
+
+  setMemberPref(memberId: string, key: string, value: unknown) {
+    this.db
+      .prepare('INSERT INTO member_prefs (member_id, key, value) VALUES (?, ?, ?) ON CONFLICT(member_id, key) DO UPDATE SET value = excluded.value')
+      .run(memberId, key, JSON.stringify(value));
+  }
+
+  categoryAppearance(budgetId: string): { categoryId: string; color: string | null; emoji: string | null }[] {
+    const rows = this.db.prepare('SELECT category_id, color, emoji FROM category_appearance WHERE budget_id = ? ORDER BY category_id').all(budgetId) as {
+      category_id: string;
+      color: string | null;
+      emoji: string | null;
+    }[];
+    return rows.map((r) => ({ categoryId: r.category_id, color: r.color, emoji: r.emoji }));
+  }
+
+  setCategoryAppearance(budgetId: string, categoryId: string, color: string | null, emoji: string | null) {
+    if (color === null && emoji === null) {
+      this.db.prepare('DELETE FROM category_appearance WHERE budget_id = ? AND category_id = ?').run(budgetId, categoryId);
+      return;
+    }
+    this.db
+      .prepare(
+        'INSERT INTO category_appearance (budget_id, category_id, color, emoji) VALUES (?, ?, ?, ?) ON CONFLICT(budget_id, category_id) DO UPDATE SET color = excluded.color, emoji = excluded.emoji',
+      )
+      .run(budgetId, categoryId, color, emoji);
   }
 
   // ── Review inbox ─────────────────────────────────────────────────────────

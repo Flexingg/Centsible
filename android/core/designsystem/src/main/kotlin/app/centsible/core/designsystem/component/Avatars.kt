@@ -58,11 +58,13 @@ object CategoryEmoji {
 
 @Composable
 fun CategoryAvatar(name: String, modifier: Modifier = Modifier, size: Dp = 36.dp) {
+    // A chosen color tints the tile; otherwise it's the plain card tone.
+    val tint = categoryColor(name)?.copy(alpha = 0.22f) ?: CentsibleTheme.colors.cardMuted
     Box(
-        modifier.size(size).background(CentsibleTheme.colors.cardMuted, RoundedCornerShape(size / 3.2f)),
+        modifier.size(size).background(tint, RoundedCornerShape(size / 3.2f)),
         contentAlignment = Alignment.Center,
     ) {
-        Text(CategoryEmoji.forName(name), fontSize = (size.value * 0.48f).sp)
+        Text(categoryEmoji(name), fontSize = (size.value * 0.48f).sp)
     }
 }
 

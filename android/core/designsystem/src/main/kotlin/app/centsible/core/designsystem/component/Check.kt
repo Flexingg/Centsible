@@ -32,7 +32,11 @@ fun AnimatedCheck(
     key: Any? = Unit,
     delayMillis: Int = 0,
     description: String? = "Done",
+    /** A confirm buzz as it lands (for one-off confirmations, not lists of checks). */
+    haptic: Boolean = false,
 ) {
+    val haptics = app.centsible.core.designsystem.motion.rememberHaptics()
+    if (haptic) androidx.compose.runtime.LaunchedEffect(key) { haptics.confirm() }
     val pop = rememberEntrance(key, delayMillis = delayMillis, durationMillis = Motion.MEDIUM, easing = Motion.Spring)
     val stroke = rememberEntrance(key, delayMillis = delayMillis + Motion.SHORT, durationMillis = Motion.MEDIUM, easing = Motion.EaseOut)
     Canvas(

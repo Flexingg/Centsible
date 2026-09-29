@@ -41,6 +41,7 @@ import javax.inject.Inject
 /** The two most important alerts this month; hidden when nothing stands out. */
 class InsightsWidget @Inject constructor(private val insights: InsightsGateway) : DashboardWidget {
     override val id = "reports.insights"
+    override val title = "Trends and alerts"
     override val order = 150
     override val requires = setOf(Feature.ReportsSpending)
 
@@ -70,6 +71,7 @@ class InsightsWidget @Inject constructor(private val insights: InsightsGateway) 
 /** Shows in December and January: the year, wrapped. */
 class YearInReviewWidget @Inject constructor() : DashboardWidget {
     override val id = "reports.year-in-review"
+    override val title = "Reviews"
     override val order = 50
     override val requires = setOf(Feature.ReportsSpending)
 

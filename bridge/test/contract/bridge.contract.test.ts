@@ -967,6 +967,34 @@ describe('phase 2: bank sync, import, reconcile, reports', () => {
   });
 });
 
+describe('personal preferences', () => {
+  it('keeps a Home layout per person', async () => {
+    const HOME = '/v1/me/home';
+    const empty = await call({ method: 'GET', url: HOME, path: HOME, token: owner.accessToken });
+    expect(empty.body).toEqual({ order: [], hidden: [] });
+    const saved = await call({ method: 'PUT', url: HOME, path: HOME, token: owner.accessToken, body: { order: ['core.net-worth', 'core.budget-dial', 'core.net-worth'], hidden: ['core.recent-transactions'] } });
+    expect(saved.body).toEqual({ order: ['core.net-worth', 'core.budget-dial'], hidden: ['core.recent-transactions'] });
+    expect((await call({ method: 'GET', url: HOME, path: HOME, token: owner.accessToken })).body).toEqual(saved.body);
+    recordFixture('home-layout', saved.body);
+  });
+
+  it('shares category colors and emoji across the household', async () => {
+    const url = (c: string) => `/v1/budgets/${budgetId}/categories/${c}/appearance`;
+    const PATH = '/v1/budgets/{budgetId}/categories/{categoryId}/appearance';
+    const food = actual.categories['Food']!;
+    const res = await call({ method: 'PUT', url: url(food), path: PATH, token: owner.accessToken, body: { color: '#7fd1a8', emoji: '🥑' } });
+    expect(res.body).toEqual({ categoryId: food, color: '#7FD1A8', emoji: '🥑' });
+    expect((await call({ method: 'PUT', url: url(food), path: PATH, token: owner.accessToken, body: { color: 'green', emoji: null } })).status).toBe(400);
+    expect((await call({ method: 'PUT', url: url('nope'), path: PATH, token: owner.accessToken, body: { color: null, emoji: '🙂' } })).status).toBe(404);
+    const all = await call({ method: 'GET', url: `/v1/budgets/${budgetId}/appearance`, path: '/v1/budgets/{budgetId}/appearance', token: owner.accessToken });
+    expect((all.body as { categories: unknown[] }).categories).toContainEqual({ categoryId: food, color: '#7FD1A8', emoji: '🥑' });
+    recordFixture('appearance', all.body);
+    await call({ method: 'PUT', url: url(food), path: PATH, token: owner.accessToken, body: { color: null, emoji: null } });
+    const after = await call({ method: 'GET', url: `/v1/budgets/${budgetId}/appearance`, path: '/v1/budgets/{budgetId}/appearance', token: owner.accessToken });
+    expect((after.body as { categories: { categoryId: string }[] }).categories.some((c: { categoryId: string }) => c.categoryId === food)).toBe(false);
+  });
+});
+
 describe('tokens', () => {
   it('rotates refresh tokens and revokes the device when an old one is replayed', async () => {
     const refreshed = await call({ method: 'POST', url: '/v1/auth/refresh', path: '/v1/auth/refresh', body: { refreshToken: owner.refreshToken } });

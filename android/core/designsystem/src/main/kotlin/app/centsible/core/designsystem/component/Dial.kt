@@ -72,6 +72,7 @@ fun BrandDial(
     val turn = remember(key) { Animatable(if (reduced) 0f else -150f) }
     val sweep = remember(key) { Animatable(if (reduced) 1f else 0f) }
     val needleAt = remember(key) { Animatable(if (reduced) (needle ?: 0f) else 0f) }
+    val haptics = app.centsible.core.designsystem.motion.rememberHaptics()
     LaunchedEffect(key) {
         if (reduced) return@LaunchedEffect
         coroutineScope {
@@ -88,7 +89,10 @@ fun BrandDial(
                 )
             }
             launch { sweep.animateTo(1f, tween(1100, delayMillis = 80, easing = LinearEasing)) }
-            launch { needleAt.animateTo(needle ?: 0f, tween(600, delayMillis = 950, easing = Motion.Spring)) }
+            launch {
+                needleAt.animateTo(needle ?: 0f, tween(600, delayMillis = 950, easing = Motion.Spring))
+                if (needle != null) haptics.tick() // the needle settles
+            }
         }
     }
     // A new needle position after the entrance (the month moves on) glides there.
@@ -220,6 +224,9 @@ fun ProgressRing(
 @Composable
 fun DialPullIndicator(state: androidx.compose.material3.pulltorefresh.PullToRefreshState, refreshing: Boolean, modifier: Modifier = Modifier) {
     val fraction = state.distanceFraction
+    val haptics = app.centsible.core.designsystem.motion.rememberHaptics()
+    val armed = fraction >= 1f
+    LaunchedEffect(armed) { if (armed && !refreshing) haptics.threshold() }
     if (!refreshing && fraction <= 0f) return
     val shown = if (refreshing) 1f else fraction.coerceIn(0f, 1f)
     androidx.compose.material3.Surface(

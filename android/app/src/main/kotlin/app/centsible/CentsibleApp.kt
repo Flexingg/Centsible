@@ -107,6 +107,7 @@ private object Routes {
     const val SEARCH = "transactions/search?${TransactionsViewModel.ARG_QUERY}={${TransactionsViewModel.ARG_QUERY}}"
 
     const val REVIEW = "review"
+    const val APPEARANCE = "appearance"
     const val RULE = "rule?id={id}&payee={payee}&category={category}"
     fun rule(id: String?, payee: String? = null, category: String? = null) = "rule?id=${id.orEmpty()}&payee=${payee.orEmpty()}&category=${category.orEmpty()}"
     const val AUTOMATIONS = "automations?month={month}"
@@ -135,7 +136,9 @@ fun CentsibleApp(pairingLink: String?, openScreen: String? = null, onOpened: () 
     val state by viewModel.state.collectAsStateWithLifecycle()
     val offline by viewModel.offline.collectAsStateWithLifecycle()
     val pending by viewModel.pending.collectAsStateWithLifecycle()
+    val look by viewModel.look.collectAsStateWithLifecycle()
     CentsibleTheme {
+      androidx.compose.runtime.CompositionLocalProvider(app.centsible.core.designsystem.component.LocalCategoryLook provides look) {
         when (val s = state) {
             AppState.Starting -> LoadingState()
             AppState.NeedsPairing -> PairingRoute(deepLink = pairingLink)
@@ -143,6 +146,7 @@ fun CentsibleApp(pairingLink: String?, openScreen: String? = null, onOpened: () 
             // Switching budgets rebuilds navigation and every screen's state.
             is AppState.Ready -> key(s.budget) { MainScaffold(offline, pending, viewModel.undoOffers, openScreen, onOpened) }
         }
+      }
     }
 }
 
@@ -258,6 +262,7 @@ private fun MainScaffold(
                             MoreItem.Merchants -> Routes.MERCHANTS
                             MoreItem.Rules -> Routes.RULES
                             MoreItem.Tags -> Routes.TAGS
+                            MoreItem.Appearance -> Routes.APPEARANCE
                             MoreItem.BankSync -> Routes.BANK_SYNC
                             MoreItem.Server -> Routes.SERVER
                             MoreItem.Settings -> Routes.SETTINGS
@@ -316,6 +321,7 @@ private fun MainScaffold(
             ) {
                 app.centsible.feature.budget.AutomationEditorRoute(onDone = { nav.popBackStack() })
             }
+            composable(Routes.APPEARANCE) { app.centsible.feature.budget.AppearanceRoute(onBack = { nav.popBackStack() }) }
             composable(Routes.REVIEW) {
                 app.centsible.feature.transactions.ReviewRoute(onBack = { nav.popBackStack() }, onOpen = { nav.navigate(Routes.transaction(it)) })
             }

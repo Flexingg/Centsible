@@ -27,6 +27,7 @@ import { householdRoutes } from './routes/household.js';
 import { structureRoutes } from './routes/structure.js';
 import { transactionRoutes } from './routes/transactions.js';
 import { automationRoutes } from './routes/automations.js';
+import { personalRoutes } from './routes/personal.js';
 import { planningRoutes } from './routes/planning.js';
 import { planRoutes } from './routes/plan.js';
 import { insightsRoutes } from './routes/insights.js';
@@ -124,6 +125,7 @@ export async function buildServer(deps: Deps, opts: { logger?: boolean | object 
   await app.register(budgetRoutes(deps));
   await app.register(transactionRoutes(deps));
   await app.register(automationRoutes(deps));
+  await app.register(personalRoutes(deps));
   await app.register(structureRoutes(deps));
   await app.register(planningRoutes(deps));
   await app.register(planRoutes(deps));

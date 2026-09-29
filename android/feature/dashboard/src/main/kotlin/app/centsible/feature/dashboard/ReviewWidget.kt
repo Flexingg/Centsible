@@ -30,6 +30,7 @@ import javax.inject.Inject
 /** "7 transactions to review": this person's inbox, when there's anything in it. */
 class ReviewWidget @Inject constructor() : DashboardWidget {
     override val id = "core.review"
+    override val title = "Review inbox"
     override val order = 15
     override val requires = setOf(Feature.TransactionsRead)
 

@@ -87,7 +87,7 @@ fun TransactionRow(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 if (category != null) {
                     Text(
-                        "${CategoryEmoji.forName(category)} $category",
+                        "${categoryEmoji(category)} $category",
                         style = MaterialTheme.typography.labelMedium,
                         color = colors.textSecondary,
                         modifier = Modifier.background(colors.cardMuted, RoundedCornerShape(6.dp)).padding(horizontal = 6.dp, vertical = 2.dp),

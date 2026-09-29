@@ -140,9 +140,12 @@ fun Modifier.bounceOnSelect(selected: Boolean): Modifier = composed {
     val reduced = reducedMotion
     val scale = remember { Animatable(1f) }
     var first by remember { mutableStateOf(true) }
+    val haptics = rememberHaptics()
     LaunchedEffect(selected) {
         if (first) { first = false; return@LaunchedEffect }
-        if (!selected || reduced) return@LaunchedEffect
+        if (!selected) return@LaunchedEffect
+        haptics.tick()
+        if (reduced) return@LaunchedEffect
         scale.animateTo(1.22f, tween(120, easing = Motion.EaseOut))
         scale.animateTo(1f, tween(360, easing = Motion.Spring))
     }

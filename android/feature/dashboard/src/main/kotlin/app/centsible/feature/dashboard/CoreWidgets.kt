@@ -41,6 +41,7 @@ import javax.inject.Inject
 
 class NetWorthWidget @Inject constructor() : DashboardWidget {
     override val id = "core.net-worth"
+    override val title = "Net worth"
     override val order = 100
     override val requires = setOf(Feature.AccountsRead)
 
@@ -64,6 +65,7 @@ class NetWorthWidget @Inject constructor() : DashboardWidget {
 
 class BudgetSummaryWidget @Inject constructor() : DashboardWidget {
     override val id = "core.budget-summary"
+    override val title = "Budget this month"
     override val order = 200
     override val requires = setOf(Feature.BudgetEnvelope)
 
@@ -124,6 +126,7 @@ class BudgetSummaryWidget @Inject constructor() : DashboardWidget {
 
 class RecentTransactionsWidget @Inject constructor() : DashboardWidget {
     override val id = "core.recent-transactions"
+    override val title = "Recent transactions"
     override val order = 300
     override val requires = setOf(Feature.TransactionsRead)
 

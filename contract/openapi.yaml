@@ -2252,6 +2252,78 @@ paths:
               schema: { type: object, required: [checked, changed], properties: { checked: { type: integer }, changed: { type: integer } } }
         '403': { $ref: '#/components/responses/Problem' }
 
+  /v1/me/home:
+    get:
+      tags: [household]
+      operationId: getHomeLayout
+      summary: This person's Home layout (widget ids in order, and hidden ones). Empty lists mean the default.
+      responses:
+        '200':
+          description: Layout
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/HomeLayout' }
+    put:
+      tags: [household]
+      operationId: setHomeLayout
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/HomeLayout' }
+      responses:
+        '200':
+          description: Saved
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/HomeLayout' }
+
+  /v1/budgets/{budgetId}/appearance:
+    get:
+      tags: [budgets]
+      operationId: getAppearance
+      summary: Category colors and emoji chosen by the household (Actual has none). Categories not listed use the app's defaults.
+      parameters:
+        - $ref: '#/components/parameters/BudgetId'
+      responses:
+        '200':
+          description: Appearance
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [categories]
+                properties:
+                  categories: { type: array, items: { $ref: '#/components/schemas/CategoryAppearance' } }
+
+  /v1/budgets/{budgetId}/categories/{categoryId}/appearance:
+    put:
+      tags: [budgets]
+      operationId: setCategoryAppearance
+      summary: Members. A category or a category group. Both null goes back to the defaults.
+      parameters:
+        - $ref: '#/components/parameters/BudgetId'
+        - { name: categoryId, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [color, emoji]
+              properties:
+                color: { type: [string, 'null'], pattern: '^#[0-9A-Fa-f]{6}$' }
+                emoji: { type: [string, 'null'] }
+      responses:
+        '200':
+          description: Saved
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CategoryAppearance' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+
 components:
   securitySchemes:
     bearer:
@@ -2750,6 +2822,21 @@ components:
                     value: { description: "The new value (ids shown as names; amounts in minor units)" }
                     note: { type: string }
                     error: { type: string }
+
+    HomeLayout:
+      type: object
+      required: [order, hidden]
+      properties:
+        order: { type: array, items: { type: string }, description: Widget ids in the order chosen; widgets not listed follow in their default order }
+        hidden: { type: array, items: { type: string } }
+
+    CategoryAppearance:
+      type: object
+      required: [categoryId, color, emoji]
+      properties:
+        categoryId: { type: string }
+        color: { type: [string, 'null'], description: '#RRGGBB' }
+        emoji: { type: [string, 'null'] }
 
     ReviewInbox:
       type: object

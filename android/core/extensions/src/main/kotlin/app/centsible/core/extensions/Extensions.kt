@@ -29,6 +29,12 @@ interface DashboardWidget {
     /** Lower sorts first. Core widgets use multiples of 100. */
     val order: Int
 
+    /** What it's called when arranging Home. */
+    val title: String get() = id
+
+    /** Some widgets only show up when there's something to say (updates, the inbox); they can't be hidden. */
+    val alwaysAvailable: Boolean get() = false
+
     /** Hidden unless the bridge reports all of these. */
     val requires: Set<Feature> get() = emptySet()
 

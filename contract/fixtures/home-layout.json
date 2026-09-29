@@ -1,0 +1,9 @@
+{
+  "order": [
+    "core.net-worth",
+    "core.budget-dial"
+  ],
+  "hidden": [
+    "core.recent-transactions"
+  ]
+}

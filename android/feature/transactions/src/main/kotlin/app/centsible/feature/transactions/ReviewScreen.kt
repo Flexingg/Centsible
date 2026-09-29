@@ -216,6 +216,12 @@ private fun ReviewCard(t: Transaction, d: ReviewData, depth: Int, today: LocalDa
     LaunchedEffect(depth) { if (reduced) lift.snapTo(depth.toFloat()) else lift.animateTo(depth.toFloat(), spring(dampingRatio = 0.7f)) }
     val isTop = depth == 0
     val category = t.categoryId?.let { d.categoryNames[it.raw] }
+    val haptics = app.centsible.core.designsystem.motion.rememberHaptics()
+    if (isTop) {
+        // A bump when letting go would act.
+        val past = abs(offset.value) > threshold
+        LaunchedEffect(past) { if (past) haptics.threshold() }
+    }
     fun fling(right: Boolean) = scope.launch {
         if (!reduced) offset.animateTo(if (right) widthPx * 1.4f else -widthPx * 1.4f, tween(Motion.SHORT))
         if (right) actions.approve(t) else actions.later(t)
@@ -278,7 +284,7 @@ private fun ReviewCard(t: Transaction, d: ReviewData, depth: Int, today: LocalDa
                 when {
                     t.isParent -> Chip("Split · ${t.subtransactions.size}", colors.cardMuted, colors.textSecondary)
                     t.isTransfer -> Chip("Transfer", colors.cardMuted, colors.textSecondary)
-                    category != null -> Chip("${CategoryEmoji.forName(category)} $category", colors.cardMuted, colors.textPrimary)
+                    category != null -> Chip("${app.centsible.core.designsystem.component.categoryEmoji(category)} $category", colors.cardMuted, colors.textPrimary)
                     else -> Chip("Needs a category", colors.accentSoft, colors.accent)
                 }
                 t.notes?.takeIf { it.isNotBlank() }?.let {
@@ -321,7 +327,7 @@ private fun Chip(text: String, background: androidx.compose.ui.graphics.Color, c
 private fun CaughtUp(done: Int) {
     val colors = CentsibleTheme.colors
     Column(Modifier.fillMaxSize().padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
-        AnimatedCheck(size = 72.dp, description = null)
+        AnimatedCheck(size = 72.dp, description = null, haptic = true)
         Spacer(Modifier.height(20.dp))
         Text("All caught up", style = MaterialTheme.typography.headlineSmall)
         Spacer(Modifier.height(6.dp))

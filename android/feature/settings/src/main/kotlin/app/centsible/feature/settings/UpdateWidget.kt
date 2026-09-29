@@ -26,6 +26,8 @@ import javax.inject.Inject
 /** Tops the dashboard when a newer app (anyone) or server (owners) is out. */
 class UpdateWidget @Inject constructor(private val server: ServerGateway) : DashboardWidget {
     override val id = "settings.update"
+    override val title = "App and server updates"
+    override val alwaysAvailable = true
     override val order = 10
 
     @Composable

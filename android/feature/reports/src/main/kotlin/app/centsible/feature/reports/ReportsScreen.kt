@@ -247,7 +247,7 @@ private fun SpendingTab(state: ReportsUiState, actions: ReportsActions) {
                             Box(Modifier.fillMaxWidth().height(8.dp)) {
                                 Box(
                                     Modifier.fillMaxWidth((share.coerceIn(0.02f, 1f) * grow).coerceIn(0.001f, 1.05f)).fillMaxHeight()
-                                        .background(colors.series1, RoundedCornerShape(topEnd = 4.dp, bottomEnd = 4.dp)),
+                                        .background(app.centsible.core.designsystem.component.categoryColor(c.name) ?: colors.series1, RoundedCornerShape(topEnd = 4.dp, bottomEnd = 4.dp)),
                                 )
                             }
                         }

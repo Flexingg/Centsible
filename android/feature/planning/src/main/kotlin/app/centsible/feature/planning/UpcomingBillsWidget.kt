@@ -43,6 +43,7 @@ class UpcomingBillsWidget @Inject constructor(
     private val engine: BudgetEngine,
 ) : DashboardWidget {
     override val id = "planning.upcoming-bills"
+    override val title = "Upcoming bills"
     override val order = 250
     override val requires = setOf(Feature.SchedulesRead)
 

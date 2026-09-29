@@ -45,13 +45,18 @@ import javax.inject.Inject
  */
 class BudgetDialWidget @Inject constructor() : DashboardWidget {
     override val id = "core.budget-dial"
+    override val title = "Budget dial"
     override val order = 20
     override val requires = setOf(Feature.BudgetEnvelope)
 
     @Composable
     override fun Content(context: DashboardContext) {
         val month = context.month ?: return
-        val dial = BudgetDial.of(month, context.today)
+        // Groups the household gave a color keep it; the rest take the icon's colors in order.
+        val look = app.centsible.core.designsystem.component.LocalCategoryLook.current
+        val dial = BudgetDial.of(month, context.today).let { d ->
+            d.copy(slices = d.slices.map { s -> look.forId(s.groupId?.raw)?.color?.let { s.copy(color = Color(it)) } ?: s })
+        }
         val cream = Motion.Cream
         val soft = cream.copy(alpha = 0.72f)
         Surface(
