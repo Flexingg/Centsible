@@ -75,7 +75,11 @@ class BridgeApi(private val client: BridgeClient, private val outbox: Outbox? = 
         cursor: String?,
         search: String? = null,
         uncategorized: Boolean = false,
+        payeeId: String? = null,
+        groupId: String? = null,
     ): TransactionPageDto = client.get("/v1/budgets/$budgetId/transactions") {
+        payeeId?.let { parameter("payeeId", it) }
+        groupId?.let { parameter("groupId", it) }
         search?.takeIf { it.isNotBlank() }?.let { parameter("q", it.trim()) }
         if (uncategorized) parameter("uncategorized", true)
         accountId?.let { parameter("accountId", it) }

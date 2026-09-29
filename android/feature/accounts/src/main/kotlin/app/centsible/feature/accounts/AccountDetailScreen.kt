@@ -191,7 +191,8 @@ fun AccountDetailScreen(
                             }
                             d.transactions.forEachIndexed { i, t ->
                                 if (i > 0) HorizontalDivider(Modifier.padding(start = 64.dp), color = colors.border)
-                                TransactionRow(t, d.categoryNames, accountNames, onClick = { onOpenTransaction(t.id) })
+                                // The running balance: what the account held right after this one.
+                                TransactionRow(t, d.categoryNames, accountNames, onClick = { onOpenTransaction(t.id) }, balance = d.balances.getOrNull(i))
                             }
                         }
                     }

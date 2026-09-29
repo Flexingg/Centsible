@@ -1,5 +1,6 @@
 package app.centsible.feature.dashboard
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -100,7 +101,12 @@ class BudgetSummaryWidget @Inject constructor() : DashboardWidget {
                 HorizontalDivider(Modifier.padding(vertical = 12.dp), color = colors.border)
                 StatLabel("Keep an eye on")
                 watch.forEach { c ->
-                    Row(Modifier.fillMaxWidth().padding(top = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Row(
+                        Modifier.fillMaxWidth().padding(top = 4.dp)
+                            .clickable { context.navigate(Destination.TransactionsFor.month(c.name, month.month, categoryId = c.id)) }
+                            .padding(vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
                         CategoryAvatar(c.name, size = 28.dp)
                         Spacer(Modifier.width(10.dp))
                         Text(c.name, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
@@ -150,6 +156,7 @@ private fun Column2(label: String, value: @Composable () -> Unit) {
 @InstallIn(SingletonComponent::class)
 abstract class CoreWidgetsModule {
     @Binds @IntoSet abstract fun dial(w: BudgetDialWidget): DashboardWidget
+    @Binds @IntoSet abstract fun review(w: ReviewWidget): DashboardWidget
     @Binds @IntoSet abstract fun netWorth(w: NetWorthWidget): DashboardWidget
     @Binds @IntoSet abstract fun budget(w: BudgetSummaryWidget): DashboardWidget
     @Binds @IntoSet abstract fun recent(w: RecentTransactionsWidget): DashboardWidget

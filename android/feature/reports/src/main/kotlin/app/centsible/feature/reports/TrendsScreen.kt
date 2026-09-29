@@ -1,5 +1,7 @@
 package app.centsible.feature.reports
 
+import androidx.compose.ui.semantics.onClick
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -93,13 +95,13 @@ class TrendsViewModel @Inject constructor(
 }
 
 @Composable
-fun TrendsRoute(onBack: () -> Unit, viewModel: TrendsViewModel = hiltViewModel()) {
+fun TrendsRoute(onBack: () -> Unit, onOpenTransactions: (app.centsible.core.extensions.Destination.TransactionsFor) -> Unit = {}, viewModel: TrendsViewModel = hiltViewModel()) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    TrendsScreen(state, onBack = onBack, onMonth = viewModel::month, onRetry = { viewModel.load() })
+    TrendsScreen(state, onBack = onBack, onMonth = viewModel::month, onRetry = { viewModel.load() }, onOpenTransactions = onOpenTransactions)
 }
 
 @Composable
-fun TrendsScreen(state: TrendsUiState, onBack: () -> Unit = {}, onMonth: (Int) -> Unit = {}, onRetry: () -> Unit = {}) {
+fun TrendsScreen(state: TrendsUiState, onBack: () -> Unit = {}, onMonth: (Int) -> Unit = {}, onRetry: () -> Unit = {}, onOpenTransactions: (app.centsible.core.extensions.Destination.TransactionsFor) -> Unit = {}) {
     val colors = CentsibleTheme.colors
     Scaffold(
         containerColor = colors.canvas,
@@ -142,7 +144,7 @@ fun TrendsScreen(state: TrendsUiState, onBack: () -> Unit = {}, onMonth: (Int) -
                             CentsibleCard(contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp)) {
                                 rows.forEachIndexed { n, c ->
                                     if (n > 0) HorizontalDivider(color = colors.border)
-                                    TrendRow(c, i.complete)
+                                    TrendRow(c, i.complete, onOpen = c.categoryId?.let { id -> { onOpenTransactions(app.centsible.core.extensions.Destination.TransactionsFor.month(c.name, state.month, categoryId = id)) } })
                                 }
                             }
                         }
@@ -226,7 +228,7 @@ private fun AlertCard(a: Insight) {
 }
 
 @Composable
-private fun TrendRow(c: CategoryTrend, complete: Boolean) {
+private fun TrendRow(c: CategoryTrend, complete: Boolean, onOpen: (() -> Unit)? = null) {
     val colors = CentsibleTheme.colors
     val change = c.changePct
     val description = buildString {
@@ -234,7 +236,15 @@ private fun TrendRow(c: CategoryTrend, complete: Boolean) {
         if (!complete) append(", on pace for ${MoneyFormat.format(c.projected)}")
         if (!c.typical.isZero) append(", usually ${MoneyFormat.format(c.typical)}")
     }
-    Column(Modifier.fillMaxWidth().padding(vertical = 10.dp).clearAndSetSemantics { contentDescription = description }) {
+    Column(
+        Modifier.fillMaxWidth()
+            .then(if (onOpen != null) Modifier.clickable(onClickLabel = "See transactions", onClick = onOpen) else Modifier)
+            .padding(vertical = 10.dp)
+            .clearAndSetSemantics {
+                contentDescription = description
+                if (onOpen != null) onClick(label = "See transactions") { onOpen(); true }
+            },
+    ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(c.name, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
             if (change != null && c.typical.minor > 0) {

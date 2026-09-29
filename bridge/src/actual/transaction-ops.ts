@@ -35,6 +35,8 @@ export type TransactionPatch = {
 export type TransactionFilter = {
   accountId?: string;
   categoryId?: string;
+  payeeId?: string;
+  groupId?: string;
   since?: string;
   until?: string;
   q?: string;
@@ -84,6 +86,8 @@ export class TransactionOps {
       const filter: Record<string, unknown> = {};
       if (f.accountId) filter.account = f.accountId;
       if (f.categoryId) filter.category = f.categoryId;
+      if (f.payeeId) filter.payee = f.payeeId;
+      if (f.groupId) filter['category.group'] = f.groupId;
       // One condition per bound: Actual's AQL applies only the first operator in `date: { $gte, $lte }`.
       const dates: Record<string, unknown>[] = [];
       if (f.since) dates.push({ date: { $gte: f.since } });
@@ -114,7 +118,73 @@ export class TransactionOps {
           .select(TX_FIELDS),
       )) as { data: Record<string, unknown>[] };
 
-      return { items: data.slice(0, f.limit).map(toTransaction), hasMore: data.length > f.limit };
+      const items = data.slice(0, f.limit).map(toTransaction);
+      // One account, nothing else filtered: the balance after each transaction, like Actual's own column.
+      const plain = f.accountId && !f.categoryId && !f.payeeId && !f.groupId && !f.since && !f.until && !f.q?.trim() && !f.uncategorized;
+      const balances = plain ? await runningBalances(f.accountId!, f.offset, items.map((t) => t.amount)) : null;
+      return { items, hasMore: data.length > f.limit, runningBalances: balances };
+    });
+  }
+
+  /**
+   * One change applied to many transactions (bulk edit), or deleting them. Rows that
+   * can't take the change (a split's parent can't have a category, a split's part can't
+   * move account) are skipped and reported.
+   */
+  batch(budgetId: string, ids: string[], change: { set?: BatchSet; delete?: boolean }) {
+    return this.host.withBudget(budgetId, 'write', async () => {
+      const { data } = (await api.aqlQuery(
+        api.q('transactions').filter({ id: { $oneof: ids } }).options({ splits: 'all' }).select(['id', 'is_parent', 'parent_id', 'transfer_id']),
+      )) as { data: Record<string, unknown>[] };
+      const found = new Map(data.map((r) => [String(r.id), r]));
+      const skipped: { id: string; reason: string }[] = [];
+      let updated = 0;
+      let deleted = 0;
+      if (change.set?.accountId) await assertAccount(change.set.accountId);
+      const fields: Record<string, unknown> = {};
+      if (change.set) {
+        const s = change.set;
+        if (s.categoryId !== undefined) fields.category = s.categoryId;
+        if (s.accountId !== undefined) fields.account = s.accountId;
+        if (s.cleared !== undefined) fields.cleared = s.cleared;
+        if (s.notes !== undefined) fields.notes = s.notes;
+        if (s.date !== undefined) fields.date = s.date;
+        if (s.payeeId !== undefined) fields.payee = s.payeeId;
+      }
+      for (const id of ids) {
+        const row = found.get(id);
+        if (!row) {
+          skipped.push({ id, reason: 'not_found' });
+          continue;
+        }
+        if (change.delete) {
+          if (row.parent_id) {
+            skipped.push({ id, reason: 'split_part' });
+            continue;
+          }
+          await api.deleteTransaction(id);
+          deleted++;
+          continue;
+        }
+        const own = { ...fields };
+        if ('category' in own && (row.is_parent || row.transfer_id)) {
+          delete own.category;
+          if (Object.keys(own).length === 0) {
+            skipped.push({ id, reason: row.is_parent ? 'split' : 'transfer' });
+            continue;
+          }
+        }
+        if (('account' in own || 'date' in own || 'payee' in own) && row.parent_id) {
+          skipped.push({ id, reason: 'split_part' });
+          continue;
+        }
+        if (Object.keys(own).length) {
+          await api.updateTransaction(id, own);
+          updated++;
+        }
+      }
+      await settle();
+      return { updated, deleted, skipped };
     });
   }
 
@@ -205,6 +275,33 @@ export class TransactionOps {
       await settle();
     });
   }
+}
+
+export type BatchSet = { categoryId?: string | null; accountId?: string; cleared?: boolean; notes?: string | null; date?: string; payeeId?: string | null };
+
+/**
+ * Balance after each row of a page of one account's transactions (newest first): today's
+ * balance, less everything newer than the page, then less each row as we go down it.
+ */
+async function runningBalances(accountId: string, offset: number, amounts: number[]): Promise<number[]> {
+  let balance = await api.getAccountBalance(accountId);
+  if (offset > 0) {
+    const { data } = (await api.aqlQuery(
+      api
+        .q('transactions')
+        .filter({ account: accountId })
+        .options({ splits: 'grouped' })
+        .orderBy([{ date: 'desc' }, { sort_order: 'desc' }, { id: 'desc' }])
+        .limit(offset)
+        .select(['amount']),
+    )) as { data: { amount: number }[] };
+    balance -= data.reduce((s, r) => s + r.amount, 0);
+  }
+  return amounts.map((a) => {
+    const after = balance;
+    balance -= a;
+    return after;
+  });
 }
 
 async function assertAccount(accountId: string) {

@@ -42,12 +42,17 @@ class AccountDetailScreenshotTest {
 
     @Test fun account_detail_light() {
         val visa = SampleHousehold.accounts.first { it.name == "Visa Signature" }
+        val txs = SampleHousehold.transactions.filter { it.accountId == visa.id }
+        // Running balance, newest first: today's balance, then less each transaction going back.
+        var running = visa.balance.minor
+        val balances = txs.map { t -> app.centsible.core.model.Money(running).also { running -= t.amount.minor } }
         val detail = AccountDetail(
             account = visa,
-            transactions = SampleHousehold.transactions.filter { it.accountId == visa.id },
+            transactions = txs,
             nextCursor = null,
             otherAccounts = SampleHousehold.accounts.filter { it.id != visa.id },
             categoryNames = SampleHousehold.budgetMonth.groups.flatMap { it.categories }.associate { it.id.raw to it.name },
+            balances = balances,
         )
         compose.setContent { CentsibleTheme(darkTheme = false) { AccountDetailScreen(AccountDetailUiState(Loadable.Ready(detail), canWrite = true), onBack = {}, onRetry = {}) } }
         compose.onRoot().captureRoboImage("screenshots/account_detail_light.png")

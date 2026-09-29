@@ -104,6 +104,17 @@ private object Routes {
     const val SERVER = "server"
     const val SEARCH = "transactions/search?${TransactionsViewModel.ARG_QUERY}={${TransactionsViewModel.ARG_QUERY}}"
 
+    const val REVIEW = "review"
+    const val TRANSACTIONS_FOR = "transactions/for?${TransactionsViewModel.ARG_TITLE}={${TransactionsViewModel.ARG_TITLE}}" +
+        "&${TransactionsViewModel.ARG_CATEGORY}={${TransactionsViewModel.ARG_CATEGORY}}&${TransactionsViewModel.ARG_GROUP}={${TransactionsViewModel.ARG_GROUP}}" +
+        "&${TransactionsViewModel.ARG_PAYEE}={${TransactionsViewModel.ARG_PAYEE}}&${TransactionsViewModel.ARG_SINCE}={${TransactionsViewModel.ARG_SINCE}}" +
+        "&${TransactionsViewModel.ARG_UNTIL}={${TransactionsViewModel.ARG_UNTIL}}"
+    fun transactionsFor(d: Destination.TransactionsFor): String {
+        fun enc(v: String?) = java.net.URLEncoder.encode(v.orEmpty(), "UTF-8")
+        return "transactions/for?${TransactionsViewModel.ARG_TITLE}=${enc(d.title)}&${TransactionsViewModel.ARG_CATEGORY}=${enc(d.categoryId?.raw)}" +
+            "&${TransactionsViewModel.ARG_GROUP}=${enc(d.groupId?.raw)}&${TransactionsViewModel.ARG_PAYEE}=${enc(d.payeeId?.raw)}" +
+            "&${TransactionsViewModel.ARG_SINCE}=${enc(d.since)}&${TransactionsViewModel.ARG_UNTIL}=${enc(d.until)}"
+    }
     fun search(q: String) = "transactions/search?${TransactionsViewModel.ARG_QUERY}=" + java.net.URLEncoder.encode(q, "UTF-8")
 
     fun account(id: AccountId) = "account/${id.raw}"
@@ -217,8 +228,8 @@ private fun MainScaffold(
         ) {
             composable(Tab.Dashboard.route) { DashboardRoute(onNavigate = { nav.go(it) }) }
             composable(Tab.Accounts.route) { AccountsRoute(onOpenAccount = { nav.navigate(Routes.account(it)) }) }
-            composable(Tab.Transactions.route) { TransactionsRoute(onOpen = { nav.navigate(Routes.transaction(it)) }) }
-            composable(Tab.Budget.route) { BudgetRoute(onManageCategories = { nav.navigate(Routes.CATEGORIES) }) }
+            composable(Tab.Transactions.route) { TransactionsRoute(onOpen = { nav.navigate(Routes.transaction(it)) }, onOpenReview = { nav.navigate(Routes.REVIEW) }) }
+            composable(Tab.Budget.route) { BudgetRoute(onManageCategories = { nav.navigate(Routes.CATEGORIES) }, onOpenTransactions = { nav.go(it) }) }
             composable(Tab.More.route) {
                 MoreScreen(onOpen = { item ->
                     nav.navigate(
@@ -246,8 +257,8 @@ private fun MainScaffold(
             composable(Routes.SERVER) { app.centsible.feature.settings.ServerRoute(onBack = { nav.popBackStack() }) }
             composable(Routes.BANK_SYNC) { app.centsible.feature.settings.BankSyncRoute(onBack = { nav.popBackStack() }) }
             composable(Routes.RECURRING) { RecurringRoute(onBack = { nav.popBackStack() }, onFind = { nav.navigate(Routes.SUBSCRIPTIONS) { launchSingleTop = true } }) }
-            composable(Routes.SUBSCRIPTIONS) { app.centsible.feature.planning.SubscriptionsRoute(onBack = { nav.popBackStack() }) }
-            composable(Routes.TRENDS) { app.centsible.feature.reports.TrendsRoute(onBack = { nav.popBackStack() }) }
+            composable(Routes.SUBSCRIPTIONS) { app.centsible.feature.planning.SubscriptionsRoute(onBack = { nav.popBackStack() }, onOpenTransactions = { nav.go(it) }) }
+            composable(Routes.TRENDS) { app.centsible.feature.reports.TrendsRoute(onBack = { nav.popBackStack() }, onOpenTransactions = { nav.go(it) }) }
             composable(Routes.NET_WORTH) { app.centsible.feature.reports.NetWorthRoute(onBack = { nav.popBackStack() }) }
             composable(
                 Routes.YEAR_IN_REVIEW,
@@ -260,6 +271,7 @@ private fun MainScaffold(
                     onClose = { nav.popBackStack() },
                     period = entry.arguments?.getString("period")?.ifEmpty { null },
                     date = entry.arguments?.getString("date")?.ifEmpty { null },
+                    onNavigate = { nav.go(it) },
                 )
             }
             composable(Routes.GOALS) { app.centsible.feature.planning.GoalsRoute(onBack = { nav.popBackStack() }) }
@@ -273,10 +285,26 @@ private fun MainScaffold(
             composable(Routes.FORECAST) {
                 app.centsible.feature.planning.ForecastRoute(onBack = { nav.popBackStack() }, onOpenCalendar = { nav.navigate(Routes.CALENDAR) { launchSingleTop = true } })
             }
-            composable(Routes.REPORTS) { ReportsRoute(onBack = { nav.popBackStack() }) }
-            composable(Routes.MERCHANTS) { MerchantsRoute(onBack = { nav.popBackStack() }) }
+            composable(Routes.REPORTS) { ReportsRoute(onBack = { nav.popBackStack() }, onOpenTransactions = { nav.go(it) }) }
+            composable(Routes.MERCHANTS) { MerchantsRoute(onBack = { nav.popBackStack() }, onOpenTransactions = { nav.go(it) }) }
             composable(Routes.RULES) { RulesRoute(onBack = { nav.popBackStack() }) }
             composable(Routes.TAGS) { TagsRoute(onBack = { nav.popBackStack() }, onSearch = { nav.navigate(Routes.search(it)) }) }
+            composable(Routes.REVIEW) {
+                app.centsible.feature.transactions.ReviewRoute(onBack = { nav.popBackStack() }, onOpen = { nav.navigate(Routes.transaction(it)) })
+            }
+            composable(
+                Routes.TRANSACTIONS_FOR,
+                arguments = listOf(
+                    TransactionsViewModel.ARG_TITLE, TransactionsViewModel.ARG_CATEGORY, TransactionsViewModel.ARG_GROUP,
+                    TransactionsViewModel.ARG_PAYEE, TransactionsViewModel.ARG_SINCE, TransactionsViewModel.ARG_UNTIL,
+                ).map { name -> navArgument(name) { type = NavType.StringType; defaultValue = "" } },
+            ) {
+                TransactionsRoute(
+                    onOpen = { nav.navigate(Routes.transaction(it)) },
+                    onOpenReview = { nav.navigate(Routes.REVIEW) },
+                    onBack = { nav.popBackStack() },
+                )
+            }
             composable(Routes.SEARCH, arguments = listOf(navArgument(TransactionsViewModel.ARG_QUERY) { type = NavType.StringType; defaultValue = "" })) {
                 TransactionsRoute(onOpen = { nav.navigate(Routes.transaction(it)) })
             }
@@ -333,6 +361,8 @@ private fun NavHostController.go(d: Destination) = when (d) {
     Destination.Trends -> navigate(Routes.TRENDS)
     Destination.YearInReview -> navigate(Routes.review())
     Destination.Server -> navigate(Routes.SERVER)
+    Destination.Review -> navigate(Routes.REVIEW)
+    is Destination.TransactionsFor -> navigate(Routes.transactionsFor(d))
     is Destination.Account -> navigate(Routes.account(d.id))
     is Destination.Transaction -> navigate(Routes.transaction(d.id, d.account))
 }

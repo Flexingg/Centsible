@@ -1,5 +1,6 @@
 package app.centsible.feature.reports
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -59,9 +60,9 @@ private fun YearMonth.short() = Month.of(month).getDisplayName(TextStyle.SHORT, 
 private fun YearMonth.long() = Month.of(month).getDisplayName(TextStyle.FULL, Locale.getDefault()) + " " + year
 
 @Composable
-fun ReportsRoute(onBack: () -> Unit, viewModel: ReportsViewModel = hiltViewModel()) {
+fun ReportsRoute(onBack: () -> Unit, onOpenTransactions: (app.centsible.core.extensions.Destination.TransactionsFor) -> Unit = {}, viewModel: ReportsViewModel = hiltViewModel()) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    ReportsScreen(state, onBack, ReportsActions(viewModel::tab, viewModel::range, viewModel::selectMonth, viewModel::selectPoint, viewModel::spendingMonth, { viewModel.refresh() }))
+    ReportsScreen(state, onBack, ReportsActions(viewModel::tab, viewModel::range, viewModel::selectMonth, viewModel::selectPoint, viewModel::spendingMonth, { viewModel.refresh() }, onOpenTransactions))
 }
 
 data class ReportsActions(
@@ -71,6 +72,7 @@ data class ReportsActions(
     val selectPoint: (Int) -> Unit = {},
     val spendingMonth: (Int) -> Unit = {},
     val retry: () -> Unit = {},
+    val openTransactions: (app.centsible.core.extensions.Destination.TransactionsFor) -> Unit = {},
 )
 
 @Composable
@@ -222,7 +224,17 @@ private fun SpendingTab(state: ReportsUiState, actions: ReportsActions) {
                 val max = report.categories.maxOfOrNull { -it.amount.minor }?.coerceAtLeast(1) ?: 1
                 report.categories.filter { it.amount.isNegative }.forEachIndexed { i, c ->
                     val grow = app.centsible.core.designsystem.motion.rememberEntrance(key = report, delayMillis = i * app.centsible.core.designsystem.motion.Motion.STAGGER, durationMillis = app.centsible.core.designsystem.motion.Motion.LONG, easing = app.centsible.core.designsystem.motion.Motion.Spring)
-                    Row(Modifier.fillMaxWidth().padding(vertical = 8.dp).staggeredEntrance(i, key = report), verticalAlignment = Alignment.CenterVertically) {
+                    Row(
+                        Modifier.fillMaxWidth()
+                            .then(
+                                c.categoryId?.let { id ->
+                                    Modifier.clickable(onClickLabel = "See transactions") { actions.openTransactions(app.centsible.core.extensions.Destination.TransactionsFor.month(c.name, state.spendingMonth, categoryId = id)) }
+                                } ?: Modifier,
+                            )
+                            .padding(vertical = 8.dp)
+                            .staggeredEntrance(i, key = report),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
                         CategoryAvatar(c.name, size = 30.dp)
                         Spacer(Modifier.width(10.dp))
                         Column(Modifier.weight(1f)) {

@@ -101,4 +101,9 @@ data class Preferences(
     val hideFraction: Boolean,
 )
 
-data class Page<T>(val items: List<T>, val nextCursor: String?)
+data class Page<T>(
+    val items: List<T>,
+    val nextCursor: String?,
+    /** For one account's unfiltered list: the balance after each item. */
+    val runningBalances: List<Money>? = null,
+)

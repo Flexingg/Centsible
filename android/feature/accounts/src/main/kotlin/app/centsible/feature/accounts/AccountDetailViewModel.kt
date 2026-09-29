@@ -38,6 +38,8 @@ data class AccountDetail(
     val otherAccounts: List<Account>,
     val categoryNames: Map<String, String>,
     val loadingMore: Boolean = false,
+    /** The balance after each transaction, in order (Actual's running balance). */
+    val balances: List<app.centsible.core.model.Money> = emptyList(),
 )
 
 /** A statement file picked for import, previewed before anything is written. */
@@ -92,7 +94,7 @@ class AccountDetailViewModel @Inject constructor(
         state.update { it.copy(data = Loadable.Ready(current.copy(loadingMore = true))) }
         viewModelScope.launch {
             runCatching { engine.transactions(selectedBudget(), TransactionQuery(accountId = id, limit = 50), cursor) }
-                .onSuccess { p -> state.update { it.copy(data = Loadable.Ready(current.copy(transactions = current.transactions + p.items, nextCursor = p.nextCursor))) } }
+                .onSuccess { p -> state.update { it.copy(data = Loadable.Ready(current.copy(transactions = current.transactions + p.items, nextCursor = p.nextCursor, balances = current.balances + p.runningBalances.orEmpty()))) } }
                 .onFailure { state.update { it.copy(data = Loadable.Ready(current.copy(loadingMore = false))) } }
         }
     }
@@ -117,7 +119,7 @@ class AccountDetailViewModel @Inject constructor(
             val all = accounts.await()
             val account = all.firstOrNull { it.id == id } ?: return@runCatching null
             val page = txs.await()
-            AccountDetail(account, page.items, page.nextCursor, all.filter { it.id != id && !it.closed }, cats.await()) to canWrite
+            AccountDetail(account, page.items, page.nextCursor, all.filter { it.id != id && !it.closed }, cats.await(), balances = page.runningBalances.orEmpty()) to canWrite
         }
             .onSuccess { r ->
                 if (r == null) state.update { it.copy(gone = true) }

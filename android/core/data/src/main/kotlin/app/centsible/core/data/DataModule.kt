@@ -104,6 +104,11 @@ abstract class DataModule {
 
         @Provides
         @Singleton
+        fun transactionTools(client: BridgeClient, changes: NotifyingBudgetEngine): app.centsible.core.domain.TransactionTools =
+            app.centsible.core.engine.bridge.BridgeTransactionTools(app.centsible.core.network.TransactionToolsApi(client), changes::notifyChanged)
+
+        @Provides
+        @Singleton
         fun server(client: BridgeClient): app.centsible.core.domain.ServerGateway =
             app.centsible.core.engine.bridge.BridgeServer(app.centsible.core.network.ServerApi(client))
     }

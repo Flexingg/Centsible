@@ -71,6 +71,8 @@ interface BudgetEngine {
 data class TransactionQuery(
     val accountId: AccountId? = null,
     val categoryId: CategoryId? = null,
+    val payeeId: app.centsible.core.model.PayeeId? = null,
+    val groupId: app.centsible.core.model.CategoryGroupId? = null,
     val since: String? = null,
     val until: String? = null,
     /** Matches payee, notes or category name. */

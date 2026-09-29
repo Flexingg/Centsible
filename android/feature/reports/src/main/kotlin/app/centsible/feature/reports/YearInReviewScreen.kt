@@ -120,10 +120,30 @@ class YearInReviewViewModel @Inject constructor(
 }
 
 @Composable
-fun YearInReviewRoute(onClose: () -> Unit, period: String? = null, date: String? = null, viewModel: YearInReviewViewModel = hiltViewModel()) {
+fun YearInReviewRoute(
+    onClose: () -> Unit,
+    period: String? = null,
+    date: String? = null,
+    onNavigate: (app.centsible.core.extensions.Destination) -> Unit = {},
+    viewModel: YearInReviewViewModel = hiltViewModel(),
+) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     androidx.compose.runtime.LaunchedEffect(Unit) { viewModel.start(period?.let(ReviewPeriod::of), date) }
-    YearInReviewScreen(state, onClose = onClose, onPeriod = { p, d -> viewModel.load(p, d) })
+    CompositionLocalProvider(LocalOpen provides onNavigate) {
+        YearInReviewScreen(state, onClose = onClose, onPeriod = { p, d -> viewModel.load(p, d) })
+    }
+}
+
+/** Tapping a category, merchant or purchase opens its transactions for the period. */
+private val LocalOpen = compositionLocalOf<(app.centsible.core.extensions.Destination) -> Unit> { {} }
+
+@Composable
+private fun Modifier.opens(r: YearInReview, title: String, category: app.centsible.core.model.CategoryId? = null, payee: app.centsible.core.model.PayeeId? = null): Modifier {
+    if (category == null && payee == null) return this
+    val open = LocalOpen.current
+    return clickable(onClickLabel = "See transactions") {
+        open(app.centsible.core.extensions.Destination.TransactionsFor("$title · ${r.label}", categoryId = category, payeeId = payee, since = r.start, until = r.end))
+    }
 }
 
 // ── Pages ────────────────────────────────────────────────────────────────────
@@ -348,7 +368,7 @@ private fun CategoriesPage(r: YearInReview) {
         val max = r.topCategories.maxOf { it.amount.minor }.coerceAtLeast(1)
         r.topCategories.forEachIndexed { i, c ->
             val grow = pageGrowth(3 + i)
-            Row(Modifier.fillMaxWidth().padding(vertical = 6.dp).rise(3 + i), verticalAlignment = Alignment.CenterVertically) {
+            Row(Modifier.fillMaxWidth().opens(r, c.name, category = c.categoryId).padding(vertical = 6.dp).rise(3 + i), verticalAlignment = Alignment.CenterVertically) {
                 Text("${i + 1}", color = INK, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, modifier = Modifier.width(28.dp))
                 Column(Modifier.weight(1f)) {
                     Row {
@@ -370,7 +390,7 @@ private fun MerchantsPage(r: YearInReview) {
         Kicker("Your top merchants")
         Spacer(Modifier.height(16.dp))
         r.topMerchants.forEachIndexed { i, m ->
-            Row(Modifier.fillMaxWidth().padding(vertical = 10.dp).rise(1 + i), verticalAlignment = Alignment.CenterVertically) {
+            Row(Modifier.fillMaxWidth().opens(r, m.name, payee = m.payeeId).padding(vertical = 10.dp).rise(1 + i), verticalAlignment = Alignment.CenterVertically) {
                 Text("${i + 1}", color = INK, fontSize = if (i == 0) 44.sp else 30.sp, fontWeight = FontWeight.Black, modifier = Modifier.width(56.dp))
                 Column(Modifier.weight(1f)) {
                     Text(m.name, color = INK, fontSize = if (i == 0) 26.sp else 20.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)

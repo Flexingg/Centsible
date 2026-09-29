@@ -37,6 +37,7 @@ class DashboardViewModel @Inject constructor(
     private val selectedBudget: SelectedBudget,
     private val sessions: SessionStore,
     private val allWidgets: Set<@JvmSuppressWildcards DashboardWidget>,
+    private val tools: app.centsible.core.domain.TransactionTools,
     changes: BudgetChanges,
 ) : ViewModel() {
     private val state = MutableStateFlow(DashboardUiState())
@@ -62,7 +63,14 @@ class DashboardViewModel @Inject constructor(
             val accounts = async { engine.accounts(budget) }
             val recent = async { engine.transactions(budget, TransactionQuery(limit = 6)).items }
             val categories = async { engine.categoryGroups(budget).flatMap { it.categories }.associate { it.id.raw to it.name } }
-            DashboardContext(budget, member, caps.await(), month.await(), accounts.await(), recent.await(), categories.await(), navigate = {})
+            // Older bridges have no inbox; the card just doesn't show.
+            val review = async { runCatching { tools.inbox(budget, limit = 3) }.getOrNull() }
+            val inbox = review.await()
+            DashboardContext(
+                budget, member, caps.await(), month.await(), accounts.await(), recent.await(), categories.await(), navigate = {},
+                reviewCount = inbox?.total,
+                reviewPreview = inbox?.items.orEmpty(),
+            )
         }
             .onSuccess { ctx ->
                 val widgets = allWidgets.filter { w -> w.requires.all(ctx.capabilities::has) }.sortedBy { it.order }

@@ -59,7 +59,11 @@ import app.centsible.core.model.CategoryId
 import app.centsible.core.model.Money
 
 @Composable
-fun BudgetRoute(onManageCategories: () -> Unit, viewModel: BudgetViewModel = hiltViewModel()) {
+fun BudgetRoute(
+    onManageCategories: () -> Unit,
+    onOpenTransactions: (app.centsible.core.extensions.Destination.TransactionsFor) -> Unit = {},
+    viewModel: BudgetViewModel = hiltViewModel(),
+) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     BudgetScreen(
         onManageCategories = onManageCategories,
@@ -82,6 +86,7 @@ fun BudgetRoute(onManageCategories: () -> Unit, viewModel: BudgetViewModel = hil
             apply = viewModel::applyAutopilot,
             openCover = viewModel::openCover,
             cover = { viewModel.coverOverspending() },
+            openTransactions = onOpenTransactions,
         ),
     )
 }
@@ -204,6 +209,10 @@ fun BudgetScreen(
             onMove = onMove,
             onRollover = { onRollover(selected.id, it) },
             onSaveNote = { onSaveNote(selected.id, it) },
+            onSeeTransactions = {
+                onOpenCategory(null)
+                plan.openTransactions(app.centsible.core.extensions.Destination.TransactionsFor.month(selected.name, month.month, categoryId = selected.id))
+            },
         )
     }
 }

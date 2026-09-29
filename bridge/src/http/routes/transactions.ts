@@ -38,13 +38,15 @@ function decodeCursor(cursor: string | undefined): number {
 export const transactionRoutes =
   (deps: Deps): FastifyPluginAsync =>
   async (app) => {
-    const { transactions } = deps;
+    const { transactions, review } = deps;
 
     app.get<{
       Params: BudgetParams;
       Querystring: {
         accountId?: string;
         categoryId?: string;
+        payeeId?: string;
+        groupId?: string;
         since?: string;
         until?: string;
         q?: string;
@@ -61,6 +63,8 @@ export const transactionRoutes =
             properties: {
               accountId: { type: 'string' },
               categoryId: { type: 'string' },
+              payeeId: { type: 'string' },
+              groupId: { type: 'string' },
               since: DATE,
               until: DATE,
               q: { type: 'string', maxLength: 100 },
@@ -76,7 +80,7 @@ export const transactionRoutes =
         const { cursor, limit = 100, ...filters } = req.query;
         const offset = decodeCursor(cursor);
         const page = await transactions.list(req.params.budgetId, { ...filters, limit, offset });
-        return { items: page.items, nextCursor: page.hasMore ? encodeCursor(offset + limit) : null };
+        return { items: page.items, nextCursor: page.hasMore ? encodeCursor(offset + limit) : null, runningBalances: page.runningBalances };
       },
     );
 
@@ -103,8 +107,10 @@ export const transactionRoutes =
         },
       },
       async (req, reply) => {
-        requireBudget(deps, req, req.params.budgetId, 'member');
+        const auth = requireBudget(deps, req, req.params.budgetId, 'member');
         const { created, transaction } = await transactions.create(req.params.budgetId, req.body);
+        // Your own entry doesn't need reviewing by you.
+        review.markReviewed(req.params.budgetId, auth.member.id, [transaction.id]);
         if (created) audit(deps, req, req.params.budgetId, 'transaction.created', transaction.id, { amount: transaction.amount });
         return reply.status(created ? 201 : 200).send(transaction);
       },
@@ -139,8 +145,9 @@ export const transactionRoutes =
       },
       async (req) => {
         const { budgetId, transactionId } = req.params;
-        requireBudget(deps, req, budgetId, 'member');
+        const auth = requireBudget(deps, req, budgetId, 'member');
         const updated = await transactions.update(budgetId, transactionId, req.body);
+        review.markReviewed(budgetId, auth.member.id, [transactionId]);
         audit(deps, req, budgetId, 'transaction.updated', transactionId, Object.keys(req.body));
         return updated;
       },
@@ -153,4 +160,76 @@ export const transactionRoutes =
       audit(deps, req, budgetId, 'transaction.deleted', transactionId);
       return reply.status(204).send();
     });
+
+    // Bulk edit or delete from multi-select.
+    app.post<{ Params: BudgetParams; Body: { ids: string[]; set?: Record<string, unknown>; delete?: boolean } }>(
+      '/v1/budgets/:budgetId/transactions/batch',
+      {
+        schema: {
+          body: {
+            type: 'object',
+            required: ['ids'],
+            additionalProperties: false,
+            properties: {
+              ids: { type: 'array', minItems: 1, maxItems: 500, items: { type: 'string' } },
+              set: {
+                type: 'object',
+                minProperties: 1,
+                additionalProperties: false,
+                properties: {
+                  categoryId: { type: ['string', 'null'] },
+                  accountId: { type: 'string' },
+                  cleared: { type: 'boolean' },
+                  notes: { type: ['string', 'null'], maxLength: 2000 },
+                  date: DATE,
+                  payeeId: { type: ['string', 'null'] },
+                },
+              },
+              delete: { type: 'boolean' },
+            },
+          },
+        },
+      },
+      async (req) => {
+        const { budgetId } = req.params;
+        const auth = requireBudget(deps, req, budgetId, 'member');
+        const { ids, set, delete: del } = req.body;
+        if (!!set === !!del) throw ApiError.validation('Send either set or delete');
+        const result = await transactions.batch(budgetId, ids, { set, delete: del });
+        if (set) review.markReviewed(budgetId, auth.member.id, ids.filter((id) => !result.skipped.some((s) => s.id === id)));
+        audit(deps, req, budgetId, del ? 'transaction.batch_deleted' : 'transaction.batch_updated', undefined, { count: ids.length, fields: set ? Object.keys(set) : undefined });
+        return result;
+      },
+    );
+
+    // ── Review inbox (per person) ──
+    app.get<{ Params: BudgetParams; Querystring: { limit?: number } }>(
+      '/v1/budgets/:budgetId/review',
+      { schema: { querystring: { type: 'object', properties: { limit: { type: 'integer', minimum: 1, maximum: 200, default: 50 } } } } },
+      async (req) => {
+        const auth = requireBudget(deps, req, req.params.budgetId);
+        return review.inbox(req.params.budgetId, auth.member.id, req.query.limit ?? 50);
+      },
+    );
+
+    app.post<{ Params: BudgetParams; Body: { ids?: string[]; all?: boolean } }>(
+      '/v1/budgets/:budgetId/review',
+      {
+        schema: {
+          body: {
+            type: 'object',
+            additionalProperties: false,
+            minProperties: 1,
+            properties: { ids: { type: 'array', minItems: 1, maxItems: 500, items: { type: 'string' } }, all: { type: 'boolean', const: true } },
+          },
+        },
+      },
+      async (req) => {
+        const { budgetId } = req.params;
+        const auth = requireBudget(deps, req, budgetId);
+        if (req.body.all) await review.reviewAll(budgetId, auth.member.id);
+        else review.markReviewed(budgetId, auth.member.id, req.body.ids ?? []);
+        return { remaining: await review.count(budgetId, auth.member.id) };
+      },
+    );
   };

@@ -48,6 +48,10 @@ data class DashboardContext(
     val navigate: (Destination) -> Unit,
     /** Today, for anything paced through the month (injectable for tests). */
     val today: java.time.LocalDate = java.time.LocalDate.now(),
+    /** How many transactions wait in this person's review inbox (null: the bridge doesn't know). */
+    val reviewCount: Int? = null,
+    /** The first few waiting, for the card's preview. */
+    val reviewPreview: List<Transaction> = emptyList(),
 )
 
 /** Places a widget (or any screen) may send the person. */
@@ -62,6 +66,28 @@ sealed interface Destination {
     data object Trends : Destination
     data object YearInReview : Destination
     data object Server : Destination
+    /** This person's review inbox. */
+    data object Review : Destination
+    /**
+     * Transactions narrowed to what was tapped: a category or group in a month, a merchant.
+     * Dates are yyyy-MM-dd, inclusive.
+     */
+    data class TransactionsFor(
+        val title: String,
+        val categoryId: app.centsible.core.model.CategoryId? = null,
+        val groupId: app.centsible.core.model.CategoryGroupId? = null,
+        val payeeId: app.centsible.core.model.PayeeId? = null,
+        val since: String? = null,
+        val until: String? = null,
+    ) : Destination {
+        companion object {
+            /** A calendar month, e.g. "Food · September". */
+            fun month(title: String, month: app.centsible.core.model.YearMonth, categoryId: app.centsible.core.model.CategoryId? = null, groupId: app.centsible.core.model.CategoryGroupId? = null): TransactionsFor {
+                val first = java.time.LocalDate.of(month.year, month.month, 1)
+                return TransactionsFor(title, categoryId, groupId, since = first.toString(), until = first.plusMonths(1).minusDays(1).toString())
+            }
+        }
+    }
     data class Account(val id: app.centsible.core.model.AccountId) : Destination
     /** Opens the editor; a null id starts a new transaction. */
     data class Transaction(val id: app.centsible.core.model.TransactionId?, val account: app.centsible.core.model.AccountId? = null) : Destination

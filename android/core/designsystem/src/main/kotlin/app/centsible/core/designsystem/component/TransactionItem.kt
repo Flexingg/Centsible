@@ -1,7 +1,14 @@
 package app.centsible.core.designsystem.component
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -32,7 +39,18 @@ fun dayLabel(date: String, today: LocalDate): String {
 }
 
 @Composable
-fun TransactionRow(t: Transaction, categoryNames: Map<String, String>, accountNames: Map<String, String>, onClick: (() -> Unit)? = null) {
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
+fun TransactionRow(
+    t: Transaction,
+    categoryNames: Map<String, String>,
+    accountNames: Map<String, String>,
+    onClick: (() -> Unit)? = null,
+    /** The account's balance after this transaction (one account's list). */
+    balance: app.centsible.core.model.Money? = null,
+    onLongClick: (() -> Unit)? = null,
+    /** In multi-select: a check replaces the avatar. */
+    selected: Boolean? = null,
+) {
     val colors = CentsibleTheme.colors
     val category = when {
         t.isParent -> "Split · ${t.subtransactions.size}"
@@ -40,10 +58,29 @@ fun TransactionRow(t: Transaction, categoryNames: Map<String, String>, accountNa
         else -> t.categoryId?.let { categoryNames[it.raw] }
     }
     Row(
-        Modifier.fillMaxWidth().then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier).padding(horizontal = 16.dp, vertical = 12.dp),
+        Modifier.fillMaxWidth()
+            .then(
+                when {
+                    onLongClick != null -> Modifier.combinedClickable(onClick = { onClick?.invoke() }, onLongClick = onLongClick, onLongClickLabel = "Select")
+                    onClick != null -> Modifier.clickable(onClick = onClick)
+                    else -> Modifier
+                },
+            )
+            .then(if (selected == true) Modifier.background(colors.accentSoft) else Modifier)
+            .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        MerchantAvatar(t.payeeName)
+        if (selected != null) {
+            androidx.compose.animation.Crossfade(selected, label = "select") { on ->
+                if (on) {
+                    AnimatedCheck(size = 40.dp, color = colors.accent, description = "Selected")
+                } else {
+                    Box(Modifier.size(40.dp).border(2.dp, colors.border, CircleShape))
+                }
+            }
+        } else {
+            MerchantAvatar(t.payeeName)
+        }
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
             Text(t.payeeName ?: "No payee", style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -70,6 +107,16 @@ fun TransactionRow(t: Transaction, categoryNames: Map<String, String>, accountNa
             }
         }
         Spacer(Modifier.width(8.dp))
-        MoneyText(t.amount, tone = MoneyTone.Signed, signed = t.amount.minor > 0, style = MaterialTheme.typography.bodyLarge)
+        Column(horizontalAlignment = Alignment.End) {
+            MoneyText(t.amount, tone = MoneyTone.Signed, signed = t.amount.minor > 0, style = MaterialTheme.typography.bodyLarge)
+            balance?.let {
+                Text(
+                    MoneyFormat.format(it),
+                    style = MaterialTheme.typography.labelSmall.copy(fontFeatureSettings = "tnum"),
+                    color = colors.textTertiary,
+                    modifier = Modifier.semantics { contentDescription = "Balance after: ${MoneyFormat.format(it)}" },
+                )
+            }
+        }
     }
 }

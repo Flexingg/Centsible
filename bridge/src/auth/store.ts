@@ -68,6 +68,21 @@ const MIGRATIONS: string[] = [
   `CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
    CREATE TABLE simplefin_requests (at INTEGER NOT NULL);
    CREATE INDEX simplefin_requests_at ON simplefin_requests(at);`,
+  // 3: each person's review inbox: a watermark (Actual's sort_order, which is the
+  // creation time in ms) plus transactions reviewed one by one since then.
+  `CREATE TABLE review_state (
+     member_id TEXT NOT NULL REFERENCES members(id) ON DELETE CASCADE,
+     budget_id TEXT NOT NULL,
+     since REAL NOT NULL,
+     PRIMARY KEY (member_id, budget_id)
+   );
+   CREATE TABLE reviewed (
+     member_id TEXT NOT NULL REFERENCES members(id) ON DELETE CASCADE,
+     budget_id TEXT NOT NULL,
+     transaction_id TEXT NOT NULL,
+     at TEXT NOT NULL,
+     PRIMARY KEY (member_id, budget_id, transaction_id)
+   );`,
 ];
 
 const sha256 = (s: string) => createHash('sha256').update(s).digest('hex');
@@ -111,6 +126,39 @@ export class HouseholdStore {
         this.db.pragma(`user_version = ${v + 1}`);
       })();
     }
+  }
+
+  // ── Review inbox ─────────────────────────────────────────────────────────
+
+  reviewSince(memberId: string, budgetId: string): number | null {
+    const row = this.db.prepare('SELECT since FROM review_state WHERE member_id = ? AND budget_id = ?').get(memberId, budgetId) as { since: number } | undefined;
+    return row?.since ?? null;
+  }
+
+  setReviewSince(memberId: string, budgetId: string, since: number) {
+    this.db
+      .prepare('INSERT INTO review_state (member_id, budget_id, since) VALUES (?, ?, ?) ON CONFLICT(member_id, budget_id) DO UPDATE SET since = excluded.since')
+      .run(memberId, budgetId, since);
+  }
+
+  reviewedIds(memberId: string, budgetId: string): Set<string> {
+    const rows = this.db.prepare('SELECT transaction_id FROM reviewed WHERE member_id = ? AND budget_id = ?').all(memberId, budgetId) as { transaction_id: string }[];
+    return new Set(rows.map((r) => r.transaction_id));
+  }
+
+  markReviewed(memberId: string, budgetId: string, ids: string[]) {
+    const insert = this.db.prepare('INSERT OR IGNORE INTO reviewed (member_id, budget_id, transaction_id, at) VALUES (?, ?, ?, ?)');
+    const at = nowIso();
+    this.db.transaction(() => ids.forEach((id) => insert.run(memberId, budgetId, id, at)))();
+  }
+
+  /** Forgets one-by-one marks (after the watermark moves past them). */
+  pruneReviewed(memberId: string, budgetId: string, keep: string[]) {
+    const keepSet = new Set(keep);
+    const del = this.db.prepare('DELETE FROM reviewed WHERE member_id = ? AND budget_id = ? AND transaction_id = ?');
+    this.db.transaction(() => {
+      for (const id of this.reviewedIds(memberId, budgetId)) if (!keepSet.has(id)) del.run(memberId, budgetId, id);
+    })();
   }
 
   // ── Settings and SimpleFIN request log ───────────────────────────────────

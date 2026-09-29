@@ -561,6 +561,87 @@ describe('phase 1: transactions', () => {
     expect(s3.categoryId).toBe(actual.categories['Food']);
   });
 
+  it('shows the running balance on one account', async () => {
+    type Page = { items: Tx[]; nextCursor: string | null; runningBalances: number[] | null };
+    const accounts = (await call({ method: 'GET', url: `/v1/budgets/${budgetId}/accounts`, path: '/v1/budgets/{budgetId}/accounts', token: owner.accessToken })).body as { items: { id: string; balance: number }[] };
+    const balance = accounts.items.find((a) => a.id === actual.accounts.checking)!.balance;
+    const page1 = (await call({ method: 'GET', url: `${tx()}?accountId=${actual.accounts.checking}&limit=3`, path: LIST, token: owner.accessToken })).body as Page;
+    expect(page1.runningBalances).toHaveLength(page1.items.length);
+    expect(page1.runningBalances![0]).toBe(balance);
+    for (let i = 1; i < page1.items.length; i++) expect(page1.runningBalances![i]).toBe(page1.runningBalances![i - 1]! - page1.items[i - 1]!.amount);
+    const page2 = (await call({ method: 'GET', url: `${tx()}?accountId=${actual.accounts.checking}&limit=3&cursor=${page1.nextCursor}`, path: LIST, token: owner.accessToken })).body as Page;
+    expect(page2.runningBalances![0]).toBe(page1.runningBalances![2]! - page1.items[2]!.amount);
+    recordFixture('transactions-running-balance', page1);
+    // Filtered lists have no meaningful running balance.
+    const filtered = (await call({ method: 'GET', url: `${tx()}?accountId=${actual.accounts.checking}&q=a`, path: LIST, token: owner.accessToken })).body as Page;
+    expect(filtered.runningBalances).toBeNull();
+  });
+
+  it('filters by merchant', async () => {
+    const t = await create({ accountId: actual.accounts.checking, amount: -1234, payeeName: 'Only Here Once' });
+    const items = await list(`payeeId=${((await call({ method: 'GET', url: one(t.id), path: ONE, token: owner.accessToken })).body as { payeeId: string }).payeeId}`);
+    expect(items.map((x) => x.id)).toEqual([t.id]);
+  });
+
+  it('filters by category group and month', async () => {
+    const groups = (await call({ method: 'GET', url: `/v1/budgets/${budgetId}/category-groups`, path: '/v1/budgets/{budgetId}/category-groups', token: owner.accessToken })).body as { items: { id: string; categories: { id: string }[] }[] };
+    const group = groups.items.find((g) => g.categories.some((c) => c.id === actual.categories['Food']))!;
+    const ids = new Set(group.categories.map((c) => c.id));
+    const items = await list(`groupId=${group.id}&since=${actual.month}-01&until=${actual.month}-31`);
+    expect(items.length).toBeGreaterThan(0);
+    expect(items.every((t) => (t.categoryId && ids.has(t.categoryId)) || t.subtransactions.some((s) => s.categoryId && ids.has(s.categoryId)))).toBe(true);
+  });
+
+  it('edits and deletes in bulk, skipping what can\'t change', async () => {
+    const BATCH = '/v1/budgets/{budgetId}/transactions/batch';
+    const a = await create({ accountId: actual.accounts.checking, amount: -101, payeeName: 'Bulk A' });
+    const b = await create({ accountId: actual.accounts.checking, amount: -102, payeeName: 'Bulk B' });
+    const split = await create({
+      accountId: actual.accounts.checking, amount: -300, payeeName: 'Bulk Split',
+      subtransactions: [{ amount: -100, categoryId: actual.categories['Food'] }, { amount: -200, categoryId: actual.categories['General'] }],
+    });
+    const res = await call({ method: 'POST', url: `${tx()}/batch`, path: BATCH, token: owner.accessToken, body: { ids: [a.id, b.id, split.id, 'nope'], set: { categoryId: actual.categories['Bills'] } } });
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ updated: 2, deleted: 0, skipped: [{ id: split.id, reason: 'split' }, { id: 'nope', reason: 'not_found' }] });
+    expect(((await call({ method: 'GET', url: one(b.id), path: ONE, token: owner.accessToken })).body as Tx).categoryId).toBe(actual.categories['Bills']);
+    const cleared = await call({ method: 'POST', url: `${tx()}/batch`, path: BATCH, token: owner.accessToken, body: { ids: [a.id, split.id], set: { cleared: false } } });
+    expect(cleared.body).toMatchObject({ updated: 2, skipped: [] });
+    const del = await call({ method: 'POST', url: `${tx()}/batch`, path: BATCH, token: owner.accessToken, body: { ids: [a.id, b.id], delete: true } });
+    expect(del.body).toEqual({ updated: 0, deleted: 2, skipped: [] });
+    expect((await call({ method: 'GET', url: one(a.id), path: ONE, token: owner.accessToken })).status).toBe(404);
+    expect((await call({ method: 'POST', url: `${tx()}/batch`, path: BATCH, token: owner.accessToken, body: { ids: [a.id] } })).status).toBe(400);
+  });
+
+  it('keeps a review inbox per person', async () => {
+    const REVIEW = '/v1/budgets/{budgetId}/review';
+    type Inbox = { items: Tx[]; total: number; more: boolean; since: string };
+    const robinMember = store.createMember({ displayName: 'Robin', role: 'member', budgetIds: [budgetId] });
+    const robin = await pair(robinMember.id, 'Robin phone');
+    const inbox = async (token: string) => (await call({ method: 'GET', url: `/v1/budgets/${budgetId}/review?limit=200`, path: REVIEW, token })).body as Inbox;
+
+    const t = await create({ accountId: actual.accounts.checking, amount: -4242, payeeName: 'Review Me', categoryId: actual.categories['Food'] });
+    // Someone else's new transaction is in Robin's inbox; your own isn't in yours.
+    expect((await inbox(robin.accessToken)).items.some((x) => x.id === t.id)).toBe(true);
+    expect((await inbox(owner.accessToken)).items.some((x) => x.id === t.id)).toBe(false);
+
+    const before = (await inbox(robin.accessToken)).total;
+    const marked = await call({ method: 'POST', url: `/v1/budgets/${budgetId}/review`, path: REVIEW, token: robin.accessToken, body: { ids: [t.id] } });
+    expect(marked.body).toEqual({ remaining: before - 1 });
+    expect((await inbox(robin.accessToken)).items.some((x) => x.id === t.id)).toBe(false);
+
+    // Uncategorized stays in the inbox even when it's old news, until reviewed.
+    const all = await call({ method: 'POST', url: `/v1/budgets/${budgetId}/review`, path: REVIEW, token: robin.accessToken, body: { all: true } });
+    expect(all.body).toEqual({ remaining: 0 });
+    const next = await create({ accountId: actual.accounts.checking, amount: -777, payeeName: 'After Catch Up' });
+    const after = await inbox(robin.accessToken);
+    expect(after.items.map((x) => x.id)).toEqual([next.id]);
+    recordFixture('review-inbox', after);
+
+    // Editing it counts as reviewing it.
+    await call({ method: 'PATCH', url: one(next.id), path: ONE, token: robin.accessToken, body: { categoryId: actual.categories['Food'] } });
+    expect((await inbox(robin.accessToken)).total).toBe(0);
+  });
+
   it('reports budget preferences with defaults', async () => {
     const res = await call({ method: 'GET', url: `/v1/budgets/${budgetId}/preferences`, path: '/v1/budgets/{budgetId}/preferences', token: owner.accessToken });
     expect(res.body).toMatchObject({ budgetType: 'envelope', currencyCode: 'USD', firstDayOfWeek: 0 });

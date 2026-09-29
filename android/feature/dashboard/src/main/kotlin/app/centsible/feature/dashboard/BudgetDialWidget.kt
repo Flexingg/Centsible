@@ -1,6 +1,7 @@
 package app.centsible.feature.dashboard
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -82,8 +83,13 @@ class BudgetDialWidget @Inject constructor() : DashboardWidget {
                 if (dial.slices.isNotEmpty()) {
                     Spacer(Modifier.height(14.dp))
                     dial.slices.forEachIndexed { i, s ->
+                        // A group opens its transactions this month; "Other" opens the budget.
+                        val open = s.groupId?.let { g -> { context.navigate(Destination.TransactionsFor.month(s.name, month.month, groupId = g)) } }
                         Row(
-                            Modifier.fillMaxWidth().padding(vertical = 4.dp).staggeredEntrance(i + 4, key = month.month),
+                            Modifier.fillMaxWidth()
+                                .then(if (open != null) Modifier.clickable(onClickLabel = "See ${s.name} transactions", onClick = open) else Modifier)
+                                .padding(vertical = 4.dp)
+                                .staggeredEntrance(i + 4, key = month.month),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(10.dp),
                         ) {
@@ -107,7 +113,8 @@ internal data class BudgetDial(
     val day: Pair<Int, Int>?,
     val status: String,
 ) {
-    data class Slice(val name: String, val amount: Money, val fraction: Float, val color: Color)
+    /** [groupId] is null for "Other". */
+    data class Slice(val name: String, val amount: Money, val fraction: Float, val color: Color, val groupId: app.centsible.core.model.CategoryGroupId? = null)
 
     val description: String
         get() = "Budget dial: ${MoneyFormat.format(spent, showCents = false)} spent of ${MoneyFormat.format(budgeted, showCents = false)}. $status."
@@ -119,14 +126,14 @@ internal data class BudgetDial(
             val spent = month.totalSpent.abs()
             val budgeted = month.totalBudgeted
             val groups = month.expenseGroups.filter { !it.hidden && it.spent.minor < 0 }
-                .map { it.name to it.spent.abs() }
+                .map { Triple(it.name, it.spent.abs(), it.id) }
                 .sortedByDescending { it.second.minor }
             // The whole arc is the budget; if nothing is budgeted (or spending passed it), it's what was spent.
             val whole = maxOf(budgeted.minor, spent.minor).toFloat()
             val top = groups.take(TOP)
             val rest = groups.drop(TOP)
             val slices = buildList {
-                top.forEachIndexed { i, (name, amount) -> add(Slice(name, amount, amount.minor / whole, Motion.Segments[i])) }
+                top.forEachIndexed { i, (name, amount, id) -> add(Slice(name, amount, amount.minor / whole, Motion.Segments[i], id)) }
                 if (rest.isNotEmpty()) {
                     val other = Money(rest.sumOf { it.second.minor })
                     add(Slice("Other", other, other.minor / whole, Motion.Cream.copy(alpha = 0.55f)))

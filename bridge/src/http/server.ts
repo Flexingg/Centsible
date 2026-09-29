@@ -1,3 +1,4 @@
+import type { ReviewOps } from '../actual/review-ops.js';
 import Fastify, { type FastifyError, type FastifyInstance, type FastifyRequest } from 'fastify';
 import type { ActualHost } from '../actual/host.js';
 import type { BudgetOps } from '../actual/budget-ops.js';
@@ -38,6 +39,7 @@ export type Deps = {
   host: ActualHost;
   ops: BudgetOps;
   transactions: TransactionOps;
+  review: ReviewOps;
   structure: StructureOps;
   planning: PlanningOps;
   plan: PlanOps;

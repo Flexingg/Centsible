@@ -129,9 +129,9 @@ class SubscriptionsViewModel @Inject constructor(
 }
 
 @Composable
-fun SubscriptionsRoute(onBack: () -> Unit, viewModel: SubscriptionsViewModel = hiltViewModel()) {
+fun SubscriptionsRoute(onBack: () -> Unit, onOpenTransactions: (app.centsible.core.extensions.Destination.TransactionsFor) -> Unit = {}, viewModel: SubscriptionsViewModel = hiltViewModel()) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    SubscriptionsScreen(state, onBack, onRetry = { viewModel.load() }, onTrack = { viewModel.track(it) }, onDismiss = { viewModel.dismiss(it) }, onMessageShown = viewModel::messageShown)
+    SubscriptionsScreen(state, onBack, onRetry = { viewModel.load() }, onTrack = { viewModel.track(it) }, onDismiss = { viewModel.dismiss(it) }, onMessageShown = viewModel::messageShown, onOpenTransactions = onOpenTransactions)
 }
 
 internal fun every(c: RecurringCandidate): String {
@@ -152,6 +152,7 @@ fun SubscriptionsScreen(
     onTrack: (RecurringCandidate) -> Unit = {},
     onDismiss: (RecurringCandidate) -> Unit = {},
     onMessageShown: () -> Unit = {},
+    onOpenTransactions: (app.centsible.core.extensions.Destination.TransactionsFor) -> Unit = {},
 ) {
     val colors = CentsibleTheme.colors
     val snackbar = remember { SnackbarHostState() }
@@ -213,11 +214,11 @@ fun SubscriptionsScreen(
                     }
                     if (bills.isNotEmpty()) {
                         item { StatLabel("Subscriptions and bills", Modifier.padding(start = 4.dp, top = 4.dp)) }
-                        items(bills, key = { it.payeeId.raw }) { CandidateCard(it, state, onTrack, onDismiss) }
+                        items(bills, key = { it.payeeId.raw }) { CandidateCard(it, state, onTrack, onDismiss, onOpen = { onOpenTransactions(app.centsible.core.extensions.Destination.TransactionsFor(it.payeeName, payeeId = it.payeeId)) }) }
                     }
                     if (income.isNotEmpty()) {
                         item { StatLabel("Income", Modifier.padding(start = 4.dp, top = 4.dp)) }
-                        items(income, key = { it.payeeId.raw }) { CandidateCard(it, state, onTrack, onDismiss) }
+                        items(income, key = { it.payeeId.raw }) { CandidateCard(it, state, onTrack, onDismiss, onOpen = { onOpenTransactions(app.centsible.core.extensions.Destination.TransactionsFor(it.payeeName, payeeId = it.payeeId)) }) }
                     }
                 }
             }
@@ -226,10 +227,11 @@ fun SubscriptionsScreen(
 }
 
 @Composable
-private fun CandidateCard(c: RecurringCandidate, state: SubscriptionsUiState, onTrack: (RecurringCandidate) -> Unit, onDismiss: (RecurringCandidate) -> Unit) {
+private fun CandidateCard(c: RecurringCandidate, state: SubscriptionsUiState, onTrack: (RecurringCandidate) -> Unit, onDismiss: (RecurringCandidate) -> Unit, onOpen: () -> Unit = {}) {
     val colors = CentsibleTheme.colors
     val busy = c.payeeId.raw in state.busy
-    CentsibleCard(contentPadding = PaddingValues(16.dp)) {
+    // Tapping the card shows the payments it was found from.
+    CentsibleCard(onClick = onOpen, contentPadding = PaddingValues(16.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             MerchantAvatar(c.payeeName)
             androidx.compose.foundation.layout.Spacer(Modifier.width(12.dp))

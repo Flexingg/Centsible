@@ -40,8 +40,8 @@ class BridgeBudgetEngine @Inject constructor(private val api: BridgeApi) : Budge
     override suspend fun payees(budget: BudgetId) = api.payees(budget.raw).map { it.toModel() }
 
     override suspend fun transactions(budget: BudgetId, query: TransactionQuery, cursor: String?) =
-        api.transactions(budget.raw, query.accountId?.raw, query.categoryId?.raw, query.since, query.until, query.limit, cursor, query.search, query.uncategorized)
-            .let { page -> Page(page.items.map { it.toModel() }, page.nextCursor) }
+        api.transactions(budget.raw, query.accountId?.raw, query.categoryId?.raw, query.since, query.until, query.limit, cursor, query.search, query.uncategorized, query.payeeId?.raw, query.groupId?.raw)
+            .let { page -> Page(page.items.map { it.toModel() }, page.nextCursor, page.runningBalances?.map(::Money)) }
 
     override suspend fun createTransaction(budget: BudgetId, transaction: NewTransaction) = api.createTransaction(
         budget.raw,

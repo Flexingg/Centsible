@@ -9,6 +9,7 @@ import { BackupService } from './backups.js';
 import { ServerOps } from './server-ops.js';
 import { ReportOps } from './actual/report-ops.js';
 import { StructureOps } from './actual/structure-ops.js';
+import { ReviewOps } from './actual/review-ops.js';
 import { TransactionOps } from './actual/transaction-ops.js';
 import type { HouseholdStore } from './auth/store.js';
 import { BankSyncBackfill } from './bank-sync-backfill.js';
@@ -44,6 +45,7 @@ export function createDeps(config: BridgeConfig, store: HouseholdStore, host: Ac
     plan: new PlanOps(host, budgetOps),
     insights: new InsightsOps(host, store),
     transactions: new TransactionOps(host),
+    review: new ReviewOps(host, store),
     structure: new StructureOps(host),
     planning: new PlanningOps(host),
     accountOps: new AccountOps(host),

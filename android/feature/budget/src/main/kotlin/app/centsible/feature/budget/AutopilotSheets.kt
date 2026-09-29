@@ -48,6 +48,8 @@ data class BudgetPlanActions(
     val apply: () -> Unit = {},
     val openCover: (Boolean) -> Unit = {},
     val cover: () -> Unit = {},
+    /** Tap-through to the transactions behind a number. */
+    val openTransactions: (app.centsible.core.extensions.Destination.TransactionsFor) -> Unit = {},
 )
 
 /**

@@ -44,13 +44,15 @@ class DashboardScreenshotTest {
         categoryNames = SampleHousehold.budgetMonth.groups.flatMap { it.categories }.associate { it.id.raw to it.name },
         navigate = {},
         today = java.time.LocalDate.of(SampleHousehold.budgetMonth.month.year, SampleHousehold.budgetMonth.month.month, 18),
+        reviewCount = 7,
+        reviewPreview = SampleHousehold.transactions.take(3),
     )
 
     @Test fun dashboard_light() {
         compose.setContent {
             CentsibleTheme(darkTheme = false) {
                 DashboardScreen(
-                    DashboardUiState("Jo", Loadable.Ready(context), listOf(BudgetDialWidget(), NetWorthWidget(), BudgetSummaryWidget(), RecentTransactionsWidget())),
+                    DashboardUiState("Jo", Loadable.Ready(context), listOf(ReviewWidget(), BudgetDialWidget(), NetWorthWidget(), BudgetSummaryWidget(), RecentTransactionsWidget())),
                     onNavigate = {}, onRetry = {}, now = LocalTime.of(9, 0),
                 )
             }
@@ -82,7 +84,7 @@ class DashboardScreenshotTest {
                     },
                 ) {
                     DashboardScreen(
-                        DashboardUiState("Jo", Loadable.Ready(context), listOf(BudgetDialWidget(), NetWorthWidget(), BudgetSummaryWidget(), RecentTransactionsWidget())),
+                        DashboardUiState("Jo", Loadable.Ready(context), listOf(ReviewWidget(), BudgetDialWidget(), NetWorthWidget(), BudgetSummaryWidget(), RecentTransactionsWidget())),
                         onNavigate = {}, onRetry = {}, now = LocalTime.of(9, 0),
                     )
                 }

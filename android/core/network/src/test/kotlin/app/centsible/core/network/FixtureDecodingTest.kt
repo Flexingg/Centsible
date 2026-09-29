@@ -23,6 +23,8 @@ class FixtureDecodingTest {
         "accounts" to ItemsDto.serializer(AccountDto.serializer()),
         "category-groups" to ItemsDto.serializer(CategoryGroupDto.serializer()),
         "transactions-page" to TransactionPageDto.serializer(),
+        "transactions-running-balance" to TransactionPageDto.serializer(),
+        "review-inbox" to ReviewInboxDto.serializer(),
         "transaction" to TransactionDto.serializer(),
         "budget-month" to BudgetMonthDto.serializer(),
         "problem-unauthorized" to ProblemDto.serializer(),

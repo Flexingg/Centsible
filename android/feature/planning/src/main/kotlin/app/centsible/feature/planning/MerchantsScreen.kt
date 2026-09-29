@@ -100,7 +100,7 @@ class MerchantsViewModel @Inject constructor(
 }
 
 @Composable
-fun MerchantsRoute(onBack: () -> Unit, viewModel: MerchantsViewModel = hiltViewModel()) {
+fun MerchantsRoute(onBack: () -> Unit, onOpenTransactions: (app.centsible.core.extensions.Destination.TransactionsFor) -> Unit = {}, viewModel: MerchantsViewModel = hiltViewModel()) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     MerchantsScreen(
         state, onBack,
@@ -109,6 +109,7 @@ fun MerchantsRoute(onBack: () -> Unit, viewModel: MerchantsViewModel = hiltViewM
         onDelete = { viewModel.delete(it) },
         onRetry = { viewModel.refresh() },
         onMessageShown = viewModel::messageShown,
+        onOpenTransactions = onOpenTransactions,
     )
 }
 
@@ -121,6 +122,7 @@ fun MerchantsScreen(
     onDelete: (PayeeStat) -> Unit = {},
     onRetry: () -> Unit = {},
     onMessageShown: () -> Unit = {},
+    onOpenTransactions: (app.centsible.core.extensions.Destination.TransactionsFor) -> Unit = {},
 ) {
     val colors = CentsibleTheme.colors
     val snackbar = remember { SnackbarHostState() }
@@ -158,7 +160,7 @@ fun MerchantsScreen(
                             shown.forEachIndexed { i, p ->
                                 if (i > 0) HorizontalDivider(Modifier.padding(start = 64.dp), color = colors.border)
                                 Row(
-                                    Modifier.fillMaxWidth().clickable(enabled = state.canEdit) { selected = p }.padding(horizontal = 16.dp, vertical = 12.dp),
+                                    Modifier.fillMaxWidth().clickable { if (state.canEdit) selected = p else onOpenTransactions(app.centsible.core.extensions.Destination.TransactionsFor(p.name, payeeId = p.id)) }.padding(horizontal = 16.dp, vertical = 12.dp),
                                     verticalAlignment = Alignment.CenterVertically,
                                 ) {
                                     MerchantAvatar(p.name)
@@ -191,6 +193,11 @@ fun MerchantsScreen(
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedTextField(name, { name = it }, label = { Text("Name") }, singleLine = true)
+                    if (p.transactionCount > 0) {
+                        TextButton(onClick = { selected = null; onOpenTransactions(app.centsible.core.extensions.Destination.TransactionsFor(p.name, payeeId = p.id)) }) {
+                            Text(if (p.transactionCount == 1) "See its transaction" else "See its ${p.transactionCount} transactions")
+                        }
+                    }
                     TextButton(onClick = { merging = p; selected = null }) { Text("Merge another merchant into this one…") }
                     if (p.transactionCount == 0) TextButton(onClick = { onDelete(p); selected = null }) { Text("Delete (unused)", color = colors.negative) }
                 }

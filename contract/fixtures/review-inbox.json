@@ -1,0 +1,23 @@
+{
+  "items": [
+    {
+      "id": "ee26fa40-c644-457a-bf68-c67d906f7113",
+      "accountId": "4f50dbe9-b7f1-48f7-b629-e31d374afafd",
+      "date": "2026-09-15",
+      "amount": -777,
+      "payeeId": "38d4a1c8-bf13-4437-8626-089904858736",
+      "payeeName": "After Catch Up",
+      "categoryId": null,
+      "notes": null,
+      "cleared": true,
+      "reconciled": false,
+      "transferId": null,
+      "isParent": false,
+      "parentId": null,
+      "subtransactions": []
+    }
+  ],
+  "total": 1,
+  "more": false,
+  "since": "2026-09-29T08:04:58.036Z"
+}

@@ -84,7 +84,7 @@ import kotlinx.serialization.Serializable
     val subtransactions: List<TransactionDto> = emptyList(),
 )
 
-@Serializable data class TransactionPageDto(val items: List<TransactionDto>, val nextCursor: String? = null)
+@Serializable data class TransactionPageDto(val items: List<TransactionDto>, val nextCursor: String? = null, val runningBalances: List<Long>? = null)
 
 @Serializable data class NewTransactionDto(
     val id: String,
