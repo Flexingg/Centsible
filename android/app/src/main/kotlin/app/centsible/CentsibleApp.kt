@@ -107,6 +107,8 @@ private object Routes {
     const val SEARCH = "transactions/search?${TransactionsViewModel.ARG_QUERY}={${TransactionsViewModel.ARG_QUERY}}"
 
     const val REVIEW = "review"
+    const val RULE = "rule?id={id}&payee={payee}&category={category}"
+    fun rule(id: String?, payee: String? = null, category: String? = null) = "rule?id=${id.orEmpty()}&payee=${payee.orEmpty()}&category=${category.orEmpty()}"
     const val AUTOMATIONS = "automations?month={month}"
     fun automations(month: YearMonth) = "automations?month=${month.raw}"
     const val AUTOMATION = "automation/{category}?month={month}"
@@ -297,8 +299,14 @@ private fun MainScaffold(
             }
             composable(Routes.REPORTS) { ReportsRoute(onBack = { nav.popBackStack() }, onOpenTransactions = { nav.go(it) }) }
             composable(Routes.MERCHANTS) { MerchantsRoute(onBack = { nav.popBackStack() }, onOpenTransactions = { nav.go(it) }) }
-            composable(Routes.RULES) { RulesRoute(onBack = { nav.popBackStack() }) }
+            composable(Routes.RULES) { RulesRoute(onBack = { nav.popBackStack() }, onOpenRule = { nav.navigate(Routes.rule(it)) }) }
             composable(Routes.TAGS) { TagsRoute(onBack = { nav.popBackStack() }, onSearch = { nav.navigate(Routes.search(it)) }) }
+            composable(
+                Routes.RULE,
+                arguments = listOf("id", "payee", "category").map { n -> navArgument(n) { type = NavType.StringType; defaultValue = "" } },
+            ) {
+                app.centsible.feature.planning.RuleEditorRoute(onDone = { nav.popBackStack() })
+            }
             composable(Routes.AUTOMATIONS, arguments = listOf(navArgument("month") { type = NavType.StringType; defaultValue = "" })) {
                 app.centsible.feature.budget.AutomationsRoute(onBack = { nav.popBackStack() }, onOpen = { c, m -> nav.navigate(Routes.automation(c, m)) })
             }
@@ -336,7 +344,12 @@ private fun MainScaffold(
                     navArgument(TransactionEditorViewModel.ARG_ID) { type = NavType.StringType; defaultValue = "" },
                     navArgument(TransactionEditorViewModel.ARG_ACCOUNT) { type = NavType.StringType; defaultValue = "" },
                 ),
-            ) { TransactionEditorRoute(onClose = { nav.popBackStack() }) }
+            ) {
+                TransactionEditorRoute(
+                    onClose = { nav.popBackStack() },
+                    onMakeRule = { p, c -> nav.navigate(Routes.rule(null, p.raw, c?.raw)) },
+                )
+            }
             composable(Routes.CATEGORIES) { CategoryManagerRoute(onBack = { nav.popBackStack() }) }
         }
     }

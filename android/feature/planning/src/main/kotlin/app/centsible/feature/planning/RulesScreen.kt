@@ -1,5 +1,6 @@
 package app.centsible.feature.planning
 
+import androidx.compose.material.icons.rounded.Search
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -118,24 +119,23 @@ class RulesViewModel @Inject constructor(
 }
 
 @Composable
-fun RulesRoute(onBack: () -> Unit, viewModel: RulesViewModel = hiltViewModel()) {
+fun RulesRoute(onBack: () -> Unit, onOpenRule: (String?) -> Unit = {}, viewModel: RulesViewModel = hiltViewModel()) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    RulesScreen(state, onBack, onSave = viewModel::save, onDelete = viewModel::delete, onRetry = { viewModel.refresh() }, onMessageShown = viewModel::messageShown)
+    RulesScreen(state, onBack, onOpen = onOpenRule, onRetry = { viewModel.refresh() }, onMessageShown = viewModel::messageShown)
 }
 
 @Composable
 fun RulesScreen(
     state: RulesUiState,
     onBack: () -> Unit,
-    onSave: (String?, RuleDraft) -> Unit = { _, _ -> },
-    onDelete: (String) -> Unit = {},
+    /** Opens the rule editor; null starts a new rule. */
+    onOpen: (String?) -> Unit = {},
     onRetry: () -> Unit = {},
     onMessageShown: () -> Unit = {},
 ) {
     val colors = CentsibleTheme.colors
     val snackbar = remember { SnackbarHostState() }
-    var editing by remember { mutableStateOf<Rule?>(null) }
-    var creating by remember { mutableStateOf(false) }
+    var query by remember { mutableStateOf("") }
     LaunchedEffect(state.message) { state.message?.let { snackbar.showSnackbar(it); onMessageShown() } }
     Scaffold(
         containerColor = colors.canvas,
@@ -144,7 +144,7 @@ fun RulesScreen(
             Row(Modifier.fillMaxWidth().padding(4.dp), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Back") }
                 Text("Rules", style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
-                if (state.canEdit) TextButton(onClick = { creating = true }) { Text("Add") }
+                if (state.canEdit) TextButton(onClick = { onOpen(null) }) { Text("Add") }
             }
         },
     ) { padding ->
@@ -164,12 +164,25 @@ fun RulesScreen(
                         modifier = Modifier.padding(horizontal = 4.dp),
                     )
                 }
+                if (d.value.visible.size > 5) {
+                    item {
+                        androidx.compose.material3.OutlinedTextField(
+                            query, { query = it },
+                            placeholder = { Text("Search rules") },
+                            leadingIcon = { Icon(Icons.Rounded.Search, contentDescription = null) },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
+                }
                 if (d.value.visible.isEmpty()) {
                     item { Text("No rules yet. Tip: when you pick a category for a merchant, tick \"Always use this category\".", style = MaterialTheme.typography.bodyMedium, color = colors.textSecondary, modifier = Modifier.padding(4.dp)) }
                 }
-                items(d.value.visible, key = { it.id }) { rule ->
-                    val (ifText, thenText) = Describe.rule(rule, d.value.names)
-                    CentsibleCard(onClick = { editing = rule }) {
+                val shown = d.value.visible.map { it to Describe.rule(it, d.value.names) }
+                    .filter { (_, text) -> query.isBlank() || (text.first + " " + text.second).contains(query.trim(), ignoreCase = true) }
+                items(shown, key = { it.first.id }) { (rule, text) ->
+                    val (ifText, thenText) = text
+                    CentsibleCard(onClick = { onOpen(rule.id) }) {
                         StatLabel(if (rule.stage == "pre") "Runs first" else if (rule.stage == "post") "Runs last" else "Rule")
                         Text(ifText, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.padding(top = 4.dp))
                         Text("→ $thenText", style = MaterialTheme.typography.bodyMedium, color = colors.textSecondary, modifier = Modifier.padding(top = 2.dp))
@@ -189,15 +202,4 @@ fun RulesScreen(
         }
     }
 
-    val data = state.data.valueOrNull
-    if (data != null && (editing != null || creating)) {
-        RuleSheet(
-            rule = editing,
-            data = data,
-            canEdit = state.canEdit,
-            onDismiss = { editing = null; creating = false },
-            onSave = { draft -> onSave(editing?.id, draft); editing = null; creating = false },
-            onDelete = { id -> onDelete(id); editing = null },
-        )
-    }
 }

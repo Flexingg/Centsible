@@ -1,4 +1,5 @@
 import type { FastifyPluginAsync } from 'fastify';
+import type { RuleDraft } from '../../actual/rule-tools.js';
 import type { RuleInput, ScheduleInput } from '../../actual/planning-ops.js';
 import { audit, requireBudget, type Deps } from '../server.js';
 import { DATE, MONEY, type BudgetParams } from './budgets.js';
@@ -126,6 +127,49 @@ export const planningRoutes =
       audit(deps, req, req.params.budgetId, 'rule.updated', req.params.id);
       return r;
     });
+    // Which transactions a (draft) rule matches and what it would do; nothing is written.
+    app.post<{ Params: BudgetParams; Body: RuleDraft & { limit?: number } }>(
+      '/v1/budgets/:budgetId/rules/preview',
+      {
+        schema: {
+          body: {
+            type: 'object',
+            required: ['conditions', 'actions'],
+            additionalProperties: false,
+            properties: { ...RULE.properties, limit: { type: 'integer', minimum: 1, maximum: 100 } },
+          },
+        },
+      },
+      async (req) => {
+        requireBudget(deps, req, req.params.budgetId);
+        return deps.ruleTools.preview(req.params.budgetId, req.body, req.body.limit ?? 20);
+      },
+    );
+
+    // Runs a saved rule on the existing transactions it matches (or some of them).
+    app.post<{ Params: IdParams; Body: { transactionIds?: string[] } | undefined }>(
+      '/v1/budgets/:budgetId/rules/:id/run',
+      { schema: { body: { type: ['object', 'null'], additionalProperties: false, properties: { transactionIds: { type: 'array', minItems: 1, maxItems: 1000, items: { type: 'string' } } } } } },
+      async (req) => {
+        requireBudget(deps, req, req.params.budgetId, 'member');
+        const res = await deps.ruleTools.runRule(req.params.budgetId, req.params.id, req.body?.transactionIds);
+        audit(deps, req, req.params.budgetId, 'rule.run', req.params.id, res);
+        return res;
+      },
+    );
+
+    // Every rule again, on chosen transactions (as if just imported).
+    app.post<{ Params: BudgetParams; Body: { transactionIds: string[] } }>(
+      '/v1/budgets/:budgetId/rules/rerun',
+      { schema: { body: { type: 'object', required: ['transactionIds'], additionalProperties: false, properties: { transactionIds: { type: 'array', minItems: 1, maxItems: 500, items: { type: 'string' } } } } } },
+      async (req) => {
+        requireBudget(deps, req, req.params.budgetId, 'member');
+        const res = await deps.ruleTools.rerun(req.params.budgetId, req.body.transactionIds);
+        audit(deps, req, req.params.budgetId, 'rules.rerun', undefined, res);
+        return res;
+      },
+    );
+
     app.delete<{ Params: IdParams }>('/v1/budgets/:budgetId/rules/:id', async (req, reply) => {
       write(req, req.params.budgetId);
       await planning.deleteRule(req.params.budgetId, req.params.id);

@@ -74,7 +74,12 @@ import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 
 @Composable
-fun TransactionEditorRoute(onClose: () -> Unit, viewModel: TransactionEditorViewModel = hiltViewModel()) {
+fun TransactionEditorRoute(
+    onClose: () -> Unit,
+    /** Opens a new rule prefilled from this transaction (merchant → category). */
+    onMakeRule: (app.centsible.core.model.PayeeId, app.centsible.core.model.CategoryId?) -> Unit = { _, _ -> },
+    viewModel: TransactionEditorViewModel = hiltViewModel(),
+) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     LaunchedEffect(state.done) { if (state.done) onClose() }
     TransactionEditorScreen(
@@ -89,6 +94,7 @@ fun TransactionEditorRoute(onClose: () -> Unit, viewModel: TransactionEditorView
             removeSplit = viewModel::removeSplit,
             save = viewModel::save,
             delete = viewModel::delete,
+            makeRule = onMakeRule,
         ),
     )
 }
@@ -98,6 +104,7 @@ data class EditorActions(
     val retry: () -> Unit = {},
     val edit: ((TransactionForm) -> TransactionForm) -> Unit = {},
     val rememberCategory: (Boolean) -> Unit = {},
+    val makeRule: (app.centsible.core.model.PayeeId, app.centsible.core.model.CategoryId?) -> Unit = { _, _ -> },
     val addSplit: () -> Unit = {},
     val updateSplit: (Long, (SplitRow) -> SplitRow) -> Unit = { _, _ -> },
     val removeSplit: (Long) -> Unit = {},
@@ -248,6 +255,12 @@ fun TransactionEditorScreen(state: EditorUiState, actions: EditorActions) {
                     Text("🔒 Reconciled transactions are read-only here. Unlock them in Actual to edit.", style = MaterialTheme.typography.bodySmall, color = colors.textSecondary)
                 }
                 state.error?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = colors.negative) }
+                // A rule so the next one from this merchant is handled the same way.
+                state.original?.takeIf { it.payeeId != null && !it.isTransfer && state.canDelete }?.let { t ->
+                    TextButton(onClick = { actions.makeRule(t.payeeId!!, t.categoryId) }, modifier = Modifier.fillMaxWidth()) {
+                        Text("Make a rule for ${t.payeeName ?: "this merchant"}…")
+                    }
+                }
                 if (state.canDelete) {
                     TextButton(onClick = { confirmDelete = true }, enabled = !state.saving, modifier = Modifier.fillMaxWidth()) {
                         Icon(Icons.Rounded.DeleteOutline, contentDescription = null, tint = colors.negative)

@@ -1,3 +1,4 @@
+import type { RuleTools } from '../actual/rule-tools.js';
 import type { AutomationOps } from '../actual/automation-ops.js';
 import type { ReviewOps } from '../actual/review-ops.js';
 import Fastify, { type FastifyError, type FastifyInstance, type FastifyRequest } from 'fastify';
@@ -43,6 +44,7 @@ export type Deps = {
   transactions: TransactionOps;
   review: ReviewOps;
   automations: AutomationOps;
+  ruleTools: RuleTools;
   structure: StructureOps;
   planning: PlanningOps;
   plan: PlanOps;

@@ -1,0 +1,70 @@
+{
+  "matchCount": 2,
+  "items": [
+    {
+      "transaction": {
+        "id": "38a0cfdc-3f1b-4831-9fe4-33b5c19752e4",
+        "accountId": "9943feb0-2239-4a7c-b0db-d4ce4c2df654",
+        "date": "2026-09-05",
+        "amount": -9834,
+        "payeeId": "05624545-b6e9-41d9-92f6-9668cb135e9f",
+        "payeeName": "Costco",
+        "categoryId": "541836f1-e756-4473-a5d0-6c1d3f06c7fa",
+        "notes": null,
+        "cleared": true,
+        "reconciled": false,
+        "transferId": null,
+        "isParent": false,
+        "parentId": "6615171f-a36d-4543-ba12-f6088e9600f9",
+        "subtransactions": []
+      },
+      "changes": [
+        {
+          "field": "category",
+          "value": "Food"
+        },
+        {
+          "field": "notes",
+          "value": "COSTCO at Joint Checking"
+        },
+        {
+          "field": "amount",
+          "value": -19668
+        }
+      ]
+    },
+    {
+      "transaction": {
+        "id": "29bb2650-1ab3-4ec6-a5bb-e75b5856745b",
+        "accountId": "9943feb0-2239-4a7c-b0db-d4ce4c2df654",
+        "date": "2026-09-05",
+        "amount": -3000,
+        "payeeId": "05624545-b6e9-41d9-92f6-9668cb135e9f",
+        "payeeName": "Costco",
+        "categoryId": "af375fd4-d759-46b3-bffe-74a856151d57",
+        "notes": "batteries",
+        "cleared": true,
+        "reconciled": false,
+        "transferId": null,
+        "isParent": false,
+        "parentId": "6615171f-a36d-4543-ba12-f6088e9600f9",
+        "subtransactions": []
+      },
+      "changes": [
+        {
+          "field": "category",
+          "value": "Food"
+        },
+        {
+          "field": "notes",
+          "value": "COSTCO at Joint Checking"
+        },
+        {
+          "field": "amount",
+          "value": -6000
+        }
+      ]
+    }
+  ],
+  "errors": []
+}

@@ -24,6 +24,7 @@
     "adm-zip": "0.5.18",
     "better-sqlite3": "13.0.3",
     "fastify": "5.12.5",
+    "hyperformula": "3.3.0",
     "qrcode": "1.5.4"
   },
   "devDependencies": {

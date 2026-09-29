@@ -100,6 +100,7 @@ class TransactionsViewModel @Inject constructor(
     private val engine: BudgetEngine,
     private val selectedBudget: SelectedBudget,
     private val tools: TransactionTools,
+    private val rules: app.centsible.core.domain.RuleTools,
     private val sessions: app.centsible.core.domain.SessionStore,
     changes: BudgetChanges,
 ) : ViewModel() {
@@ -211,6 +212,17 @@ class TransactionsViewModel @Inject constructor(
                 refreshReviewCount()
             }
             .onFailure { e -> state.update { it.copy(message = e.userMessage()) } }
+    }
+
+    /** Every rule again on the selection (after adding or changing a rule, say). */
+    fun rerunRules() {
+        val ids = state.value.selected.toList()
+        state.update { it.copy(selected = emptySet()) }
+        viewModelScope.launch {
+            runCatching { rules.rerun(selectedBudget(), ids) }
+                .onSuccess { n -> state.update { it.copy(message = if (n == 0) "Rules ran; nothing changed" else "Rules changed $n transaction${if (n == 1) "" else "s"}") } }
+                .onFailure { e -> state.update { it.copy(message = e.userMessage()) } }
+        }
     }
 
     // ── Delete with undo ──

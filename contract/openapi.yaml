@@ -2184,6 +2184,74 @@ paths:
                   message: { type: string }
                   details: { type: [string, 'null'], description: Which automations need fixing }
 
+  /v1/budgets/{budgetId}/rules/preview:
+    post:
+      tags: [budgets]
+      operationId: previewRule
+      summary: "Which transactions a rule (saved or not) matches, and what it would change on the first `limit` of them. Nothing is written. Matching is Actual's own; formula results are worked out like Actual does (numbers out are currency units); BALANCE_OF, QUERY and BUDGET_QUERY only when the rule runs."
+      parameters:
+        - $ref: '#/components/parameters/BudgetId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [conditions, actions]
+              properties:
+                conditionsOp: { type: string, enum: [and, or] }
+                conditions: { type: array, items: { $ref: '#/components/schemas/RuleItem' } }
+                actions: { type: array, items: { $ref: '#/components/schemas/RuleItem' } }
+                stage: { type: [string, 'null'] }
+                limit: { type: integer, minimum: 1, maximum: 100 }
+      responses:
+        '200':
+          description: Matches and changes
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RulePreview' }
+
+  /v1/budgets/{budgetId}/rules/{id}/run:
+    post:
+      tags: [budgets]
+      operationId: runRule
+      summary: Members. Runs a saved rule's actions on the existing transactions it matches (or just `transactionIds`, where they match).
+      parameters:
+        - $ref: '#/components/parameters/BudgetId'
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody:
+        content:
+          application/json:
+            schema: { type: object, properties: { transactionIds: { type: array, items: { type: string } } } }
+      responses:
+        '200':
+          description: How many were updated
+          content:
+            application/json:
+              schema: { type: object, required: [updated], properties: { updated: { type: integer } } }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+
+  /v1/budgets/{budgetId}/rules/rerun:
+    post:
+      tags: [budgets]
+      operationId: rerunRules
+      summary: Members. Runs every rule again on these transactions, as if they had just been imported.
+      parameters:
+        - $ref: '#/components/parameters/BudgetId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [transactionIds], properties: { transactionIds: { type: array, minItems: 1, maxItems: 500, items: { type: string } } } }
+      responses:
+        '200':
+          description: How many changed
+          content:
+            application/json:
+              schema: { type: object, required: [checked, changed], properties: { checked: { type: integer }, changed: { type: integer } } }
+        '403': { $ref: '#/components/responses/Problem' }
+
 components:
   securitySchemes:
     bearer:
@@ -2658,6 +2726,30 @@ components:
         month: { type: [string, 'null'] }
         projected: { type: ['integer', 'null'] }
         perAutomation: { type: [array, 'null'], items: { $ref: '#/components/schemas/Money' } }
+
+    RulePreview:
+      type: object
+      required: [matchCount, items, errors]
+      properties:
+        matchCount: { type: integer, description: Every existing transaction the conditions match }
+        errors: { type: array, items: { type: string }, description: Conditions Actual couldn't turn into a search }
+        items:
+          type: array
+          items:
+            type: object
+            required: [transaction, changes]
+            properties:
+              transaction: { $ref: '#/components/schemas/Transaction' }
+              changes:
+                type: array
+                items:
+                  type: object
+                  required: [field, value]
+                  properties:
+                    field: { type: string }
+                    value: { description: "The new value (ids shown as names; amounts in minor units)" }
+                    note: { type: string }
+                    error: { type: string }
 
     ReviewInbox:
       type: object

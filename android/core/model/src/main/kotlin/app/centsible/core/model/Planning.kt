@@ -136,3 +136,8 @@ data class SpendingCategory(val categoryId: CategoryId?, val name: String, val g
 data class SpendingReport(val total: Money, val categories: List<SpendingCategory>)
 
 data class NetWorthPoint(val month: YearMonth, val assets: Money, val liabilities: Money, val netWorth: Money)
+
+/** What a rule would do to one existing transaction (nothing written). */
+data class RuleChange(val field: String, val value: String?, val note: String? = null, val error: String? = null)
+data class RulePreviewItem(val transaction: Transaction, val changes: List<RuleChange>)
+data class RulePreview(val matchCount: Int, val items: List<RulePreviewItem>, val errors: List<String>)

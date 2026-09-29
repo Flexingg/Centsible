@@ -70,6 +70,7 @@ data class TransactionsActions(
     val categorize: (List<TransactionId>) -> Unit = {},
     val move: (List<TransactionId>) -> Unit = {},
     val setCleared: (Boolean) -> Unit = {},
+    val rerunRules: () -> Unit = {},
     val delete: (List<TransactionId>) -> Unit = {},
     val undoDelete: () -> Unit = {},
     val pickCategory: (app.centsible.core.model.CategoryId?) -> Unit = {},
@@ -106,6 +107,7 @@ fun TransactionsRoute(
             categorize = viewModel::startCategorizing,
             move = viewModel::startMoving,
             setCleared = viewModel::setCleared,
+            rerunRules = viewModel::rerunRules,
             delete = viewModel::delete,
             undoDelete = viewModel::undoDelete,
             pickCategory = viewModel::categorize,
@@ -317,6 +319,7 @@ private fun SelectionBar(state: TransactionsUiState, actions: TransactionsAction
                 DropdownMenuItem(text = { Text("Move to account…") }, onClick = { more = false; actions.move(ids) })
                 DropdownMenuItem(text = { Text("Mark cleared") }, onClick = { more = false; actions.setCleared(true) })
                 DropdownMenuItem(text = { Text("Mark uncleared") }, onClick = { more = false; actions.setCleared(false) })
+                DropdownMenuItem(text = { Text("Run rules again") }, onClick = { more = false; actions.rerunRules() })
             }
         }
     }

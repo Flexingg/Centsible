@@ -9,6 +9,7 @@ import { BackupService } from './backups.js';
 import { ServerOps } from './server-ops.js';
 import { ReportOps } from './actual/report-ops.js';
 import { StructureOps } from './actual/structure-ops.js';
+import { RuleTools } from './actual/rule-tools.js';
 import { AutomationOps } from './actual/automation-ops.js';
 import { ReviewOps } from './actual/review-ops.js';
 import { TransactionOps } from './actual/transaction-ops.js';
@@ -48,6 +49,7 @@ export function createDeps(config: BridgeConfig, store: HouseholdStore, host: Ac
     transactions: new TransactionOps(host),
     review: new ReviewOps(host, store),
     automations: new AutomationOps(host),
+    ruleTools: new RuleTools(host),
     structure: new StructureOps(host),
     planning: new PlanningOps(host),
     accountOps: new AccountOps(host),

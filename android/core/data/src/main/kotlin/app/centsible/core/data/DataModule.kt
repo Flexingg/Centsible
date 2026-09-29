@@ -104,6 +104,11 @@ abstract class DataModule {
 
         @Provides
         @Singleton
+        fun ruleTools(client: BridgeClient, changes: NotifyingBudgetEngine): app.centsible.core.domain.RuleTools =
+            app.centsible.core.engine.bridge.BridgeRuleTools(app.centsible.core.network.RuleToolsApi(client), changes::notifyChanged)
+
+        @Provides
+        @Singleton
         fun automations(client: BridgeClient, changes: NotifyingBudgetEngine): app.centsible.core.domain.AutomationsGateway =
             app.centsible.core.engine.bridge.BridgeAutomations(app.centsible.core.network.AutomationsApi(client), changes::notifyChanged)
 

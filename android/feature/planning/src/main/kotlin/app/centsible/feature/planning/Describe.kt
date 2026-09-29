@@ -90,7 +90,30 @@ object Describe {
         return if (c.op == "onBudget" || c.op == "offBudget") "$field $op" else "$field $op ${value(c.field, c.value, names)}"
     }
 
-    fun action(a: RuleClause, names: Names): String = when (a.op) {
+    private val optionsJson = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
+
+    private fun option(a: RuleClause, key: String): String? = a.optionsJson?.let {
+        runCatching { (optionsJson.parseToJsonElement(it) as? kotlinx.serialization.json.JsonObject)?.get(key)?.let { v -> (v as? kotlinx.serialization.json.JsonPrimitive)?.content } }.getOrNull()
+    }
+
+    fun action(a: RuleClause, names: Names): String {
+        val part = option(a, "splitIndex")?.toIntOrNull()?.takeIf { it > 0 }?.let { "in part $it, " }.orEmpty()
+        val formula = option(a, "formula")
+        val template = option(a, "template")
+        return part + when {
+            a.op == "set" && formula != null -> "set ${fieldNames[a.field] ?: a.field} to $formula"
+            a.op == "set" && template != null -> "set ${fieldNames[a.field] ?: a.field} from “$template”"
+            a.op == "set-split-amount" -> when (option(a, "method")) {
+                "fixed-amount" -> "split off ${value("amount", a.value, names)}"
+                "fixed-percent" -> "split off ${(a.value as? RuleValue.Number)?.value ?: 0}% of the rest"
+                "formula" -> "split off $formula"
+                else -> "split off what's left"
+            }
+            else -> baseAction(a, names)
+        }
+    }
+
+    private fun baseAction(a: RuleClause, names: Names): String = when (a.op) {
         "set" -> "set ${fieldNames[a.field] ?: a.field} to ${value(a.field, a.value, names)}"
         "append-notes" -> "add ${value(null, a.value, names)} to the end of notes"
         "prepend-notes" -> "add ${value(null, a.value, names)} to the start of notes"
