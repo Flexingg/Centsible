@@ -1487,6 +1487,126 @@ paths:
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
 
+  /v1/budgets/{budgetId}/mortgages:
+    get:
+      tags: [plan]
+      operationId: listMortgages
+      summary: "Mortgages (any fixed-rate loan) and the homes they're for. The terms are kept by the bridge; the balances live in Actual: the loan as an off-budget account (what's owed, negative) and the home as an off-budget account (its value), so net worth includes both."
+      parameters:
+        - $ref: '#/components/parameters/BudgetId'
+      responses:
+        '200':
+          description: Mortgages
+          content:
+            application/json:
+              schema: { type: object, required: [items], properties: { items: { type: array, items: { $ref: '#/components/schemas/Mortgage' } } } }
+        '423': { $ref: '#/components/responses/Problem' }
+    post:
+      tags: [plan]
+      operationId: createMortgage
+      parameters:
+        - $ref: '#/components/parameters/BudgetId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/MortgageInput' }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Mortgage' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+
+  /v1/budgets/{budgetId}/mortgages/{id}:
+    get:
+      tags: [plan]
+      operationId: getMortgage
+      summary: One mortgage with its full amortization schedule, each row matched to the payment made for it (within about two weeks).
+      parameters:
+        - $ref: '#/components/parameters/BudgetId'
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: Mortgage
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Mortgage' }
+        '404': { $ref: '#/components/responses/Problem' }
+    put:
+      tags: [plan]
+      operationId: updateMortgage
+      parameters:
+        - $ref: '#/components/parameters/BudgetId'
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/MortgageInput' }
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Mortgage' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+    delete:
+      tags: [plan]
+      operationId: deleteMortgage
+      summary: Forgets the terms. The loan and home accounts stay in Actual.
+      parameters:
+        - $ref: '#/components/parameters/BudgetId'
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        '204': { description: Removed }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+
+  /v1/budgets/{budgetId}/mortgages/{id}/home-value:
+    put:
+      tags: [plan]
+      operationId: setHomeValue
+      summary: The home's value now. Adds a "Home value update" transaction to the home account for the difference (creating the account the first time).
+      parameters:
+        - $ref: '#/components/parameters/BudgetId'
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [value], properties: { value: { type: integer, minimum: 0 } } }
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Mortgage' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+
+  /v1/budgets/{budgetId}/mortgages/{id}/record-principal:
+    post:
+      tags: [plan]
+      operationId: recordMortgagePrincipal
+      summary: For each payment to the lender not recorded yet, takes its principal (as the schedule splits it) off the loan account. Not for a loan the bank syncs.
+      parameters:
+        - $ref: '#/components/parameters/BudgetId'
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: What was recorded
+          content:
+            application/json:
+              schema: { type: object, required: [recorded, principal], properties: { recorded: { type: integer }, principal: { $ref: '#/components/schemas/Money' } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+
   /v1/budgets/{budgetId}/categories/{id}/goal:
     put:
       tags: [plan]
@@ -2602,6 +2722,74 @@ components:
         reimportDeleted: { type: boolean, description: Bring back bank transactions you deleted }
         updateDates: { type: boolean, description: Update dates of already-imported transactions }
         mapping: { $ref: '#/components/schemas/SyncMappings' }
+    MortgageInput:
+      type: object
+      required: [name, principal, rate, termMonths, firstPayment]
+      properties:
+        name: { type: string }
+        principal: { type: integer, description: What was borrowed (cents) }
+        rate: { type: number, description: Yearly rate in percent }
+        termMonths: { type: integer }
+        firstPayment: { $ref: '#/components/schemas/Date' }
+        escrow: { type: integer, description: Taxes and insurance paid with the loan each month }
+        extra: { type: integer, description: Extra principal each month }
+        payeeId: { type: [string, 'null'], description: Who the payments go to (to find them) }
+        paymentAccountId: { type: [string, 'null'] }
+        loanAccountId: { type: [string, 'null'], description: An existing account for the loan }
+        homeAccountId: { type: [string, 'null'], description: An existing account for the home }
+        createLoanAccount: { type: boolean, description: On create, make an off-budget loan account owing currentBalance (or what the schedule says) }
+        currentBalance: { type: [integer, 'null'] }
+        homeValue: { type: [integer, 'null'], description: On create, make an off-budget home account worth this }
+    Mortgage:
+      type: object
+      required: [id, name, principal, rate, termMonths, firstPayment, escrow, extra, monthlyPayment, monthlyTotal, balance, scheduledBalance, aheadBy, paymentsMade, paymentsLeft, payoffDate, originalPayoffDate, interestPaid, interestLeft, interestSaved, homeValue, equity, loanSynced, paymentsFound, unrecorded]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        principal: { type: integer }
+        rate: { type: number }
+        termMonths: { type: integer }
+        firstPayment: { $ref: '#/components/schemas/Date' }
+        escrow: { type: integer }
+        extra: { type: integer }
+        payeeId: { type: [string, 'null'] }
+        paymentAccountId: { type: [string, 'null'] }
+        loanAccountId: { type: [string, 'null'] }
+        homeAccountId: { type: [string, 'null'] }
+        loanSynced: { type: boolean, description: The bank updates the loan account }
+        monthlyPayment: { type: integer, description: Principal and interest }
+        monthlyTotal: { type: integer, description: With escrow and extra }
+        balance: { type: integer, description: Owed now (the loan account's balance, or the schedule's without one) }
+        scheduledBalance: { type: integer }
+        aheadBy: { type: integer, description: 'Positive: owed less than the schedule says by now' }
+        paymentsMade: { type: integer }
+        paymentsLeft: { type: integer }
+        payoffDate: { $ref: '#/components/schemas/Date' }
+        originalPayoffDate: { $ref: '#/components/schemas/Date' }
+        interestPaid: { type: integer }
+        interestLeft: { type: integer }
+        interestSaved: { type: integer }
+        homeValue: { type: [integer, 'null'] }
+        equity: { type: [integer, 'null'] }
+        paymentsFound: { type: integer }
+        unrecorded: { type: integer, description: Payments whose principal isn't on the loan account yet }
+        lastPayment: { type: [object, 'null'], properties: { id: { type: string }, date: { type: string }, amount: { type: integer } } }
+        schedule:
+          type: array
+          description: Only from GET /mortgages/{id}
+          items:
+            type: object
+            required: [n, date, payment, interest, principal, extra, balance, paidOn, paidAmount]
+            properties:
+              n: { type: integer }
+              date: { $ref: '#/components/schemas/Date' }
+              payment: { type: integer }
+              interest: { type: integer }
+              principal: { type: integer }
+              extra: { type: integer }
+              balance: { type: integer }
+              paidOn: { type: [string, 'null'] }
+              paidAmount: { type: [integer, 'null'] }
     TargetInput:
       type: object
       required: [kind]

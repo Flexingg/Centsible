@@ -70,6 +70,19 @@ class PlanningApi(private val client: BridgeClient) {
         client.execute(HttpMethod.Put, "${b(budgetId)}/targets/$id") { jsonBody(body) }
     }
     suspend fun deleteTarget(budgetId: String, id: String) { client.execute(HttpMethod.Delete, "${b(budgetId)}/targets/$id") }
+    suspend fun mortgages(budgetId: String): MortgagesDto = client.get("${b(budgetId)}/mortgages")
+    suspend fun mortgage(budgetId: String, id: String): MortgageDto = client.get("${b(budgetId)}/mortgages/$id")
+    suspend fun createMortgage(budgetId: String, body: MortgageInputDto) {
+        client.execute(HttpMethod.Post, "${b(budgetId)}/mortgages") { jsonBody(body) }
+    }
+    suspend fun updateMortgage(budgetId: String, id: String, body: MortgageInputDto) {
+        client.execute(HttpMethod.Put, "${b(budgetId)}/mortgages/$id") { jsonBody(body) }
+    }
+    suspend fun deleteMortgage(budgetId: String, id: String) { client.execute(HttpMethod.Delete, "${b(budgetId)}/mortgages/$id") }
+    suspend fun setHomeValue(budgetId: String, id: String, body: HomeValueDto) {
+        client.execute(HttpMethod.Put, "${b(budgetId)}/mortgages/$id/home-value") { jsonBody(body) }
+    }
+    suspend fun recordPrincipal(budgetId: String, id: String): RecordedDto = client.send(HttpMethod.Post, "${b(budgetId)}/mortgages/$id/record-principal", Unit)
     suspend fun forecast(budgetId: String, days: Int, accountIds: List<String>, includeTypical: Boolean): ForecastDto =
         client.get("${b(budgetId)}/forecast") {
             parameter("days", days)

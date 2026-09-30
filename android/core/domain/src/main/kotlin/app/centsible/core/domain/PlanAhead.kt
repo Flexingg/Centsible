@@ -27,4 +27,14 @@ interface PlanAheadGateway {
     /** [id] null creates one. */
     suspend fun saveTarget(budget: BudgetId, id: String?, input: app.centsible.core.model.TargetInput)
     suspend fun deleteTarget(budget: BudgetId, id: String)
+
+    suspend fun mortgages(budget: BudgetId): List<app.centsible.core.model.Mortgage>
+    /** With its amortization schedule. */
+    suspend fun mortgage(budget: BudgetId, id: String): app.centsible.core.model.Mortgage
+    /** [id] null creates one. */
+    suspend fun saveMortgage(budget: BudgetId, id: String?, input: app.centsible.core.model.MortgageInput)
+    suspend fun deleteMortgage(budget: BudgetId, id: String)
+    suspend fun setHomeValue(budget: BudgetId, id: String, value: app.centsible.core.model.Money)
+    /** Takes unrecorded payments' principal off the loan account; returns how many. */
+    suspend fun recordPrincipal(budget: BudgetId, id: String): Int
 }

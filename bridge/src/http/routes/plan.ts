@@ -1,5 +1,6 @@
 import type { FastifyPluginAsync } from 'fastify';
 import { AVERAGE_BASES, type Basis, type GoalInput } from '../../actual/plan-ops.js';
+import type { MortgageInput } from '../../actual/mortgage-ops.js';
 import type { TargetInput } from '../../actual/target-ops.js';
 import { ApiError } from '../../errors.js';
 import { audit, requireBudget, type Deps } from '../server.js';
@@ -13,7 +14,7 @@ const monthParams = { type: 'object', properties: { month: MONTH } };
 export const planRoutes =
   (deps: Deps): FastifyPluginAsync =>
   async (app) => {
-    const { plan, targets } = deps;
+    const { plan, targets, mortgages } = deps;
 
     app.get<{ Params: MonthParams }>('/v1/budgets/:budgetId/months/:month/autopilot', { schema: { params: monthParams } }, async (req) => {
       requireBudget(deps, req, req.params.budgetId);
@@ -129,6 +130,78 @@ export const planRoutes =
       targets.remove(req.params.budgetId, req.params.id);
       audit(deps, req, req.params.budgetId, 'target.removed', req.params.id);
       return reply.status(204).send();
+    });
+
+    // ── Mortgages: terms kept by the bridge, balances in Actual's accounts ──
+    const MORTGAGE_BODY = {
+      type: 'object',
+      required: ['name', 'principal', 'rate', 'termMonths', 'firstPayment'],
+      additionalProperties: false,
+      properties: {
+        name: { type: 'string', minLength: 1, maxLength: 100 },
+        principal: { type: 'integer', minimum: 1 },
+        rate: { type: 'number', minimum: 0, maximum: 50 },
+        termMonths: { type: 'integer', minimum: 1, maximum: 600 },
+        firstPayment: { type: 'string', pattern: '^\\d{4}-\\d{2}-\\d{2}$' },
+        escrow: { type: 'integer', minimum: 0 },
+        extra: { type: 'integer', minimum: 0 },
+        payeeId: { type: ['string', 'null'] },
+        paymentAccountId: { type: ['string', 'null'] },
+        loanAccountId: { type: ['string', 'null'] },
+        homeAccountId: { type: ['string', 'null'] },
+        createLoanAccount: { type: 'boolean' },
+        currentBalance: { type: ['integer', 'null'], minimum: 0 },
+        homeValue: { type: ['integer', 'null'], minimum: 0 },
+      },
+    };
+
+    app.get<{ Params: { budgetId: string } }>('/v1/budgets/:budgetId/mortgages', async (req) => {
+      requireBudget(deps, req, req.params.budgetId);
+      return mortgages.list(req.params.budgetId);
+    });
+
+    app.post<{ Params: { budgetId: string }; Body: MortgageInput }>('/v1/budgets/:budgetId/mortgages', { schema: { body: MORTGAGE_BODY } }, async (req, reply) => {
+      requireBudget(deps, req, req.params.budgetId, 'member');
+      const m = await mortgages.create(req.params.budgetId, req.body);
+      audit(deps, req, req.params.budgetId, 'mortgage.created', m.id);
+      return reply.status(201).send(m);
+    });
+
+    app.get<{ Params: CategoryParams }>('/v1/budgets/:budgetId/mortgages/:id', async (req) => {
+      requireBudget(deps, req, req.params.budgetId);
+      return mortgages.get(req.params.budgetId, req.params.id);
+    });
+
+    app.put<{ Params: CategoryParams; Body: MortgageInput }>('/v1/budgets/:budgetId/mortgages/:id', { schema: { body: MORTGAGE_BODY } }, async (req) => {
+      requireBudget(deps, req, req.params.budgetId, 'member');
+      const m = await mortgages.update(req.params.budgetId, req.params.id, req.body);
+      audit(deps, req, req.params.budgetId, 'mortgage.updated', m.id);
+      return m;
+    });
+
+    app.delete<{ Params: CategoryParams }>('/v1/budgets/:budgetId/mortgages/:id', async (req, reply) => {
+      requireBudget(deps, req, req.params.budgetId, 'member');
+      mortgages.remove(req.params.budgetId, req.params.id);
+      audit(deps, req, req.params.budgetId, 'mortgage.removed', req.params.id);
+      return reply.status(204).send();
+    });
+
+    app.put<{ Params: CategoryParams; Body: { value: number } }>(
+      '/v1/budgets/:budgetId/mortgages/:id/home-value',
+      { schema: { body: { type: 'object', required: ['value'], additionalProperties: false, properties: { value: { type: 'integer', minimum: 0 } } } } },
+      async (req) => {
+        requireBudget(deps, req, req.params.budgetId, 'member');
+        const m = await mortgages.setHomeValue(req.params.budgetId, req.params.id, req.body.value);
+        audit(deps, req, req.params.budgetId, 'mortgage.home_value', req.params.id, { value: req.body.value });
+        return m;
+      },
+    );
+
+    app.post<{ Params: CategoryParams }>('/v1/budgets/:budgetId/mortgages/:id/record-principal', async (req) => {
+      requireBudget(deps, req, req.params.budgetId, 'member');
+      const r = await mortgages.recordPrincipal(req.params.budgetId, req.params.id);
+      audit(deps, req, req.params.budgetId, 'mortgage.principal_recorded', req.params.id, r);
+      return r;
     });
 
     app.get<{ Params: { budgetId: string }; Querystring: { days?: number; accountIds?: string; includeTypical?: boolean } }>(

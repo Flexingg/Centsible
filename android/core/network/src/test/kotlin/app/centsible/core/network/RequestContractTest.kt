@@ -125,6 +125,10 @@ class RequestContractTest {
         call { planning.createTarget(b, TargetInputDto("spend-at-least", categoryId = "c1", percentOfIncome = 10.0)) }
         call { planning.updateTarget(b, "t1", TargetInputDto("account", accountId = "a1", amount = 1000000, targetMonth = "2027-06")) }
         call { planning.deleteTarget(b, "t1") }
+        call { planning.createMortgage(b, MortgageInputDto("House", 30_000_000, 6.0, 360, "2026-01-01", escrow = 30_000, createLoanAccount = true, homeValue = 42_000_000)) }
+        call { planning.updateMortgage(b, "m1", MortgageInputDto("House", 30_000_000, 6.0, 360, "2026-01-01", extra = 20_000)) }
+        call { planning.setHomeValue(b, "m1", HomeValueDto(45_000_000)) }
+        call { planning.deleteMortgage(b, "m1") }
         val tools = TransactionToolsApi(client)
         call { tools.linkTransfer(b, TransferPairRequestDto("o1", "i1")) }
         call { tools.dismissTransfer(b, TransferPairRequestDto("o1", "i1")) }

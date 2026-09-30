@@ -50,6 +50,69 @@ import kotlinx.serialization.Serializable
 @Serializable data class GoalsDto(val month: String, val items: List<GoalDto> = emptyList())
 @Serializable data class GoalInputDto(val kind: String, val target: Long, val targetMonth: String? = null)
 
+@Serializable data class MortgageRowDto(
+    val n: Int,
+    val date: String,
+    val payment: Long,
+    val interest: Long,
+    val principal: Long,
+    val extra: Long = 0,
+    val balance: Long,
+    val paidOn: String? = null,
+    val paidAmount: Long? = null,
+)
+@Serializable data class MortgageDto(
+    val id: String,
+    val name: String,
+    val principal: Long,
+    val rate: Double,
+    val termMonths: Int,
+    val firstPayment: String,
+    val escrow: Long = 0,
+    val extra: Long = 0,
+    val payeeId: String? = null,
+    val paymentAccountId: String? = null,
+    val loanAccountId: String? = null,
+    val homeAccountId: String? = null,
+    val loanSynced: Boolean = false,
+    val monthlyPayment: Long,
+    val monthlyTotal: Long,
+    val balance: Long,
+    val scheduledBalance: Long = 0,
+    val aheadBy: Long = 0,
+    val paymentsMade: Int = 0,
+    val paymentsLeft: Int = 0,
+    val payoffDate: String,
+    val originalPayoffDate: String,
+    val interestPaid: Long = 0,
+    val interestLeft: Long = 0,
+    val interestSaved: Long = 0,
+    val homeValue: Long? = null,
+    val equity: Long? = null,
+    val paymentsFound: Int = 0,
+    val unrecorded: Int = 0,
+    val schedule: List<MortgageRowDto> = emptyList(),
+)
+@Serializable data class MortgagesDto(val items: List<MortgageDto> = emptyList())
+@Serializable data class MortgageInputDto(
+    val name: String,
+    val principal: Long,
+    val rate: Double,
+    val termMonths: Int,
+    val firstPayment: String,
+    val escrow: Long = 0,
+    val extra: Long = 0,
+    val payeeId: String? = null,
+    val paymentAccountId: String? = null,
+    val loanAccountId: String? = null,
+    val homeAccountId: String? = null,
+    val createLoanAccount: Boolean? = null,
+    val currentBalance: Long? = null,
+    val homeValue: Long? = null,
+)
+@Serializable data class HomeValueDto(val value: Long)
+@Serializable data class RecordedDto(val recorded: Int = 0, val principal: Long = 0)
+
 @Serializable data class TargetMonthDto(val month: String, val value: Long, val goal: Long)
 @Serializable data class TargetDto(
     val id: String,

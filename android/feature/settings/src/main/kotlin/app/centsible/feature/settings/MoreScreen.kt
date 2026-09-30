@@ -36,6 +36,7 @@ enum class MoreItem(val emoji: String, val title: String, val subtitle: String) 
     Subscriptions("🔎", "Subscriptions", "Find recurring payments and price changes"),
     Trends("📉", "Trends", "Spending against your usual, and alerts"),
     NetWorth("🏔️", "Net worth", "Assets and debts over time"),
+    Mortgage("🏠", "Mortgage", "Payoff, interest, and your home's value"),
     YearInReview("✨", "Reviews", "Your week, month, quarter or year, wrapped"),
     Reports("📊", "Reports", "Cash flow, spending and net worth"),
     Merchants("🏪", "Merchants", "Rename, merge and tidy up"),

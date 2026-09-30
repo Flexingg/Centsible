@@ -1,6 +1,7 @@
 import type { RuleTools } from '../actual/rule-tools.js';
 import type { AutomationOps } from '../actual/automation-ops.js';
 import type { ReviewOps } from '../actual/review-ops.js';
+import type { MortgageOps } from '../actual/mortgage-ops.js';
 import type { TargetOps } from '../actual/target-ops.js';
 import type { TransferOps } from '../actual/transfer-ops.js';
 import Fastify, { type FastifyError, type FastifyInstance, type FastifyRequest } from 'fastify';
@@ -48,6 +49,7 @@ export type Deps = {
   review: ReviewOps;
   transfers: TransferOps;
   targets: TargetOps;
+  mortgages: MortgageOps;
   automations: AutomationOps;
   ruleTools: RuleTools;
   structure: StructureOps;

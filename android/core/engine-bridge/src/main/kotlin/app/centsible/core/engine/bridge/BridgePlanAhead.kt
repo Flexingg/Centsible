@@ -2,6 +2,7 @@ package app.centsible.core.engine.bridge
 
 import app.centsible.core.domain.PlanAheadGateway
 import app.centsible.core.model.AccountId
+import app.centsible.core.model.PayeeId
 import app.centsible.core.model.Autopilot
 import app.centsible.core.model.AverageBasis
 import app.centsible.core.model.BudgetId
@@ -90,7 +91,45 @@ class BridgePlanAhead(private val api: PlanningApi, private val onWrite: () -> U
         api.deleteTarget(budget.raw, id)
         onWrite()
     }
+
+    override suspend fun mortgages(budget: BudgetId) = api.mortgages(budget.raw).items.map { it.toModel() }
+
+    override suspend fun mortgage(budget: BudgetId, id: String) = api.mortgage(budget.raw, id).toModel()
+
+    override suspend fun saveMortgage(budget: BudgetId, id: String?, input: app.centsible.core.model.MortgageInput) {
+        val body = app.centsible.core.network.MortgageInputDto(
+            name = input.name, principal = input.principal.minor, rate = input.rate, termMonths = input.termMonths, firstPayment = input.firstPayment,
+            escrow = input.escrow.minor, extra = input.extra.minor, payeeId = input.payeeId?.raw, paymentAccountId = input.paymentAccountId?.raw,
+            loanAccountId = input.loanAccountId?.raw, homeAccountId = input.homeAccountId?.raw,
+            createLoanAccount = input.createLoanAccount.takeIf { it }, currentBalance = input.currentBalance?.minor, homeValue = input.homeValue?.minor,
+        )
+        if (id == null) api.createMortgage(budget.raw, body) else api.updateMortgage(budget.raw, id, body)
+        onWrite()
+    }
+
+    override suspend fun deleteMortgage(budget: BudgetId, id: String) {
+        api.deleteMortgage(budget.raw, id)
+        onWrite()
+    }
+
+    override suspend fun setHomeValue(budget: BudgetId, id: String, value: Money) {
+        api.setHomeValue(budget.raw, id, app.centsible.core.network.HomeValueDto(value.minor))
+        onWrite()
+    }
+
+    override suspend fun recordPrincipal(budget: BudgetId, id: String): Int = api.recordPrincipal(budget.raw, id).recorded.also { onWrite() }
 }
+
+private fun app.centsible.core.network.MortgageDto.toModel() = app.centsible.core.model.Mortgage(
+    id = id, name = name, principal = Money(principal), rate = rate, termMonths = termMonths, firstPayment = firstPayment,
+    escrow = Money(escrow), extra = Money(extra), payeeId = payeeId?.let(::PayeeId), paymentAccountId = paymentAccountId?.let(::AccountId),
+    loanAccountId = loanAccountId?.let(::AccountId), homeAccountId = homeAccountId?.let(::AccountId), loanSynced = loanSynced,
+    monthlyPayment = Money(monthlyPayment), monthlyTotal = Money(monthlyTotal), balance = Money(balance), scheduledBalance = Money(scheduledBalance),
+    aheadBy = Money(aheadBy), paymentsMade = paymentsMade, paymentsLeft = paymentsLeft, payoffDate = payoffDate, originalPayoffDate = originalPayoffDate,
+    interestPaid = Money(interestPaid), interestLeft = Money(interestLeft), interestSaved = Money(interestSaved),
+    homeValue = homeValue?.let(::Money), equity = equity?.let(::Money), paymentsFound = paymentsFound, unrecorded = unrecorded,
+    schedule = schedule.map { app.centsible.core.model.Mortgage.Row(it.n, it.date, Money(it.payment), Money(it.interest), Money(it.principal), Money(it.extra), Money(it.balance), it.paidOn) },
+)
 
 private fun kindName(k: app.centsible.core.model.Target.Kind) = when (k) {
     app.centsible.core.model.Target.Kind.Account -> "account"

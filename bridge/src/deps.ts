@@ -12,6 +12,7 @@ import { StructureOps } from './actual/structure-ops.js';
 import { RuleTools } from './actual/rule-tools.js';
 import { AutomationOps } from './actual/automation-ops.js';
 import { ReviewOps } from './actual/review-ops.js';
+import { MortgageOps } from './actual/mortgage-ops.js';
 import { TargetOps } from './actual/target-ops.js';
 import { TransferOps } from './actual/transfer-ops.js';
 import { TransactionOps } from './actual/transaction-ops.js';
@@ -54,6 +55,7 @@ export function createDeps(config: BridgeConfig, store: HouseholdStore, host: Ac
     review: new ReviewOps(host, store),
     transfers,
     targets: new TargetOps(host, store),
+    mortgages: new MortgageOps(host, store),
     automations: new AutomationOps(host),
     ruleTools: new RuleTools(host),
     structure: new StructureOps(host),
