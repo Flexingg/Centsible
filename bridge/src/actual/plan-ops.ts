@@ -2,6 +2,7 @@ import * as api from '@actual-app/api';
 import { ApiError } from '../errors.js';
 import type { BudgetOps } from './budget-ops.js';
 import type { ActualHost } from './host.js';
+import { estimateFor } from './recurring-patterns.js';
 import { dateRange } from './report-ops.js';
 import { fromActual, toActual, type AutomationDto } from './automation-ops.js';
 
@@ -239,6 +240,9 @@ export class PlanOps {
         const transferTo = p?.transfer_acct ?? null;
         const amt = s.amount;
         const amount = typeof amt === 'number' ? amt : amt && typeof amt === 'object' ? Math.round((num((amt as Raw).num1) + num((amt as Raw).num2)) / 2) : 0;
+        // A bill that varies (approximate or a range): what it was this month last year, or lately.
+        const varies = s.amountOp === 'isapprox' || s.amountOp === 'isbetween';
+        const history = varies ? await paidHistory(String(s.id), typeof s.payee === 'string' ? s.payee : null, account) : [];
         let dates = [String(s.next_date)];
         if (s.date && typeof s.date === 'object') {
           dates = await this.host
@@ -251,6 +255,7 @@ export class PlanOps {
           // Overdue occurrences still count: the money hasn't moved yet.
           const day = date < from ? from : date;
           if (day > to) continue;
+          const guess = varies ? estimateFor(history, date) : null;
           events.push({
             date: day,
             scheduleId: String(s.id),
@@ -258,7 +263,8 @@ export class PlanOps {
             payeeName: p?.name ?? null,
             accountId: account,
             accountName: account ? (accountName.get(account) ?? null) : null,
-            amount,
+            amount: guess?.amount ?? amount,
+            estimate: guess?.basis ?? null,
             // Moving money between two accounts in the forecast doesn't change the total.
             internalTransfer: !!transferTo && ids.has(transferTo) && !!account,
             overdue: date < from,
@@ -323,6 +329,18 @@ export class PlanOps {
 
 type PaidBill = { date: string; scheduleId: string; name: string; amount: number };
 
+/** What a schedule has actually been paid over the last two years (by the schedule, else the same payee and account). */
+async function paidHistory(scheduleId: string, payee: string | null, account: string | null): Promise<{ date: string; amount: number }[]> {
+  const since = `${Number(today().slice(0, 4)) - 2}${today().slice(4, 10)}`;
+  const run = async (filter: Raw) =>
+    ((await api.aqlQuery(api.q('transactions').filter({ date: { $gte: since }, is_child: false, ...filter }).options({ splits: 'inline' }).select(['date', 'amount']))) as { data: Raw[] }).data.map(
+      (r) => ({ date: String(r.date), amount: num(r.amount) }),
+    );
+  const linked = await run({ schedule: scheduleId });
+  if (linked.length >= 2 || !payee) return linked;
+  return run(account ? { payee, account } : { payee });
+}
+
 type ForecastEvent = {
   date: string;
   scheduleId: string;
@@ -333,6 +351,8 @@ type ForecastEvent = {
   amount: number;
   internalTransfer: boolean;
   overdue: boolean;
+  /** For a bill that varies: where the amount came from ('last-year' or 'average'). */
+  estimate: 'last-year' | 'average' | null;
 };
 
 export type GoalInput = { kind: 'balance' | 'by'; target: number; targetMonth?: string | null };

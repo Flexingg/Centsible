@@ -96,6 +96,7 @@ import kotlinx.serialization.Serializable
     val amount: Long,
     val internalTransfer: Boolean = false,
     val overdue: Boolean = false,
+    val estimate: String? = null,
 )
 @Serializable data class ForecastDayDto(val date: String, val balance: Long, val scheduled: Long = 0, val typical: Long = 0)
 @Serializable data class ForecastLowDto(val date: String, val balance: Long)

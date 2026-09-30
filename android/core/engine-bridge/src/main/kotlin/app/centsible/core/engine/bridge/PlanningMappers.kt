@@ -74,6 +74,7 @@ internal fun RecurrenceDto.toModel() = Recurrence(
     endOccurrences = endOccurrences,
     endDate = endDate,
     skipWeekend = skipWeekend ?: false,
+    weekendBefore = weekendSolveMode == "before",
     patternsJson = patterns?.takeIf { it.isNotEmpty() }?.toString(),
 )
 
@@ -89,6 +90,7 @@ internal fun Recurrence.toDto() = RecurrenceDto(
     endOccurrences = endOccurrences,
     endDate = endDate,
     skipWeekend = skipWeekend,
+    weekendSolveMode = if (skipWeekend) (if (weekendBefore) "before" else "after") else null,
     patterns = patternsJson?.let { jsonParser.parseToJsonElement(it).jsonArray },
 )
 

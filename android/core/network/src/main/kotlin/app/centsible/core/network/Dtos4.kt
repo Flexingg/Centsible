@@ -44,7 +44,26 @@ import kotlinx.serialization.Serializable
     val income: Boolean = false,
 )
 @Serializable data class PriceChangeDto(val scheduleId: String, val name: String, val previous: Long, val latest: Long, val changePct: Int, val date: String)
-@Serializable data class SubscriptionsDto(val candidates: List<CandidateDto> = emptyList(), val priceChanges: List<PriceChangeDto> = emptyList())
+@Serializable data class SubscriptionsDto(val candidates: List<CandidateDto> = emptyList(), val priceChanges: List<PriceChangeDto> = emptyList(), val patterns: List<PatternDto> = emptyList())
+@Serializable data class OccurrenceDto(val date: String, val amount: Long)
+@Serializable data class ProjectionDto(val date: String, val amount: Long, val basis: String = "average")
+@Serializable data class PatternDto(
+    val payeeId: String,
+    val payeeName: String,
+    val accountId: String,
+    val accountName: String? = null,
+    val income: Boolean = false,
+    val days: List<Int> = emptyList(),
+    val firstWeekday: Boolean = false,
+    val weekend: String = "after",
+    val description: String = "",
+    val occurrences: List<OccurrenceDto> = emptyList(),
+    val min: Long = 0,
+    val max: Long = 0,
+    val average3: Long = 0,
+    val varies: Boolean = false,
+    val next: ProjectionDto? = null,
+)
 @Serializable data class DismissDto(val payeeId: String)
 
 @Serializable data class CategoryShareDto(val categoryId: String? = null, val name: String, val amount: Long, val share: Float = 0f)

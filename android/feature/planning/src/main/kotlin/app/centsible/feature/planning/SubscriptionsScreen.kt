@@ -1,6 +1,11 @@
 package app.centsible.feature.planning
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.height
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -50,8 +55,11 @@ import app.centsible.core.domain.userMessage
 import app.centsible.core.model.AmountOp
 import app.centsible.core.model.Frequency
 import app.centsible.core.model.Money
+import app.centsible.core.model.PayeeId
 import app.centsible.core.model.PriceChange
+import app.centsible.core.model.Recurrence
 import app.centsible.core.model.RecurringCandidate
+import app.centsible.core.model.RecurringPattern
 import app.centsible.core.model.ScheduleDraft
 import app.centsible.core.model.Subscriptions
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -109,6 +117,51 @@ class SubscriptionsViewModel @Inject constructor(
 
     fun dismiss(c: RecurringCandidate) = act(c, "Won't suggest ${c.payeeName} again") { insights.dismissSubscription(selectedBudget(), c.payeeId) }
 
+    /**
+     * A bill that varies, or business-day pay, as a schedule: a range of amounts (lately's
+     * lowest to highest) on those days of the month, moved off weekends the way it has been.
+     */
+    fun trackPattern(p: RecurringPattern) = actOn(p.payeeId, "${p.payeeName} added to Recurring") {
+        val days = p.days.joinToString(",") { """{"type":"day","value":$it}""" }
+        val start = p.next?.date ?: p.occurrences.lastOrNull()?.date ?: java.time.LocalDate.now().toString()
+        planning.createSchedule(
+            selectedBudget(),
+            ScheduleDraft(
+                name = p.payeeName,
+                payeeId = p.payeeId,
+                accountId = p.accountId,
+                amount = if (p.varies) p.min else p.average3,
+                amountOp = if (p.varies) AmountOp.IsBetween else AmountOp.IsApprox,
+                amountMax = if (p.varies) p.max else null,
+                recurrence = Recurrence(
+                    frequency = Frequency.Monthly,
+                    start = start,
+                    skipWeekend = true,
+                    weekendBefore = !p.weekendAfter,
+                    patternsJson = "[$days]",
+                ),
+            ),
+        )
+    }
+
+    fun dismissPattern(p: RecurringPattern) = actOn(p.payeeId, "Won't suggest ${p.payeeName} again") { insights.dismissSubscription(selectedBudget(), p.payeeId) }
+
+    private fun actOn(payee: PayeeId, success: String, block: suspend () -> Unit) = viewModelScope.launch {
+        state.update { it.copy(busy = it.busy + payee.raw) }
+        runCatching { block() }
+            .onSuccess {
+                state.update { s ->
+                    val data = (s.data as? Loadable.Ready)?.value
+                    s.copy(
+                        busy = s.busy - payee.raw,
+                        message = success,
+                        data = data?.let { Loadable.Ready(it.copy(patterns = it.patterns.filter { x -> x.payeeId != payee })) } ?: s.data,
+                    )
+                }
+            }
+            .onFailure { e -> state.update { it.copy(busy = it.busy - payee.raw, message = e.userMessage()) } }
+    }
+
     fun messageShown() = state.update { it.copy(message = null) }
 
     private fun act(c: RecurringCandidate, success: String, block: suspend () -> Unit) = viewModelScope.launch {
@@ -131,7 +184,16 @@ class SubscriptionsViewModel @Inject constructor(
 @Composable
 fun SubscriptionsRoute(onBack: () -> Unit, onOpenTransactions: (app.centsible.core.extensions.Destination.TransactionsFor) -> Unit = {}, viewModel: SubscriptionsViewModel = hiltViewModel()) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    SubscriptionsScreen(state, onBack, onRetry = { viewModel.load() }, onTrack = { viewModel.track(it) }, onDismiss = { viewModel.dismiss(it) }, onMessageShown = viewModel::messageShown, onOpenTransactions = onOpenTransactions)
+    SubscriptionsScreen(
+        state, onBack,
+        onRetry = { viewModel.load() },
+        onTrack = { viewModel.track(it) },
+        onDismiss = { viewModel.dismiss(it) },
+        onMessageShown = viewModel::messageShown,
+        onOpenTransactions = onOpenTransactions,
+        onTrackPattern = { viewModel.trackPattern(it) },
+        onDismissPattern = { viewModel.dismissPattern(it) },
+    )
 }
 
 internal fun every(c: RecurringCandidate): String {
@@ -153,6 +215,8 @@ fun SubscriptionsScreen(
     onDismiss: (RecurringCandidate) -> Unit = {},
     onMessageShown: () -> Unit = {},
     onOpenTransactions: (app.centsible.core.extensions.Destination.TransactionsFor) -> Unit = {},
+    onTrackPattern: (RecurringPattern) -> Unit = {},
+    onDismissPattern: (RecurringPattern) -> Unit = {},
 ) {
     val colors = CentsibleTheme.colors
     val snackbar = remember { SnackbarHostState() }
@@ -177,7 +241,10 @@ fun SubscriptionsScreen(
                 val s = d.value
                 val bills = s.candidates.filter { !it.income }
                 val income = s.candidates.filter { it.income }
-                if (s.candidates.isEmpty() && s.priceChanges.isEmpty()) {
+                val varying = s.patterns.filter { !it.income }
+                val pay = s.patterns.filter { it.income }
+                val open = { p: RecurringPattern -> onOpenTransactions(app.centsible.core.extensions.Destination.TransactionsFor(p.payeeName, payeeId = p.payeeId)) }
+                if (s.candidates.isEmpty() && s.priceChanges.isEmpty() && s.patterns.isEmpty()) {
                     MessageState(
                         "Nothing new found",
                         "Everything that repeats in your history is already in Recurring. New ones show up here after three regular payments.",
@@ -216,12 +283,89 @@ fun SubscriptionsScreen(
                         item { StatLabel("Subscriptions and bills", Modifier.padding(start = 4.dp, top = 4.dp)) }
                         items(bills, key = { it.payeeId.raw }) { CandidateCard(it, state, onTrack, onDismiss, onOpen = { onOpenTransactions(app.centsible.core.extensions.Destination.TransactionsFor(it.payeeName, payeeId = it.payeeId)) }) }
                     }
-                    if (income.isNotEmpty()) {
+                    if (varying.isNotEmpty()) {
+                        item { StatLabel("Bills that vary", Modifier.padding(start = 4.dp, top = 4.dp)) }
+                        items(varying, key = { "v" + it.payeeId.raw + it.accountId.raw }) { PatternCard(it, state, onTrackPattern, onDismissPattern, onOpen = { open(it) }) }
+                    }
+                    if (income.isNotEmpty() || pay.isNotEmpty()) {
                         item { StatLabel("Income", Modifier.padding(start = 4.dp, top = 4.dp)) }
+                        items(pay, key = { "i" + it.payeeId.raw + it.accountId.raw }) { PatternCard(it, state, onTrackPattern, onDismissPattern, onOpen = { open(it) }) }
                         items(income, key = { it.payeeId.raw }) { CandidateCard(it, state, onTrack, onDismiss, onOpen = { onOpenTransactions(app.centsible.core.extensions.Destination.TransactionsFor(it.payeeName, payeeId = it.payeeId)) }) }
                     }
                 }
             }
+        }
+    }
+}
+
+/**
+ * A bill that varies, or business-day pay: when it comes, what the next one will likely be
+ * (and why), and the last payments as small bars so the swing is visible.
+ */
+@Composable
+private fun PatternCard(p: RecurringPattern, state: SubscriptionsUiState, onTrack: (RecurringPattern) -> Unit, onDismiss: (RecurringPattern) -> Unit, onOpen: () -> Unit) {
+    val colors = CentsibleTheme.colors
+    val busy = p.payeeId.raw in state.busy
+    CentsibleCard(onClick = onOpen, contentPadding = PaddingValues(16.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            MerchantAvatar(p.payeeName)
+            androidx.compose.foundation.layout.Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text(p.payeeName, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(p.description, style = MaterialTheme.typography.bodySmall, color = colors.textSecondary)
+            }
+        }
+        p.next?.let { n ->
+            Row(Modifier.fillMaxWidth().padding(top = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("Next, ${shortDate(n.date)}", style = MaterialTheme.typography.labelMedium, color = colors.textTertiary)
+                    Text(
+                        if (n.fromLastYear) "Like this month last year" else "The average of the last three",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = colors.textTertiary,
+                    )
+                }
+                Text("about ", style = MaterialTheme.typography.bodyMedium, color = colors.textSecondary)
+                MoneyText(n.amount.abs(), style = MaterialTheme.typography.titleMedium, color = if (p.income) colors.positive else colors.textPrimary)
+            }
+        }
+        if (p.occurrences.size > 1) {
+            AmountBars(p, Modifier.padding(top = 10.dp))
+            Text(
+                if (p.varies) "Lately ${MoneyFormat.format(p.min.abs(), showCents = false)} to ${MoneyFormat.format(p.max.abs(), showCents = false)}"
+                else "About ${MoneyFormat.format(p.average3.abs())} each time",
+                style = MaterialTheme.typography.bodySmall,
+                color = colors.textSecondary,
+                modifier = Modifier.padding(top = 4.dp),
+            )
+        }
+        if (state.canEdit) {
+            Row(Modifier.fillMaxWidth().padding(top = 4.dp), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
+                TextButton(onClick = { onDismiss(p) }, enabled = !busy) { Text("Not recurring") }
+                FilledTonalButton(onClick = { onTrack(p) }, enabled = !busy) { Text("Track it") }
+            }
+        }
+    }
+}
+
+/** The last payments, oldest first, as bars scaled to the biggest. */
+@Composable
+private fun AmountBars(p: RecurringPattern, modifier: Modifier = Modifier) {
+    val colors = CentsibleTheme.colors
+    val biggest = p.occurrences.maxOf { it.amount.abs().minor }.coerceAtLeast(1)
+    Row(
+        modifier.fillMaxWidth().height(40.dp).semantics(mergeDescendants = true) {
+            contentDescription = "Last ${p.occurrences.size}: " + p.occurrences.joinToString { MoneyFormat.format(it.amount.abs(), showCents = false) }
+        },
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        verticalAlignment = Alignment.Bottom,
+    ) {
+        p.occurrences.forEach { o ->
+            androidx.compose.foundation.layout.Box(
+                Modifier.weight(1f)
+                    .fillMaxHeight(o.amount.abs().minor.toFloat() / biggest)
+                    .background(if (p.income) colors.positive.copy(alpha = 0.6f) else colors.accent.copy(alpha = 0.6f), androidx.compose.foundation.shape.RoundedCornerShape(topStart = 4.dp, topEnd = 4.dp)),
+            )
         }
     }
 }

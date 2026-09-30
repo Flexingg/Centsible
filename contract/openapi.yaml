@@ -3226,6 +3226,7 @@ components:
               amount: { $ref: '#/components/schemas/Money' }
               internalTransfer: { type: boolean, description: Between two forecast accounts, so the total doesn't change }
               overdue: { type: boolean }
+              estimate: { type: [string, 'null'], enum: [last-year, average, null], description: "A bill that varies (approximate or a range): the amount is what it was this month last year, or the average of the last three" }
         paid:
           type: array
           description: Scheduled bills already paid this month, before today (transactions linked to a schedule). The bill calendar ticks these off.
@@ -3310,6 +3311,34 @@ components:
               lastDate: { type: [string, 'null'] }
               yearlyAmount: { $ref: '#/components/schemas/Money' }
               income: { type: boolean }
+        patterns:
+          type: array
+          description: "What Actual's own discovery misses: bills on about the same day each month whose amount moves around (utilities), and pay on business days (the first weekday, around the 15th), whatever the amount. Not already scheduled."
+          items:
+            type: object
+            required: [payeeId, payeeName, accountId, accountName, income, days, firstWeekday, weekend, description, occurrences, min, max, average3, varies, next]
+            properties:
+              payeeId: { type: string }
+              payeeName: { type: string }
+              accountId: { type: string }
+              accountName: { type: [string, 'null'] }
+              income: { type: boolean }
+              days: { type: array, items: { type: integer }, description: Days of the month (1 is the first weekday when firstWeekday) }
+              firstWeekday: { type: boolean }
+              weekend: { type: string, enum: [before, after], description: Which way a weekend date moves }
+              description: { type: string }
+              occurrences: { type: array, items: { type: object, required: [date, amount], properties: { date: { $ref: '#/components/schemas/Date' }, amount: { $ref: '#/components/schemas/Money' } } } }
+              min: { $ref: '#/components/schemas/Money' }
+              max: { $ref: '#/components/schemas/Money' }
+              average3: { $ref: '#/components/schemas/Money' }
+              varies: { type: boolean, description: The amounts differ by more than 10% }
+              next:
+                type: [object, 'null']
+                required: [date, amount, basis]
+                properties:
+                  date: { $ref: '#/components/schemas/Date' }
+                  amount: { $ref: '#/components/schemas/Money' }
+                  basis: { type: string, enum: [last-year, average] }
         priceChanges:
           type: array
           items:

@@ -42,7 +42,35 @@ data class Insight(
 }
 
 /** Recurring payments found in the history with no schedule yet, and price changes on existing ones. */
-data class Subscriptions(val candidates: List<RecurringCandidate>, val priceChanges: List<PriceChange>)
+data class Subscriptions(val candidates: List<RecurringCandidate>, val priceChanges: List<PriceChange>, val patterns: List<RecurringPattern> = emptyList())
+
+/**
+ * What Actual's discovery misses: a bill on about the same day each month whose amount
+ * moves around (utilities), or pay on business days (the first weekday, around the 15th).
+ */
+data class RecurringPattern(
+    val payeeId: PayeeId,
+    val payeeName: String,
+    val accountId: AccountId,
+    val accountName: String?,
+    val income: Boolean,
+    /** Days of the month; 1 means the first weekday when [firstWeekday]. */
+    val days: List<Int>,
+    val firstWeekday: Boolean,
+    /** A weekend date moves to the Monday after (else the Friday before). */
+    val weekendAfter: Boolean,
+    val description: String,
+    val occurrences: List<Occurrence>,
+    val min: Money,
+    val max: Money,
+    val average3: Money,
+    val varies: Boolean,
+    val next: Projection?,
+) {
+    data class Occurrence(val date: String, val amount: Money)
+    /** The next one; [fromLastYear] means the same month last year, else the last three's average. */
+    data class Projection(val date: String, val amount: Money, val fromLastYear: Boolean)
+}
 
 data class RecurringCandidate(
     val payeeId: PayeeId,

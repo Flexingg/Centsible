@@ -136,6 +136,8 @@ data class ForecastEvent(
     val amount: Money,
     val internalTransfer: Boolean,
     val overdue: Boolean,
+    /** A bill that varies: its amount is an estimate ("last-year" or "average"). */
+    val estimate: String? = null,
 )
 
 data class PaidBill(val date: String, val scheduleId: String, val name: String, val amount: Money)

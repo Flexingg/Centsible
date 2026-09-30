@@ -2,6 +2,7 @@ import * as api from '@actual-app/api';
 import type { HouseholdStore } from '../auth/store.js';
 import { ApiError } from '../errors.js';
 import type { ActualHost } from './host.js';
+import { findPatterns } from './recurring-patterns.js';
 import { BUDGET_FLOW, dateRange, lastDay } from './report-ops.js';
 
 type Raw = Record<string, unknown>;
@@ -237,7 +238,32 @@ export class InsightsOps {
         });
       }
       candidates.sort((a, b) => a.yearlyAmount - b.yearlyAmount);
-      return { candidates, priceChanges: await priceChanges() };
+
+      // Bills that vary and business-day pay, which Actual's discovery misses.
+      const now = today();
+      const since = `${Number(now.slice(0, 4)) - 2}${now.slice(4, 7)}-01`;
+      const { data: history } = (await api.aqlQuery(
+        api
+          .q('transactions')
+          .filter({ date: { $gte: since }, transfer_id: null, is_child: false, starting_balance_flag: false, payee: { $ne: null }, 'account.closed': false })
+          .options({ splits: 'inline' })
+          .select(['date', 'amount', 'payee', 'account']),
+      )) as { data: Raw[] };
+      const scheduled = new Set(((await api.getSchedules()) as unknown as Raw[]).filter((s) => !s.completed).map((s) => String(s.payee)));
+      const patterns = [];
+      for (const p of findPatterns(
+        history.map((r) => ({ date: String(r.date), amount: Number(r.amount), payee: String(r.payee), account: String(r.account) })),
+        now,
+      )) {
+        const payee = payees.find((x) => x.id === p.payeeId);
+        if (!payee || payee.transfer_acct || dismissed.has(p.payeeId) || scheduled.has(p.payeeId)) continue;
+        const actualFound = candidates.findIndex((c) => c.payeeId === p.payeeId);
+        // A steady amount on a plain day of the month: Actual's own suggestion covers it.
+        if (actualFound >= 0 && !p.varies && !p.firstWeekday && p.days.length === 1) continue;
+        if (actualFound >= 0) candidates.splice(actualFound, 1);
+        patterns.push({ ...p, payeeName: payee.name, accountName: accounts.find((a) => a.id === p.accountId)?.name ?? null });
+      }
+      return { candidates, patterns, priceChanges: await priceChanges() };
     });
   }
 

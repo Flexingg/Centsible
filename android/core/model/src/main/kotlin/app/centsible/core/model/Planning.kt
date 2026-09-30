@@ -13,6 +13,8 @@ data class Recurrence(
     val endOccurrences: Int? = null,
     val endDate: String? = null,
     val skipWeekend: Boolean = false,
+    /** With [skipWeekend]: move to the Friday before instead of the Monday after. */
+    val weekendBefore: Boolean = false,
     /** Advanced patterns ("2nd Tuesday") set in Actual's web app; kept, not edited here. */
     val patternsJson: String? = null,
 )

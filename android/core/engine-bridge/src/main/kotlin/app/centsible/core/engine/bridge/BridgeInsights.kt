@@ -66,6 +66,16 @@ class BridgeInsights(private val api: PlanningApi) : InsightsGateway {
                 )
             },
             d.priceChanges.map { PriceChange(it.scheduleId, it.name, Money(it.previous), Money(it.latest), it.changePct, it.date) },
+            d.patterns.map {
+                app.centsible.core.model.RecurringPattern(
+                    PayeeId(it.payeeId), it.payeeName, AccountId(it.accountId), it.accountName, it.income, it.days, it.firstWeekday,
+                    weekendAfter = it.weekend != "before",
+                    description = it.description,
+                    occurrences = it.occurrences.map { o -> app.centsible.core.model.RecurringPattern.Occurrence(o.date, Money(o.amount)) },
+                    min = Money(it.min), max = Money(it.max), average3 = Money(it.average3), varies = it.varies,
+                    next = it.next?.let { n -> app.centsible.core.model.RecurringPattern.Projection(n.date, Money(n.amount), n.basis == "last-year") },
+                )
+            },
         )
     }
 

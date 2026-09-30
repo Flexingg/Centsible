@@ -301,7 +301,12 @@ private fun EventRow(e: ForecastEvent, showDate: Boolean, balanceAfter: Money?) 
             e.accountName?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = colors.textTertiary) }
         }
         Column(horizontalAlignment = Alignment.End) {
-            MoneyText(e.amount, style = MaterialTheme.typography.bodyLarge, signed = true, color = if (e.amount.isNegative) colors.textPrimary else colors.positive)
+            Row(verticalAlignment = Alignment.Bottom) {
+                // A bill that varies: the amount is a guess from last year or the last three.
+                if (e.estimate != null) Text("≈ ", style = MaterialTheme.typography.bodyLarge, color = colors.textSecondary)
+                MoneyText(e.amount, style = MaterialTheme.typography.bodyLarge, signed = true, color = if (e.amount.isNegative) colors.textPrimary else colors.positive)
+            }
+            e.estimate?.let { Text(if (it == "last-year") "like last year" else "recent average", style = MaterialTheme.typography.labelSmall, color = colors.textTertiary) }
             balanceAfter?.let { Text("then ${MoneyFormat.format(it)}", style = MaterialTheme.typography.labelSmall, color = if (it.isNegative) colors.negative else colors.textTertiary) }
         }
     }

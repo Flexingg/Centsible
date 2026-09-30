@@ -115,7 +115,6 @@ describe('subscriptions', () => {
     const netflix = res.body.candidates.find((c: any) => c.payeeName === 'Netflix');
     expect(netflix).toMatchObject({ accountId: actual.accounts.card, amount: -1599, income: false, yearlyAmount: -1599 * 12, lastDate: `${shift(M, -1)}-12` });
     expect(netflix.recurrence).toMatchObject({ frequency: 'monthly', interval: 1 });
-    recordFixture('subscriptions', res.body);
   });
 
   it('can be dismissed', async () => {
@@ -124,6 +123,33 @@ describe('subscriptions', () => {
     expect((await call('POST', '/subscriptions/dismiss', '/subscriptions/dismiss', owner, { payeeId: netflix.payeeId })).status).toBe(204);
     const after = (await call('GET', '/subscriptions', '/subscriptions', viewer)).body.candidates;
     expect(after.some((c: any) => c.payeeName === 'Netflix')).toBe(false);
+  });
+
+  it('finds a bill whose amount moves around, and the forecast estimates it', async () => {
+    const { General } = actual.categories as Record<string, string>;
+    const bills = [-9000, -12000, -16000, -11000, -8700];
+    for (const [i, amount] of bills.entries()) await add(actual.accounts.checking, `${shift(M, i - 7)}-${i % 2 ? 12 : 13}`, amount, 'City Power', General!);
+    const res = await call('GET', '/subscriptions', '/subscriptions', viewer);
+    recordFixture('subscriptions', res.body);
+    const power = res.body.patterns.find((p: any) => p.payeeName === 'City Power');
+    expect(power).toMatchObject({ income: false, varies: true, min: -8700, max: -16000, firstWeekday: false });
+    expect(power.days[0]).toBeGreaterThanOrEqual(12);
+    expect(power.next.basis).toBe('average');
+    // Actual's own discovery can't keep up with the amounts, so it isn't a plain candidate too.
+    expect(res.body.candidates.some((c: any) => c.payeeName === 'City Power')).toBe(false);
+
+    const s = (
+      await call('POST', '/schedules', '/schedules', owner, {
+        name: 'City Power', payeeId: power.payeeId, accountId: actual.accounts.checking, amount: -8700, amountMax: -16000, amountOp: 'isbetween',
+        recurrence: { frequency: 'monthly', interval: 1, start: `${shift(M, 1)}-12`, skipWeekend: true, weekendSolveMode: 'after', patterns: [{ type: 'day', value: 12 }] },
+      })
+    ).body;
+    const forecast = (await call('GET', '/forecast?days=90', '/forecast', viewer)).body;
+    const next = forecast.events.find((e: any) => e.scheduleId === s.id);
+    // No bill last year this month: the average of the last three (-16000, -11000, -8700).
+    expect(next).toMatchObject({ estimate: 'average', amount: -11900 });
+    // Scheduled now, so it's no longer suggested.
+    expect((await call('GET', '/subscriptions', '/subscriptions', viewer)).body.patterns.some((p: any) => p.payeeName === 'City Power')).toBe(false);
   });
 
   it('spots a price change on a scheduled bill', async () => {

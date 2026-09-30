@@ -1,9 +1,9 @@
 {
   "candidates": [
     {
-      "payeeId": "4b57a3af-276a-45b1-9736-9672d5eb84d4",
+      "payeeId": "6cdded40-5ea9-463a-8b78-c6dfde19b12b",
       "payeeName": "Grocer",
-      "accountId": "18072f97-895b-460b-a252-acb3fdeeeb74",
+      "accountId": "77a829a4-fdb3-4558-8245-ded518d8c40c",
       "accountName": "Joint Checking",
       "amount": -30000,
       "approximateAmount": false,
@@ -15,22 +15,92 @@
       "lastDate": "2026-08-10",
       "yearlyAmount": -360000,
       "income": false
+    }
+  ],
+  "patterns": [
+    {
+      "payeeId": "098af1dc-908b-4e66-905b-4f4a2fcbf2df",
+      "accountId": "77a829a4-fdb3-4558-8245-ded518d8c40c",
+      "income": false,
+      "days": [
+        13
+      ],
+      "firstWeekday": false,
+      "weekend": "after",
+      "description": "Due around the 13th of each month",
+      "occurrences": [
+        {
+          "date": "2026-02-13",
+          "amount": -9000
+        },
+        {
+          "date": "2026-03-12",
+          "amount": -12000
+        },
+        {
+          "date": "2026-04-13",
+          "amount": -16000
+        },
+        {
+          "date": "2026-05-12",
+          "amount": -11000
+        },
+        {
+          "date": "2026-06-13",
+          "amount": -8700
+        }
+      ],
+      "min": -8700,
+      "max": -16000,
+      "average3": -11900,
+      "varies": true,
+      "next": {
+        "date": "2026-10-13",
+        "amount": -11900,
+        "basis": "average"
+      },
+      "payeeName": "City Power",
+      "accountName": "Joint Checking"
     },
     {
-      "payeeId": "9387afc6-1a0f-4aaf-ad14-33e8f4070640",
-      "payeeName": "Netflix",
-      "accountId": "6c9769d2-e22b-4144-b6bf-ff32c64ec745",
-      "accountName": "Visa",
-      "amount": -1599,
-      "approximateAmount": false,
-      "recurrence": {
-        "frequency": "monthly",
-        "interval": 1,
-        "start": "2026-06-12"
+      "payeeId": "fb34f0a0-4ccd-4100-b029-0a58695c4bdd",
+      "accountId": "77a829a4-fdb3-4558-8245-ded518d8c40c",
+      "income": false,
+      "days": [
+        11
+      ],
+      "firstWeekday": false,
+      "weekend": "after",
+      "description": "Due around the 11th of each month",
+      "occurrences": [
+        {
+          "date": "2026-05-11",
+          "amount": -500
+        },
+        {
+          "date": "2026-06-11",
+          "amount": -500
+        },
+        {
+          "date": "2026-07-11",
+          "amount": -500
+        },
+        {
+          "date": "2026-08-12",
+          "amount": -4000
+        }
+      ],
+      "min": -500,
+      "max": -4000,
+      "average3": -1667,
+      "varies": true,
+      "next": {
+        "date": "2026-10-12",
+        "amount": -1667,
+        "basis": "average"
       },
-      "lastDate": "2026-08-12",
-      "yearlyAmount": -19188,
-      "income": false
+      "payeeName": "Coffee Cart",
+      "accountName": "Joint Checking"
     }
   ],
   "priceChanges": []

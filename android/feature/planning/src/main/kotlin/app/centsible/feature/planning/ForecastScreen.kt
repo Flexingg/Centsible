@@ -171,7 +171,10 @@ fun ForecastScreen(state: ForecastUiState, actions: ForecastActions) {
                                             e.accountName?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = colors.textTertiary) }
                                         }
                                         Column(horizontalAlignment = Alignment.End) {
-                                            MoneyText(e.amount, style = MaterialTheme.typography.bodyLarge, signed = true, color = if (e.amount.isNegative) colors.textPrimary else colors.positive)
+                                            Row(verticalAlignment = Alignment.Bottom) {
+                                                if (e.estimate != null) Text("≈ ", style = MaterialTheme.typography.bodyLarge, color = colors.textSecondary)
+                                                MoneyText(e.amount, style = MaterialTheme.typography.bodyLarge, signed = true, color = if (e.amount.isNegative) colors.textPrimary else colors.positive)
+                                            }
                                             f.day(e.date)?.let { Text("then ${MoneyFormat.format(it.balance)}", style = MaterialTheme.typography.labelSmall, color = if (it.balance.isNegative) colors.negative else colors.textTertiary) }
                                         }
                                     }
