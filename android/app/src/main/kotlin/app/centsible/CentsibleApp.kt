@@ -107,6 +107,7 @@ private object Routes {
     const val SEARCH = "transactions/search?${TransactionsViewModel.ARG_QUERY}={${TransactionsViewModel.ARG_QUERY}}"
 
     const val REVIEW = "review"
+    const val TRANSFERS = "transfers/match"
     const val RULE = "rule?id={id}&payee={payee}&category={category}"
     fun rule(id: String?, payee: String? = null, category: String? = null) = "rule?id=${id.orEmpty()}&payee=${payee.orEmpty()}&category=${category.orEmpty()}"
     const val AUTOMATIONS = "automations?month={month}"
@@ -260,6 +261,7 @@ private fun MainScaffold(
                             MoreItem.Reports -> Routes.REPORTS
                             MoreItem.Merchants -> Routes.MERCHANTS
                             MoreItem.Rules -> Routes.RULES
+                            MoreItem.Transfers -> Routes.TRANSFERS
                             MoreItem.Tags -> Routes.TAGS
                             MoreItem.Appearance -> Routes.CATEGORIES
                             MoreItem.BankSync -> Routes.BANK_SYNC
@@ -321,8 +323,9 @@ private fun MainScaffold(
                 app.centsible.feature.budget.AutomationEditorRoute(onDone = { nav.popBackStack() })
             }
             composable(Routes.REVIEW) {
-                app.centsible.feature.transactions.ReviewRoute(onBack = { nav.popBackStack() }, onOpen = { nav.navigate(Routes.transaction(it)) }, onMakeRule = { p, c -> nav.navigate(Routes.rule(null, p.raw, c?.raw)) })
+                app.centsible.feature.transactions.ReviewRoute(onBack = { nav.popBackStack() }, onOpen = { nav.navigate(Routes.transaction(it)) }, onMakeRule = { p, c -> nav.navigate(Routes.rule(null, p.raw, c?.raw)) }, onMatchTransfers = { nav.navigate(Routes.TRANSFERS) })
             }
+            composable(Routes.TRANSFERS) { app.centsible.feature.transactions.TransfersRoute(onBack = { nav.popBackStack() }) }
             composable(
                 Routes.TRANSACTIONS_FOR,
                 arguments = listOf(

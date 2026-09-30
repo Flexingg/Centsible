@@ -1,0 +1,41 @@
+{
+  "pairs": [
+    {
+      "from": {
+        "id": "bccbe96b-fbf1-460e-9102-931a4a91f878",
+        "accountId": "6c109d07-8faf-466a-a718-4691ee58b65c",
+        "date": "2026-09-27",
+        "amount": -123456,
+        "payeeId": "7647721f-b415-459b-bc82-8bf713d977c6",
+        "payeeName": "CARD AUTOPAY",
+        "categoryId": "af375fd4-d759-46b3-bffe-74a856151d57",
+        "notes": null,
+        "cleared": true,
+        "reconciled": false,
+        "transferId": null,
+        "isParent": false,
+        "parentId": null,
+        "subtransactions": []
+      },
+      "to": {
+        "id": "8524d209-c6c8-4d11-8bde-b70a4f40a011",
+        "accountId": "c5a34d2a-b9cb-4639-aecc-af906255678a",
+        "date": "2026-09-29",
+        "amount": 123456,
+        "payeeId": "85e18bca-af1e-4625-a563-df5c89760580",
+        "payeeName": "PAYMENT THANK YOU",
+        "categoryId": null,
+        "notes": null,
+        "cleared": true,
+        "reconciled": false,
+        "transferId": null,
+        "isParent": false,
+        "parentId": null,
+        "subtransactions": []
+      },
+      "days": 2,
+      "confident": true
+    }
+  ],
+  "auto": false
+}

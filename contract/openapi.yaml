@@ -787,6 +787,83 @@ paths:
             application/json:
               schema: { type: object, required: [remaining], properties: { remaining: { type: integer } } }
 
+  /v1/budgets/{budgetId}/transfers/matches:
+    get:
+      tags: [budgets]
+      operationId: transferMatches
+      summary: "Pairs that look like one payment seen from both accounts (a credit card payment leaving checking and arriving on the card): same amount, opposite signs, different accounts, within five days, neither already a transfer. Last 120 days, newest first. `confident` means neither side had another candidate."
+      parameters:
+        - $ref: '#/components/parameters/BudgetId'
+      responses:
+        '200':
+          description: Pairs
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TransferMatches' }
+
+  /v1/budgets/{budgetId}/transfers/link:
+    post:
+      tags: [budgets]
+      operationId: linkTransfer
+      summary: Make the pair one transfer (what Actual's "Make transfer" does). Both stop counting as spending or income; on-budget pairs lose their categories.
+      parameters:
+        - $ref: '#/components/parameters/BudgetId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TransferPairRequest' }
+      responses:
+        '200':
+          description: Both sides, now linked
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [from, to]
+                properties:
+                  from: { $ref: '#/components/schemas/Transaction' }
+                  to: { $ref: '#/components/schemas/Transaction' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+
+  /v1/budgets/{budgetId}/transfers/dismiss:
+    post:
+      tags: [budgets]
+      operationId: dismissTransfer
+      summary: Not the same payment; stop suggesting this pair.
+      parameters:
+        - $ref: '#/components/parameters/BudgetId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TransferPairRequest' }
+      responses:
+        '204': { description: Dismissed }
+        '403': { $ref: '#/components/responses/Problem' }
+
+  /v1/budgets/{budgetId}/transfers/settings:
+    put:
+      tags: [budgets]
+      operationId: setTransferSettings
+      summary: With auto on, every bank sync links the confident pairs by itself.
+      parameters:
+        - $ref: '#/components/parameters/BudgetId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [auto], properties: { auto: { type: boolean } } }
+      responses:
+        '200':
+          description: Settings
+          content:
+            application/json:
+              schema: { type: object, required: [auto], properties: { auto: { type: boolean } } }
+        '403': { $ref: '#/components/responses/Problem' }
+
   /v1/budgets/{budgetId}/category-groups:
     get:
       tags: [budgets]
@@ -1338,6 +1415,77 @@ paths:
                   month: { $ref: '#/components/schemas/Month' }
                   items: { type: array, items: { $ref: '#/components/schemas/Goal' } }
         '423': { $ref: '#/components/responses/Problem' }
+
+  /v1/budgets/{budgetId}/targets:
+    get:
+      tags: [plan]
+      operationId: listTargets
+      summary: "Goals Actual has no place for, kept by the bridge and shared by the household: grow an account to an amount, keep a category's (or group's) spending under an amount each month, or put at least an amount or a share of the month's income into a category."
+      parameters:
+        - $ref: '#/components/parameters/BudgetId'
+        - { name: month, in: query, schema: { $ref: '#/components/schemas/Month' } }
+      responses:
+        '200':
+          description: Goals and how they're going this month
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [month, items]
+                properties:
+                  month: { $ref: '#/components/schemas/Month' }
+                  items: { type: array, items: { $ref: '#/components/schemas/Target' } }
+        '423': { $ref: '#/components/responses/Problem' }
+    post:
+      tags: [plan]
+      operationId: createTarget
+      parameters:
+        - $ref: '#/components/parameters/BudgetId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TargetInput' }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TargetDef' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+
+  /v1/budgets/{budgetId}/targets/{id}:
+    put:
+      tags: [plan]
+      operationId: updateTarget
+      parameters:
+        - $ref: '#/components/parameters/BudgetId'
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TargetInput' }
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TargetDef' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+    delete:
+      tags: [plan]
+      operationId: deleteTarget
+      parameters:
+        - $ref: '#/components/parameters/BudgetId'
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        '204': { description: Removed }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
 
   /v1/budgets/{budgetId}/categories/{id}/goal:
     put:
@@ -2454,6 +2602,82 @@ components:
         reimportDeleted: { type: boolean, description: Bring back bank transactions you deleted }
         updateDates: { type: boolean, description: Update dates of already-imported transactions }
         mapping: { $ref: '#/components/schemas/SyncMappings' }
+    TargetInput:
+      type: object
+      required: [kind]
+      properties:
+        kind: { type: string, enum: [account, spend-under, spend-at-least] }
+        name: { type: [string, 'null'], description: Defaults to the account's or category's name }
+        accountId: { type: [string, 'null'], description: For account goals }
+        categoryId: { type: [string, 'null'] }
+        groupId: { type: [string, 'null'], description: A whole group instead of one category (spending goals) }
+        amount: { type: [integer, 'null'], description: 'account: the balance to reach; spend-under: the monthly limit; spend-at-least: the monthly minimum' }
+        percentOfIncome: { type: [number, 'null'], description: 'spend-at-least only: a share of the month''s income instead of an amount' }
+        targetMonth: { type: [string, 'null'], pattern: '^\d{4}-\d{2}$', description: account goals only }
+    TargetDef:
+      allOf:
+        - $ref: '#/components/schemas/TargetInput'
+        - type: object
+          required: [id, createdAt]
+          properties:
+            id: { type: string }
+            createdAt: { type: string, format: date-time }
+    Target:
+      type: object
+      required: [id, kind, name, current, goal, progress, status, history]
+      properties:
+        id: { type: string }
+        kind: { type: string, enum: [account, spend-under, spend-at-least] }
+        name: { type: string }
+        accountId: { type: [string, 'null'] }
+        categoryId: { type: [string, 'null'] }
+        groupId: { type: [string, 'null'] }
+        amount: { type: [integer, 'null'] }
+        percentOfIncome: { type: [number, 'null'] }
+        targetMonth: { type: [string, 'null'] }
+        current: { type: integer, description: 'The balance (account), or what went out this month (spending goals), in cents' }
+        goal: { type: integer, description: 'The amount to reach or stay under this month (a share of income, worked out)' }
+        progress: { type: number, description: current / goal, 0 to 1 }
+        status: { type: string, enum: [reached, on-track, behind, over, stalled] }
+        remaining: { type: integer }
+        monthlyNeeded: { type: [integer, 'null'] }
+        avgChange: { type: integer, description: 'account: average monthly change lately' }
+        projectedMonth: { type: [string, 'null'] }
+        income: { type: integer, description: This month's income (spending goals) }
+        pace: { type: number, description: How far through the month (1 for a past month) }
+        monthsKept: { type: integer, description: 'Of the months in history, how many met the goal' }
+        missing: { type: boolean, description: The account or category was deleted }
+        history:
+          type: array
+          description: Spending goals, the last six months (oldest first)
+          items:
+            type: object
+            required: [month, value, goal]
+            properties:
+              month: { $ref: '#/components/schemas/Month' }
+              value: { type: integer }
+              goal: { type: integer }
+    TransferPairRequest:
+      type: object
+      required: [fromId, toId]
+      properties:
+        fromId: { type: string, description: The side money left }
+        toId: { type: string, description: The side money arrived }
+    TransferMatches:
+      type: object
+      required: [pairs, auto]
+      properties:
+        auto: { type: boolean }
+        pairs:
+          type: array
+          items:
+            type: object
+            required: [from, to, days, confident]
+            properties:
+              from: { $ref: '#/components/schemas/Transaction' }
+              to: { $ref: '#/components/schemas/Transaction' }
+              days: { type: integer, description: Days between the two dates }
+              confident: { type: boolean }
     SyncSummary:
       type: object
       required: [accounts, newTransactions, results, simplefinRequests]
@@ -2461,6 +2685,7 @@ components:
         accounts: { type: integer }
         newTransactions: { type: integer }
         simplefinRequests: { type: integer }
+        transfersLinked: { type: integer, description: Transfers linked automatically after the sync (when turned on) }
         results:
           type: array
           items:

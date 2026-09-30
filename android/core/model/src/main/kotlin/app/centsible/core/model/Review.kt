@@ -14,3 +14,8 @@ sealed interface BatchChange {
 data class BatchResult(val updated: Int, val deleted: Int, val skipped: List<Skipped>) {
     data class Skipped(val id: TransactionId, val reason: String)
 }
+
+/** Two transactions that look like one payment seen from both accounts. */
+data class TransferPair(val from: Transaction, val to: Transaction, val days: Int, val confident: Boolean)
+
+data class TransferMatches(val pairs: List<TransferPair>, val auto: Boolean)

@@ -23,6 +23,7 @@ class FixtureDecodingTest {
         "accounts" to ItemsDto.serializer(AccountDto.serializer()),
         "category-groups" to ItemsDto.serializer(CategoryGroupDto.serializer()),
         "transactions-page" to TransactionPageDto.serializer(),
+        "transfer-matches" to TransferMatchesDto.serializer(),
         "home-layout" to HomeLayoutDto.serializer(),
         "appearance" to AppearanceListDto.serializer(),
         "rule-preview" to RulePreviewDto.serializer(),

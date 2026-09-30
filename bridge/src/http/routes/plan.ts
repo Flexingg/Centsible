@@ -1,5 +1,6 @@
 import type { FastifyPluginAsync } from 'fastify';
 import { AVERAGE_BASES, type Basis, type GoalInput } from '../../actual/plan-ops.js';
+import type { TargetInput } from '../../actual/target-ops.js';
 import { ApiError } from '../../errors.js';
 import { audit, requireBudget, type Deps } from '../server.js';
 import { MONEY, MONTH } from './budgets.js';
@@ -12,7 +13,7 @@ const monthParams = { type: 'object', properties: { month: MONTH } };
 export const planRoutes =
   (deps: Deps): FastifyPluginAsync =>
   async (app) => {
-    const { plan } = deps;
+    const { plan, targets } = deps;
 
     app.get<{ Params: MonthParams }>('/v1/budgets/:budgetId/months/:month/autopilot', { schema: { params: monthParams } }, async (req) => {
       requireBudget(deps, req, req.params.budgetId);
@@ -80,6 +81,53 @@ export const planRoutes =
       requireBudget(deps, req, req.params.budgetId, 'member');
       await plan.setGoal(req.params.budgetId, req.params.id, null);
       audit(deps, req, req.params.budgetId, 'goal.removed', req.params.id);
+      return reply.status(204).send();
+    });
+
+    // ── Goals on accounts and on monthly spending (kept by the bridge) ──
+    const TARGET_BODY = {
+      type: 'object',
+      required: ['kind'],
+      additionalProperties: false,
+      properties: {
+        kind: { type: 'string', enum: ['account', 'spend-under', 'spend-at-least'] },
+        name: { type: ['string', 'null'], maxLength: 100 },
+        accountId: { type: ['string', 'null'] },
+        categoryId: { type: ['string', 'null'] },
+        groupId: { type: ['string', 'null'] },
+        amount: { type: ['integer', 'null'], minimum: 0 },
+        percentOfIncome: { type: ['number', 'null'], minimum: 0, maximum: 100 },
+        targetMonth: { ...MONTH, type: ['string', 'null'] },
+      },
+    };
+
+    app.get<{ Params: { budgetId: string }; Querystring: { month?: string } }>(
+      '/v1/budgets/:budgetId/targets',
+      { schema: { querystring: { type: 'object', properties: { month: MONTH } } } },
+      async (req) => {
+        requireBudget(deps, req, req.params.budgetId);
+        return targets.list(req.params.budgetId, req.query.month);
+      },
+    );
+
+    app.post<{ Params: { budgetId: string }; Body: TargetInput }>('/v1/budgets/:budgetId/targets', { schema: { body: TARGET_BODY } }, async (req, reply) => {
+      requireBudget(deps, req, req.params.budgetId, 'member');
+      const t = await targets.create(req.params.budgetId, req.body);
+      audit(deps, req, req.params.budgetId, 'target.created', t.id, req.body);
+      return reply.status(201).send(t);
+    });
+
+    app.put<{ Params: CategoryParams; Body: TargetInput }>('/v1/budgets/:budgetId/targets/:id', { schema: { body: TARGET_BODY } }, async (req) => {
+      requireBudget(deps, req, req.params.budgetId, 'member');
+      const t = await targets.update(req.params.budgetId, req.params.id, req.body);
+      audit(deps, req, req.params.budgetId, 'target.updated', t.id, req.body);
+      return t;
+    });
+
+    app.delete<{ Params: CategoryParams }>('/v1/budgets/:budgetId/targets/:id', async (req, reply) => {
+      requireBudget(deps, req, req.params.budgetId, 'member');
+      targets.remove(req.params.budgetId, req.params.id);
+      audit(deps, req, req.params.budgetId, 'target.removed', req.params.id);
       return reply.status(204).send();
     });
 

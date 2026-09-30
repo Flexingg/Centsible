@@ -25,7 +25,7 @@ export type BankSyncSettings = {
   mapping: { payment: FieldMapping; deposit: FieldMapping };
 };
 export type AccountSyncResult = { accountId: string; name: string; newTransactions: number; matchedTransactions: number; error: string | null; status: string | null };
-export type SyncSummary = { accounts: number; newTransactions: number; results: AccountSyncResult[]; simplefinRequests: number };
+export type SyncSummary = { accounts: number; newTransactions: number; results: AccountSyncResult[]; simplefinRequests: number; transfersLinked?: number };
 
 const DEFAULT_MAPPING: FieldMapping = { date: 'date', payee: 'payeeName', notes: 'notes' };
 const BOOLEAN_PREFS = {
@@ -58,6 +58,9 @@ export class BankSyncOps {
     private readonly store: HouseholdStore,
     private readonly keys: SimpleFinKeyFile,
   ) {}
+
+  /** Runs after each sync, in the same budget session (auto-linking transfers). */
+  afterSync?: (budgetId: string, lib: Lib) => Promise<number>;
 
   /** Whether the bridge holds its own copy of the SimpleFIN access URL (needed for history backfill). */
   get historyAccess() {
@@ -243,8 +246,13 @@ export class BankSyncOps {
         results.push(toResult(linked, a.id, res));
       }
       await settle();
-      return withStatuses(results, simplefin.length ? 1 : 0);
+      return linked_(await withStatuses(results, simplefin.length ? 1 : 0), await this.after(budgetId, lib));
     });
+  }
+
+  private async after(budgetId: string, lib: Lib): Promise<number> {
+    // A failure here mustn't hide a sync that worked.
+    return this.afterSync ? this.afterSync(budgetId, lib).catch(() => 0) : 0;
   }
 
   /** One account now (a SimpleFIN account costs one request). */
@@ -257,7 +265,7 @@ export class BankSyncOps {
       if (acct.source === 'simpleFin') this.store.recordSimpleFinRequest();
       const res = (await send(lib)('accounts-bank-sync', { ids: [accountId] })) as SyncResponse;
       await settle();
-      return withStatuses([toResult(linked, accountId, res)], acct.source === 'simpleFin' ? 1 : 0);
+      return linked_(await withStatuses([toResult(linked, accountId, res)], acct.source === 'simpleFin' ? 1 : 0), await this.after(budgetId, lib));
     });
   }
 
@@ -332,3 +340,5 @@ export async function readSettings(accountId: string): Promise<BankSyncSettings>
   }
   return { ...bools, mapping };
 }
+
+const linked_ = (s: SyncSummary, transfersLinked: number): SyncSummary => (transfersLinked ? { ...s, transfersLinked } : s);

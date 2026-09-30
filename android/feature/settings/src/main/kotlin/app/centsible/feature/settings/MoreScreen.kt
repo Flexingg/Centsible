@@ -40,6 +40,7 @@ enum class MoreItem(val emoji: String, val title: String, val subtitle: String) 
     Reports("📊", "Reports", "Cash flow, spending and net worth"),
     Merchants("🏪", "Merchants", "Rename, merge and tidy up"),
     Rules("⚙️", "Rules", "Categorize automatically"),
+    Transfers("🔗", "Match transfers", "Link card payments seen from both accounts"),
     Tags("🏷️", "Tags", "#tags from your notes"),
     Appearance("🏷️", "Categories", "Add, rename, delete; colors and emoji"),
     BankSync("🏦", "Bank sync", "SimpleFIN accounts and automatic syncing"),

@@ -89,6 +89,7 @@ data class ReviewActions(
     /** Opens a new rule for this merchant (and category, if it has one). */
     val makeRule: (app.centsible.core.model.PayeeId, CategoryId?) -> Unit = { _, _ -> },
     val rulePromptShown: () -> Unit = {},
+    val matchTransfers: () -> Unit = {},
 )
 
 @Composable
@@ -96,6 +97,7 @@ fun ReviewRoute(
     onBack: () -> Unit,
     onOpen: (TransactionId) -> Unit,
     onMakeRule: (app.centsible.core.model.PayeeId, CategoryId?) -> Unit = { _, _ -> },
+    onMatchTransfers: () -> Unit = {},
     viewModel: ReviewViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -120,6 +122,7 @@ fun ReviewRoute(
             messageShown = viewModel::messageShown,
             makeRule = { p, c -> viewModel.makingRule(p); onMakeRule(p, c) },
             rulePromptShown = viewModel::rulePromptShown,
+            matchTransfers = { viewModel.leaving(); onMatchTransfers() },
         ),
     )
 }
@@ -138,11 +141,12 @@ fun ReviewScreen(state: ReviewUiState, actions: ReviewActions, today: LocalDate 
                     Text("$left to go", style = MaterialTheme.typography.bodyMedium, color = colors.textSecondary)
                 }
             }
-            if (state.left > 0) {
+            if (state.data is Loadable.Ready) {
                 Box {
                     IconButton(onClick = { menu = true }) { Icon(Icons.Rounded.MoreVert, contentDescription = "More") }
                     DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-                        DropdownMenuItem(text = { Text("Mark all reviewed") }, onClick = { menu = false; actions.askReviewAll(true) })
+                        DropdownMenuItem(text = { Text("Match transfers") }, onClick = { menu = false; actions.matchTransfers() })
+                        if (state.left > 0) DropdownMenuItem(text = { Text("Mark all reviewed") }, onClick = { menu = false; actions.askReviewAll(true) })
                     }
                 }
             }

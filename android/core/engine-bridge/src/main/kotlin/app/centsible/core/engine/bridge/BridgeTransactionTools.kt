@@ -6,7 +6,11 @@ import app.centsible.core.model.BatchResult
 import app.centsible.core.model.BudgetId
 import app.centsible.core.model.ReviewInbox
 import app.centsible.core.model.TransactionId
+import app.centsible.core.model.TransferMatches
+import app.centsible.core.model.TransferPair
 import app.centsible.core.network.ReviewMarkDto
+import app.centsible.core.network.TransferPairRequestDto
+import app.centsible.core.network.TransferSettingsDto
 import app.centsible.core.network.TransactionToolsApi
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonPrimitive
@@ -40,4 +44,20 @@ class BridgeTransactionTools(private val api: TransactionToolsApi, private val o
         onWrite()
         return BatchResult(r.updated, r.deleted, r.skipped.map { BatchResult.Skipped(TransactionId(it.id), it.reason) })
     }
+
+    override suspend fun transferMatches(budget: BudgetId): TransferMatches {
+        val d = api.transferMatches(budget.raw)
+        return TransferMatches(d.pairs.map { TransferPair(it.from.toModel(), it.to.toModel(), it.days, it.confident) }, d.auto)
+    }
+
+    override suspend fun linkTransfer(budget: BudgetId, from: TransactionId, to: TransactionId) {
+        api.linkTransfer(budget.raw, TransferPairRequestDto(from.raw, to.raw))
+        onWrite()
+    }
+
+    override suspend fun dismissTransfer(budget: BudgetId, from: TransactionId, to: TransactionId) {
+        api.dismissTransfer(budget.raw, TransferPairRequestDto(from.raw, to.raw))
+    }
+
+    override suspend fun setAutoTransfers(budget: BudgetId, auto: Boolean) = api.transferSettings(budget.raw, TransferSettingsDto(auto)).auto
 }

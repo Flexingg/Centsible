@@ -38,7 +38,7 @@ function decodeCursor(cursor: string | undefined): number {
 export const transactionRoutes =
   (deps: Deps): FastifyPluginAsync =>
   async (app) => {
-    const { transactions, review } = deps;
+    const { transactions, review, transfers } = deps;
 
     app.get<{
       Params: BudgetParams;
@@ -230,6 +230,53 @@ export const transactionRoutes =
         if (req.body.all) await review.reviewAll(budgetId, auth.member.id);
         else review.markReviewed(budgetId, auth.member.id, req.body.ids ?? []);
         return { remaining: await review.count(budgetId, auth.member.id) };
+      },
+    );
+
+    // ── Transfers: the two sides of one payment (credit card payments, savings moves) ──
+    app.get<{ Params: BudgetParams }>('/v1/budgets/:budgetId/transfers/matches', async (req) => {
+      requireBudget(deps, req, req.params.budgetId);
+      return transfers.matches(req.params.budgetId);
+    });
+
+    app.post<{ Params: BudgetParams; Body: { fromId: string; toId: string } }>(
+      '/v1/budgets/:budgetId/transfers/link',
+      {
+        schema: {
+          body: { type: 'object', required: ['fromId', 'toId'], additionalProperties: false, properties: { fromId: { type: 'string' }, toId: { type: 'string' } } },
+        },
+      },
+      async (req) => {
+        const { budgetId } = req.params;
+        const auth = requireBudget(deps, req, budgetId, 'member');
+        const result = await transfers.link(budgetId, req.body.fromId, req.body.toId);
+        review.markReviewed(budgetId, auth.member.id, [req.body.fromId, req.body.toId]);
+        audit(deps, req, budgetId, 'transfer.linked', req.body.fromId, { toId: req.body.toId });
+        return result;
+      },
+    );
+
+    app.post<{ Params: BudgetParams; Body: { fromId: string; toId: string } }>(
+      '/v1/budgets/:budgetId/transfers/dismiss',
+      {
+        schema: {
+          body: { type: 'object', required: ['fromId', 'toId'], additionalProperties: false, properties: { fromId: { type: 'string' }, toId: { type: 'string' } } },
+        },
+      },
+      async (req, reply) => {
+        requireBudget(deps, req, req.params.budgetId, 'member');
+        transfers.dismiss(req.params.budgetId, req.body.fromId, req.body.toId);
+        return reply.status(204).send();
+      },
+    );
+
+    app.put<{ Params: BudgetParams; Body: { auto: boolean } }>(
+      '/v1/budgets/:budgetId/transfers/settings',
+      { schema: { body: { type: 'object', required: ['auto'], additionalProperties: false, properties: { auto: { type: 'boolean' } } } } },
+      async (req) => {
+        requireBudget(deps, req, req.params.budgetId, 'member');
+        transfers.setAuto(req.params.budgetId, req.body.auto);
+        return { auto: transfers.auto(req.params.budgetId) };
       },
     );
   };

@@ -12,6 +12,8 @@ import { StructureOps } from './actual/structure-ops.js';
 import { RuleTools } from './actual/rule-tools.js';
 import { AutomationOps } from './actual/automation-ops.js';
 import { ReviewOps } from './actual/review-ops.js';
+import { TargetOps } from './actual/target-ops.js';
+import { TransferOps } from './actual/transfer-ops.js';
 import { TransactionOps } from './actual/transaction-ops.js';
 import type { HouseholdStore } from './auth/store.js';
 import { BankSyncBackfill } from './bank-sync-backfill.js';
@@ -30,6 +32,8 @@ export function createDeps(config: BridgeConfig, store: HouseholdStore, host: Ac
   const budgetOps = new BudgetOps(host);
   const keys = new SimpleFinKeyFile(config.dataDir, config.actualDataDir);
   const bankSync = new BankSyncOps(host, store, keys);
+  const transfers = new TransferOps(host, store);
+  bankSync.afterSync = (budgetId, lib) => transfers.autoLink(budgetId, lib);
   const backfill = new BankSyncBackfill(host, store, keys, log);
   const backups = new BackupService(config, host, store, log);
   return {
@@ -48,6 +52,8 @@ export function createDeps(config: BridgeConfig, store: HouseholdStore, host: Ac
     insights: new InsightsOps(host, store),
     transactions: new TransactionOps(host),
     review: new ReviewOps(host, store),
+    transfers,
+    targets: new TargetOps(host, store),
     automations: new AutomationOps(host),
     ruleTools: new RuleTools(host),
     structure: new StructureOps(host),
