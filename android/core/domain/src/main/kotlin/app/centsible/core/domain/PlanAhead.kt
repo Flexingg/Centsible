@@ -22,4 +22,9 @@ interface PlanAheadGateway {
     /** null removes the goal. */
     suspend fun setGoal(budget: BudgetId, category: CategoryId, goal: GoalInput?)
     suspend fun forecast(budget: BudgetId, days: Int, accounts: List<AccountId> = emptyList(), includeTypical: Boolean = true): Forecast
+    /** Goals on accounts and on monthly spending. */
+    suspend fun targets(budget: BudgetId, month: YearMonth? = null): List<app.centsible.core.model.Target>
+    /** [id] null creates one. */
+    suspend fun saveTarget(budget: BudgetId, id: String?, input: app.centsible.core.model.TargetInput)
+    suspend fun deleteTarget(budget: BudgetId, id: String)
 }

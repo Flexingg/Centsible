@@ -10,6 +10,7 @@ import app.centsible.core.model.Forecast
 import app.centsible.core.model.ForecastDay
 import app.centsible.core.model.ForecastEvent
 import app.centsible.core.model.Goal
+import app.centsible.core.model.Target
 import app.centsible.core.model.Money
 import app.centsible.core.model.YearMonth
 import com.github.takahirom.roborazzi.captureRoboImage
@@ -70,6 +71,34 @@ class PlanAheadScreenshotTest {
         compose.waitForIdle()
         captureScreenRoboImage("screenshots/goals_editor.png")
         app.centsible.core.uitesting.A11y.assertOk(compose)
+    }
+
+    private fun target(id: String, kind: Target.Kind, name: String, current: Long, goal: Long, status: Target.Status, pace: Float, history: List<Pair<Int, Int>> = emptyList(), percent: Double? = null, month: String? = null) = Target(
+        id = id, kind = kind, name = name, accountId = null, categoryId = null, amount = Money(goal), percentOfIncome = percent,
+        targetMonth = month?.let(::YearMonth), current = Money(current), goal = Money(goal), progress = (current.toFloat() / goal).coerceIn(0f, 1f),
+        status = status, remaining = Money((goal - current).coerceAtLeast(0)), monthlyNeeded = if (kind == Target.Kind.Account) Money(40000) else null,
+        avgChange = Money(52000), projectedMonth = YearMonth("2027-04"), income = Money(820000), pace = pace,
+        monthsKept = history.count { (v, g) -> if (kind == Target.Kind.SpendUnder) v <= g else v >= g },
+        missing = false,
+        history = history.mapIndexed { i, (v, g) -> Target.Month(YearMonth("2026-0${4 + i}"), Money(v.toLong()), Money(g.toLong())) },
+    )
+
+    private val targets = listOf(
+        target("t1", Target.Kind.Account, "High-Yield Savings", 1_240_000, 2_000_000, Target.Status.OnTrack, 1f, month = "2027-06"),
+        target("t2", Target.Kind.SpendUnder, "Eating out", 14357, 20000, Target.Status.Behind, 0.55f, listOf(18000 to 20000, 23100 to 20000, 19500 to 20000, 16000 to 20000, 21000 to 20000, 14357 to 20000)),
+        target("t3", Target.Kind.SpendAtLeast, "Giving", 82000, 123000, Target.Status.OnTrack, 0.55f, listOf(120000 to 118000, 125000 to 123000, 90000 to 121000, 82000 to 123000), percent = 15.0),
+    )
+
+    @Test fun goals_with_targets() {
+        compose.setContent { CentsibleTheme(darkTheme = false) { GoalsScreen(GoalsUiState(Loadable.Ready(goals.take(1)), categories, canEdit = true, targets = targets), GoalsActions()) } }
+        compose.onRoot().captureRoboImage("screenshots/goals_targets.png")
+        app.centsible.core.uitesting.A11y.assertOk(compose)
+    }
+
+    @Test fun goals_kind_chooser() {
+        compose.setContent { CentsibleTheme(darkTheme = false) { GoalsScreen(GoalsUiState(Loadable.Ready(goals), categories, canEdit = true, choosing = true), GoalsActions()) } }
+        compose.waitForIdle()
+        captureScreenRoboImage("screenshots/goals_kind_chooser.png")
     }
 
     // A checking account: paid on the 1st and 15th, rent on the 1st, a few bills, everyday spending in between.

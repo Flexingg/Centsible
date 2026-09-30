@@ -50,6 +50,42 @@ import kotlinx.serialization.Serializable
 @Serializable data class GoalsDto(val month: String, val items: List<GoalDto> = emptyList())
 @Serializable data class GoalInputDto(val kind: String, val target: Long, val targetMonth: String? = null)
 
+@Serializable data class TargetMonthDto(val month: String, val value: Long, val goal: Long)
+@Serializable data class TargetDto(
+    val id: String,
+    val kind: String,
+    val name: String = "",
+    val accountId: String? = null,
+    val categoryId: String? = null,
+    val groupId: String? = null,
+    val amount: Long? = null,
+    val percentOfIncome: Double? = null,
+    val targetMonth: String? = null,
+    val current: Long = 0,
+    val goal: Long = 0,
+    val progress: Float = 0f,
+    val status: String = "on-track",
+    val remaining: Long = 0,
+    val monthlyNeeded: Long? = null,
+    val avgChange: Long = 0,
+    val projectedMonth: String? = null,
+    val income: Long = 0,
+    val pace: Float = 1f,
+    val monthsKept: Int = 0,
+    val missing: Boolean = false,
+    val history: List<TargetMonthDto> = emptyList(),
+)
+@Serializable data class TargetsDto(val month: String, val items: List<TargetDto> = emptyList())
+@Serializable data class TargetInputDto(
+    val kind: String,
+    val name: String? = null,
+    val accountId: String? = null,
+    val categoryId: String? = null,
+    val amount: Long? = null,
+    val percentOfIncome: Double? = null,
+    val targetMonth: String? = null,
+)
+
 @Serializable data class ForecastEventDto(
     val date: String,
     val scheduleId: String,

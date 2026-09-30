@@ -121,6 +121,14 @@ class RequestContractTest {
         call { planning.applyAutopilot(b, "2026-09", ApplyAutopilotDto(12, listOf("c1"))) }
         call { planning.setGoal(b, "c1", GoalInputDto("by", 120000, "2027-03")) }
         call { planning.setGoal(b, "c1", GoalInputDto("balance", 500000)) }
+        call { planning.createTarget(b, TargetInputDto("spend-under", categoryId = "c1", amount = 20000)) }
+        call { planning.createTarget(b, TargetInputDto("spend-at-least", categoryId = "c1", percentOfIncome = 10.0)) }
+        call { planning.updateTarget(b, "t1", TargetInputDto("account", accountId = "a1", amount = 1000000, targetMonth = "2027-06")) }
+        call { planning.deleteTarget(b, "t1") }
+        val tools = TransactionToolsApi(client)
+        call { tools.linkTransfer(b, TransferPairRequestDto("o1", "i1")) }
+        call { tools.dismissTransfer(b, TransferPairRequestDto("o1", "i1")) }
+        call { tools.transferSettings(b, TransferSettingsDto(true)) }
         call { planning.dismissSubscription(b, "p1") }
         val server = ServerApi(client)
         call { server.backupSettings(BackupSettingsDto(intervalHours = 24, keep = 7)) }

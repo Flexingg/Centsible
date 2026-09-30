@@ -64,6 +64,52 @@ data class Goal(
 
 data class GoalInput(val kind: Goal.Kind, val target: Money, val targetMonth: YearMonth?)
 
+/**
+ * A goal kept by the bridge (Actual has no place for these): grow an account to an amount,
+ * keep a category's spending under an amount each month, or put at least an amount (or a
+ * share of the month's income) into a category each month.
+ */
+data class Target(
+    val id: String,
+    val kind: Kind,
+    val name: String,
+    val accountId: AccountId?,
+    val categoryId: CategoryId?,
+    val amount: Money?,
+    val percentOfIncome: Double?,
+    val targetMonth: YearMonth?,
+    /** The balance, or what went out this month. */
+    val current: Money,
+    /** This month's amount to reach or stay under (a share of income, worked out). */
+    val goal: Money,
+    val progress: Float,
+    val status: Status,
+    val remaining: Money,
+    val monthlyNeeded: Money?,
+    val avgChange: Money,
+    val projectedMonth: YearMonth?,
+    val income: Money,
+    /** How far through the month (1 for a past one). */
+    val pace: Float,
+    val monthsKept: Int,
+    val missing: Boolean,
+    val history: List<Month>,
+) {
+    enum class Kind { Account, SpendUnder, SpendAtLeast }
+    enum class Status { Reached, OnTrack, Behind, Over, Stalled }
+    data class Month(val month: YearMonth, val value: Money, val goal: Money)
+}
+
+data class TargetInput(
+    val kind: Target.Kind,
+    val name: String? = null,
+    val accountId: AccountId? = null,
+    val categoryId: CategoryId? = null,
+    val amount: Money? = null,
+    val percentOfIncome: Double? = null,
+    val targetMonth: YearMonth? = null,
+)
+
 /** Projected balances from scheduled bills and income plus typical everyday money. */
 data class Forecast(
     val from: String,

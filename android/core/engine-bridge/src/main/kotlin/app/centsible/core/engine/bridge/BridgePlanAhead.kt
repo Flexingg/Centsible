@@ -69,7 +69,68 @@ class BridgePlanAhead(private val api: PlanningApi, private val onWrite: () -> U
             dto.paid.map { app.centsible.core.model.PaidBill(it.date, it.scheduleId, it.name, Money(it.amount)) },
         )
     }
+
+    override suspend fun targets(budget: BudgetId, month: YearMonth?) = api.targets(budget.raw, month?.raw).items.map { it.toModel() }
+
+    override suspend fun saveTarget(budget: BudgetId, id: String?, input: app.centsible.core.model.TargetInput) {
+        val body = app.centsible.core.network.TargetInputDto(
+            kind = kindName(input.kind),
+            name = input.name,
+            accountId = input.accountId?.raw,
+            categoryId = input.categoryId?.raw,
+            amount = input.amount?.minor,
+            percentOfIncome = input.percentOfIncome,
+            targetMonth = input.targetMonth?.raw,
+        )
+        if (id == null) api.createTarget(budget.raw, body) else api.updateTarget(budget.raw, id, body)
+        onWrite()
+    }
+
+    override suspend fun deleteTarget(budget: BudgetId, id: String) {
+        api.deleteTarget(budget.raw, id)
+        onWrite()
+    }
 }
+
+private fun kindName(k: app.centsible.core.model.Target.Kind) = when (k) {
+    app.centsible.core.model.Target.Kind.Account -> "account"
+    app.centsible.core.model.Target.Kind.SpendUnder -> "spend-under"
+    app.centsible.core.model.Target.Kind.SpendAtLeast -> "spend-at-least"
+}
+
+private fun app.centsible.core.network.TargetDto.toModel() = app.centsible.core.model.Target(
+    id = id,
+    kind = when (kind) {
+        "account" -> app.centsible.core.model.Target.Kind.Account
+        "spend-under" -> app.centsible.core.model.Target.Kind.SpendUnder
+        else -> app.centsible.core.model.Target.Kind.SpendAtLeast
+    },
+    name = name,
+    accountId = accountId?.let(::AccountId),
+    categoryId = categoryId?.let(::CategoryId),
+    amount = amount?.let(::Money),
+    percentOfIncome = percentOfIncome,
+    targetMonth = targetMonth?.let(::YearMonth),
+    current = Money(current),
+    goal = Money(goal),
+    progress = progress,
+    status = when (status) {
+        "reached" -> app.centsible.core.model.Target.Status.Reached
+        "behind" -> app.centsible.core.model.Target.Status.Behind
+        "over" -> app.centsible.core.model.Target.Status.Over
+        "stalled" -> app.centsible.core.model.Target.Status.Stalled
+        else -> app.centsible.core.model.Target.Status.OnTrack
+    },
+    remaining = Money(remaining),
+    monthlyNeeded = monthlyNeeded?.let(::Money),
+    avgChange = Money(avgChange),
+    projectedMonth = projectedMonth?.let(::YearMonth),
+    income = Money(income),
+    pace = pace,
+    monthsKept = monthsKept,
+    missing = missing,
+    history = history.map { app.centsible.core.model.Target.Month(YearMonth(it.month), Money(it.value), Money(it.goal)) },
+)
 
 private fun AveragesDto.toMap() = mapOf(AverageBasis.Three to Money(avg3), AverageBasis.Six to Money(avg6), AverageBasis.Twelve to Money(avg12))
 

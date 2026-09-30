@@ -91,6 +91,10 @@ fun GoalsRoute(onBack: () -> Unit, viewModel: GoalsViewModel = hiltViewModel()) 
             save = { c, g -> viewModel.save(c, g) },
             remove = { viewModel.remove(it) },
             messageShown = viewModel::messageShown,
+            choose = viewModel::choose,
+            editTarget = viewModel::editTarget,
+            saveTarget = { id, t -> viewModel.saveTarget(id, t) },
+            deleteTarget = { viewModel.deleteTarget(it) },
         ),
     )
 }
@@ -102,6 +106,10 @@ data class GoalsActions(
     val save: (app.centsible.core.model.CategoryId, GoalInput) -> Unit = { _, _ -> },
     val remove: (app.centsible.core.model.CategoryId) -> Unit = {},
     val messageShown: () -> Unit = {},
+    val choose: (Boolean) -> Unit = {},
+    val editTarget: (TargetEditor?) -> Unit = {},
+    val saveTarget: (String?, app.centsible.core.model.TargetInput) -> Unit = { _, _ -> },
+    val deleteTarget: (String) -> Unit = {},
 )
 
 @Composable
@@ -119,8 +127,8 @@ fun GoalsScreen(state: GoalsUiState, actions: GoalsActions) {
             }
         },
         floatingActionButton = {
-            if (state.canEdit && state.goals is Loadable.Ready && state.available.isNotEmpty()) {
-                FloatingActionButton(onClick = { actions.edit(GoalEditor(null, null)) }, containerColor = colors.accent, contentColor = colors.card) {
+            if (state.canEdit && state.goals is Loadable.Ready) {
+                FloatingActionButton(onClick = { actions.choose(true) }, containerColor = colors.accent, contentColor = colors.card) {
                     Icon(Icons.Rounded.Add, contentDescription = "New goal")
                 }
             }
@@ -129,13 +137,13 @@ fun GoalsScreen(state: GoalsUiState, actions: GoalsActions) {
         when (val g = state.goals) {
             Loadable.Loading -> LoadingState(Modifier.padding(padding))
             is Loadable.Failed -> MessageState("Couldn't load goals", g.message, emoji = "🎯", actionLabel = "Try again", onAction = actions.retry, modifier = Modifier.padding(padding))
-            is Loadable.Ready -> if (g.value.isEmpty()) {
+            is Loadable.Ready -> if (g.value.isEmpty() && state.targets.isEmpty()) {
                 MessageState(
-                    "Save up for something",
-                    "Give a category a target, like an emergency fund or a trip, and see how it's going. Goals are saved in the category notes, so Actual's web app sees them too.",
+                    "Set a goal",
+                    "Save up in a category, grow an account, keep eating out under a limit, or give at least a share of your income each month.",
                     emoji = "🎯",
                     actionLabel = if (state.canEdit) "New goal" else null,
-                    onAction = { actions.edit(GoalEditor(null, null)) },
+                    onAction = { actions.choose(true) },
                     modifier = Modifier.padding(padding),
                 )
             } else {
@@ -144,15 +152,40 @@ fun GoalsScreen(state: GoalsUiState, actions: GoalsActions) {
                     contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 96.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    item { GoalsSummary(g.value) }
+                    if (g.value.isNotEmpty()) item { GoalsSummary(g.value) }
+                    val saving = state.targets.filter { it.kind == app.centsible.core.model.Target.Kind.Account }
+                    val spending = state.targets - saving.toSet()
+                    if (g.value.isNotEmpty() || saving.isNotEmpty()) item { StatLabel("Saving", Modifier.padding(start = 4.dp, top = 4.dp)) }
                     items(g.value, key = { it.categoryId.raw }) { goal ->
                         GoalCard(goal, onClick = if (state.canEdit) ({ actions.edit(GoalEditor(goal, GoalCategory(goal.categoryId, goal.name, goal.groupName))) }) else null)
+                    }
+                    items(saving, key = { it.id }) { t ->
+                        TargetCard(t, onClick = if (state.canEdit) ({ actions.editTarget(TargetEditor(t.kind, t)) }) else null)
+                    }
+                    if (spending.isNotEmpty()) item { StatLabel("Each month", Modifier.padding(start = 4.dp, top = 8.dp)) }
+                    items(spending, key = { it.id }) { t ->
+                        TargetCard(t, onClick = if (state.canEdit) ({ actions.editTarget(TargetEditor(t.kind, t)) }) else null)
                     }
                 }
             }
         }
     }
     state.editor?.let { GoalSheet(it, state, actions) }
+    if (state.choosing) {
+        GoalKindSheet(
+            canSaveInCategory = state.available.isNotEmpty(),
+            onPick = { kind -> if (kind == null) actions.edit(GoalEditor(null, null)) else actions.editTarget(TargetEditor(kind, null)) },
+            onDismiss = { actions.choose(false) },
+        )
+    }
+    state.targetEditor?.let { e ->
+        TargetSheet(
+            e, state.accounts, state.categoryNames, state.busy,
+            onSave = actions.saveTarget,
+            onRemove = actions.deleteTarget,
+            onDismiss = { actions.editTarget(null) },
+        )
+    }
 }
 
 @Composable

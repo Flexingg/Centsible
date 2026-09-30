@@ -1,0 +1,107 @@
+{
+  "month": "2026-09",
+  "items": [
+    {
+      "id": "360df9d5-e3c4-4c0d-aeac-25dcb74b8ec5",
+      "kind": "spend-under",
+      "name": "Food",
+      "accountId": null,
+      "categoryId": "541836f1-e756-4473-a5d0-6c1d3f06c7fa",
+      "groupId": null,
+      "amount": 20000,
+      "percentOfIncome": null,
+      "targetMonth": null,
+      "current": 14357,
+      "goal": 20000,
+      "income": 1130000,
+      "progress": 0.71785,
+      "status": "reached",
+      "remaining": 5643,
+      "pace": 1,
+      "monthsKept": 4,
+      "history": [
+        {
+          "month": "2026-06",
+          "value": 0,
+          "goal": 20000
+        },
+        {
+          "month": "2026-07",
+          "value": 0,
+          "goal": 20000
+        },
+        {
+          "month": "2026-08",
+          "value": 0,
+          "goal": 20000
+        },
+        {
+          "month": "2026-09",
+          "value": 14357,
+          "goal": 20000
+        }
+      ]
+    },
+    {
+      "id": "babe2042-6e94-4f11-b4d8-ec9ca1be8abc",
+      "kind": "spend-at-least",
+      "name": "Giving",
+      "accountId": null,
+      "categoryId": "af375fd4-d759-46b3-bffe-74a856151d57",
+      "groupId": null,
+      "amount": null,
+      "percentOfIncome": 1,
+      "targetMonth": null,
+      "current": 4650,
+      "goal": 11300,
+      "income": 1130000,
+      "progress": 0.41150442477876104,
+      "status": "behind",
+      "remaining": 6650,
+      "pace": 1,
+      "monthsKept": 0,
+      "history": [
+        {
+          "month": "2026-06",
+          "value": 0,
+          "goal": 0
+        },
+        {
+          "month": "2026-07",
+          "value": 0,
+          "goal": 0
+        },
+        {
+          "month": "2026-08",
+          "value": 0,
+          "goal": 0
+        },
+        {
+          "month": "2026-09",
+          "value": 4650,
+          "goal": 11300
+        }
+      ]
+    },
+    {
+      "id": "11f9b247-e821-4ebd-9f6a-f3c89b57d94a",
+      "kind": "account",
+      "name": "Joint Checking",
+      "accountId": "08f33cad-1f74-4c3d-93e9-6e20fdd78b3c",
+      "categoryId": null,
+      "groupId": null,
+      "amount": 1000000,
+      "percentOfIncome": null,
+      "targetMonth": null,
+      "current": 932166,
+      "goal": 1000000,
+      "progress": 0.932166,
+      "status": "on-track",
+      "remaining": 67834,
+      "monthlyNeeded": null,
+      "avgChange": 932166,
+      "projectedMonth": "2026-10",
+      "history": []
+    }
+  ]
+}
