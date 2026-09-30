@@ -104,6 +104,25 @@ describe('transfer matching', () => {
     expect(again.status).toBe(400);
   });
 
+  it('finds the other side by hand: same amount first, then search', async () => {
+    const paid = await add(actual.accounts.checking, -98765, 6, 'CAPITAL ONE ONLINE PMT');
+    const other = await add(actual.accounts.card, 98765, 9, 'Thank you for your payment');
+    await add(actual.accounts.card, 4321, 6, 'Refund from Hardware');
+    const res = await call('GET', `/transfers/candidates?transactionId=${paid.id}`, '/transfers/candidates', viewer);
+    recordFixture('transfer-candidates', res.body);
+    expect(res.body.transaction.id).toBe(paid.id);
+    expect(res.body.items[0]).toMatchObject({ exact: true, days: 3 });
+    expect(res.body.items[0].transaction.id).toBe(other.id);
+    expect(res.body.items.some((i: any) => i.transaction.accountId === actual.accounts.checking)).toBe(false);
+    const byName = await call('GET', `/transfers/candidates?transactionId=${paid.id}&q=hardware`, '/transfers/candidates', viewer);
+    expect(byName.body.items.map((i: any) => i.transaction.payeeName)).toEqual(['Refund from Hardware']);
+    const byAmount = await call('GET', `/transfers/candidates?transactionId=${paid.id}&q=${encodeURIComponent('$987.65')}`, '/transfers/candidates', viewer);
+    expect(byAmount.body.items[0].transaction.id).toBe(other.id);
+    expect((await call('GET', '/transfers/candidates?transactionId=nope', '/transfers/candidates', viewer)).status).toBe(404);
+    // Picking it links the two, like "Link" on a suggested pair.
+    expect((await call('POST', '/transfers/link', '/transfers/link', owner, { fromId: paid.id, toId: other.id })).status).toBe(200);
+  });
+
   it('stops suggesting a dismissed pair', async () => {
     const out = await add(actual.accounts.checking, -7777, 4, 'Venmo');
     const inn = await add(actual.accounts.card, 7777, 4, 'Refund');

@@ -72,3 +72,21 @@ data class MortgageInput(
     val currentBalance: Money? = null,
     val homeValue: Money? = null,
 )
+
+/**
+ * A yearly amount for a category, budgeted a twelfth a month: what isn't spent carries
+ * forward, a bill takes what it needs from the rest of the year, and once the year's
+ * amount is used up later months get nothing. Kept and applied by the bridge.
+ */
+data class AnnualBudget(
+    val categoryId: CategoryId,
+    val amount: Money,
+    /** The month the budget year starts, 1 to 12. */
+    val startMonth: Int,
+    /** This month's place in the budget year, 0 to 11. */
+    val monthIndex: Int,
+    /** Left of the year's amount to budget, this month included. */
+    val remaining: Money,
+    val budgeted: Money,
+    val suggested: Money,
+)

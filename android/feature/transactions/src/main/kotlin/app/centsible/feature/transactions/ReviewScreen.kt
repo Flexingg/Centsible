@@ -90,6 +90,9 @@ data class ReviewActions(
     val makeRule: (app.centsible.core.model.PayeeId, CategoryId?) -> Unit = { _, _ -> },
     val rulePromptShown: () -> Unit = {},
     val matchTransfers: () -> Unit = {},
+    /** Opens (or with null, closes) the sheet to link this card to its other side. */
+    val linkTransfer: (Transaction?) -> Unit = {},
+    val transferLinked: (Transaction, TransactionId, String) -> Unit = { _, _, _ -> },
 )
 
 @Composable
@@ -123,6 +126,8 @@ fun ReviewRoute(
             makeRule = { p, c -> viewModel.makingRule(p); onMakeRule(p, c) },
             rulePromptShown = viewModel::rulePromptShown,
             matchTransfers = { viewModel.leaving(); onMatchTransfers() },
+            linkTransfer = viewModel::linkTransfer,
+            transferLinked = viewModel::transferLinked,
         ),
     )
 }
@@ -192,6 +197,13 @@ fun ReviewScreen(state: ReviewUiState, actions: ReviewActions, today: LocalDate 
                     textAlign = TextAlign.Center,
                     modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
                 )
+                state.linking?.let { t ->
+                    LinkTransferSheet(
+                        t,
+                        onLinked = { other, account -> actions.transferLinked(t, other.transaction.id, account) },
+                        onDismiss = { actions.linkTransfer(null) },
+                    )
+                }
                 state.categorizing?.let { t ->
                     app.centsible.core.ui.CategoryPickerSheet(
                         title = t.payeeName?.let { "Category for $it" } ?: "Category",
@@ -319,6 +331,10 @@ private fun ReviewCard(t: Transaction, d: ReviewData, depth: Int, today: LocalDa
                     // So the next one from this merchant sorts itself out.
                     if (t.payeeId != null && !t.isTransfer) {
                         TextButton(onClick = { actions.makeRule(t.payeeId!!, t.categoryId) }, enabled = isTop) { Text("Make rule") }
+                    }
+                    // A card payment (or any move between accounts): find the other side.
+                    if (!t.isTransfer && !t.isParent) {
+                        TextButton(onClick = { actions.linkTransfer(t) }, enabled = isTop) { Text("Transfer") }
                     }
                 }
             }

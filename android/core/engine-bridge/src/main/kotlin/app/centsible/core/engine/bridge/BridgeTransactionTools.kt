@@ -55,6 +55,9 @@ class BridgeTransactionTools(private val api: TransactionToolsApi, private val o
         onWrite()
     }
 
+    override suspend fun transferCandidates(budget: BudgetId, id: TransactionId, query: String?) =
+        api.transferCandidates(budget.raw, id.raw, query).items.map { app.centsible.core.model.TransferCandidate(it.transaction.toModel(), it.exact, it.days) }
+
     override suspend fun dismissTransfer(budget: BudgetId, from: TransactionId, to: TransactionId) {
         api.dismissTransfer(budget.raw, TransferPairRequestDto(from.raw, to.raw))
     }

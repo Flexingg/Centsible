@@ -62,6 +62,50 @@ export class TransferOps {
     });
   }
 
+  /**
+   * The other side of [id], for linking by hand: transactions in other accounts, not
+   * already transfers. The same amount going the other way comes first, then the closest
+   * dates. [q] searches payee, notes and amount over the last year; without it, two months
+   * either side.
+   */
+  candidates(budgetId: string, id: string, q: string | undefined, limit: number) {
+    return this.host.withBudget(budgetId, 'read', async () => {
+      const t = await one(id);
+      if (!t) throw ApiError.notFound('Transaction not found');
+      const span = q ? 366 : 60;
+      const at = Date.parse(String(t.date));
+      const iso = (ms: number) => new Date(ms).toISOString().slice(0, 10);
+      const { data } = (await api.aqlQuery(
+        api
+          .q('transactions')
+          .filter({
+            account: { $ne: t.account },
+            transfer_id: null,
+            is_parent: false,
+            starting_balance_flag: false,
+            date: { $gte: iso(at - span * DAY), $lte: iso(at + span * DAY) },
+          })
+          .options({ splits: 'inline' })
+          .select([...TX_FIELDS]),
+      )) as { data: Raw[] };
+      const want = -Number(t.amount);
+      const needle = q?.trim().toLowerCase().replace(/^\$/, '') ?? '';
+      const cents = /^[\d,]+(\.\d{1,2})?$/.test(needle) ? Math.round(Number(needle.replace(/,/g, '')) * 100) : null;
+      const matches = (r: Raw) => {
+        if (!needle) return true;
+        const text = [r['payee.name'], r.imported_payee, r.notes].filter(Boolean).join(' ').toLowerCase();
+        return text.includes(needle) || (cents !== null && Math.abs(Number(r.amount)) === cents);
+      };
+      const items = data
+        .filter((r) => r.id !== t.id && matches(r))
+        .map((r) => ({ r, exact: Number(r.amount) === want, days: days(String(r.date), String(t.date)) }))
+        .sort((a, b) => Number(b.exact) - Number(a.exact) || a.days - b.days)
+        .slice(0, limit)
+        .map(({ r, exact, days: d }) => ({ transaction: toTransaction(r), exact, days: d }));
+      return { transaction: toTransaction(t), items };
+    });
+  }
+
   dismiss(budgetId: string, fromId: string, toId: string) {
     const list = this.store.getSetting<string[]>(dismissedKey(budgetId)) ?? [];
     const key = pairKey(fromId, toId);

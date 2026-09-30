@@ -38,4 +38,7 @@ class BridgeRuleTools(private val api: RuleToolsApi, private val onWrite: () -> 
 
     override suspend fun rerun(budget: BudgetId, ids: List<TransactionId>) =
         api.rerun(budget.raw, RerunBodyDto(ids.map { it.raw })).changed.also { onWrite() }
+
+    override suspend fun runAll(budget: BudgetId, since: String?) =
+        api.runAll(budget.raw, app.centsible.core.network.RunAllBodyDto(since)).let { it.checked to it.changed }.also { onWrite() }
 }

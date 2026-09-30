@@ -1,0 +1,120 @@
+{
+  "transaction": {
+    "id": "f0b158b3-6d99-4fa5-b197-b8ee0e73d14b",
+    "accountId": "403edcc9-2130-49a7-82ce-f5fcf83ef296",
+    "date": "2026-09-24",
+    "amount": -98765,
+    "payeeId": "fb95cf09-b53b-45c3-b1f9-265e5f24e2bc",
+    "payeeName": "CAPITAL ONE ONLINE PMT",
+    "categoryId": null,
+    "notes": null,
+    "cleared": true,
+    "reconciled": false,
+    "transferId": null,
+    "isParent": false,
+    "parentId": null,
+    "subtransactions": []
+  },
+  "items": [
+    {
+      "transaction": {
+        "id": "5013babe-839c-471b-8c9f-7ed4f5231deb",
+        "accountId": "2cbb9fe0-c980-4140-b7be-21610f47e8b8",
+        "date": "2026-09-21",
+        "amount": 98765,
+        "payeeId": "7be80a78-90d7-4e03-a213-24e6dd2d63cf",
+        "payeeName": "Thank you for your payment",
+        "categoryId": null,
+        "notes": null,
+        "cleared": true,
+        "reconciled": false,
+        "transferId": null,
+        "isParent": false,
+        "parentId": null,
+        "subtransactions": []
+      },
+      "exact": true,
+      "days": 3
+    },
+    {
+      "transaction": {
+        "id": "d12cf869-95af-41bb-adfa-1d1393c83da9",
+        "accountId": "2cbb9fe0-c980-4140-b7be-21610f47e8b8",
+        "date": "2026-09-24",
+        "amount": 4321,
+        "payeeId": "a795392a-7397-4613-8cc2-cd2902e40b55",
+        "payeeName": "Refund from Hardware",
+        "categoryId": null,
+        "notes": null,
+        "cleared": true,
+        "reconciled": false,
+        "transferId": null,
+        "isParent": false,
+        "parentId": null,
+        "subtransactions": []
+      },
+      "exact": false,
+      "days": 0
+    },
+    {
+      "transaction": {
+        "id": "81682cc0-d6cd-45ac-8693-b666d9740337",
+        "accountId": "2cbb9fe0-c980-4140-b7be-21610f47e8b8",
+        "date": "2026-09-28",
+        "amount": -123456,
+        "payeeId": "7128e5c1-1e41-4c1e-89dd-5d874b548c01",
+        "payeeName": "Big purchase",
+        "categoryId": "af375fd4-d759-46b3-bffe-74a856151d57",
+        "notes": null,
+        "cleared": true,
+        "reconciled": false,
+        "transferId": null,
+        "isParent": false,
+        "parentId": null,
+        "subtransactions": []
+      },
+      "exact": false,
+      "days": 4
+    },
+    {
+      "transaction": {
+        "id": "1001fafc-1835-4ab5-8f8e-9d0ad0fbb8be",
+        "accountId": "2cbb9fe0-c980-4140-b7be-21610f47e8b8",
+        "date": "2026-09-06",
+        "amount": -1650,
+        "payeeId": "37ba2f3e-9a90-4f6b-9a04-2bf64d217858",
+        "payeeName": "Blue Bottle",
+        "categoryId": "af375fd4-d759-46b3-bffe-74a856151d57",
+        "notes": null,
+        "cleared": true,
+        "reconciled": false,
+        "transferId": null,
+        "isParent": false,
+        "parentId": null,
+        "subtransactions": []
+      },
+      "exact": false,
+      "days": 18
+    },
+    {
+      "transaction": {
+        "id": "7353faa6-8c1a-43a1-a4a3-d22326fe8317",
+        "accountId": "2cbb9fe0-c980-4140-b7be-21610f47e8b8",
+        "date": "2026-09-03",
+        "amount": -4523,
+        "payeeId": "a72f59a8-ece3-450b-982d-f236ccd75526",
+        "payeeName": "Trader Joe's",
+        "categoryId": "541836f1-e756-4473-a5d0-6c1d3f06c7fa",
+        "notes": "weekly shop #groceries",
+        "cleared": true,
+        "reconciled": false,
+        "transferId": null,
+        "isParent": false,
+        "parentId": null,
+        "subtransactions": []
+      },
+      "exact": false,
+      "days": 21
+    }
+  ]
+}

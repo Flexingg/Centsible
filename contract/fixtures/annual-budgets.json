@@ -1,0 +1,18 @@
+{
+  "month": "2026-09",
+  "items": [
+    {
+      "categoryId": "360a9027-09b8-476e-a1c7-ed19bd749334",
+      "name": "Car insurance",
+      "amount": 120000,
+      "startMonth": 9,
+      "monthIndex": 0,
+      "budgetedBefore": 0,
+      "remaining": 120000,
+      "spentThisMonth": 120000,
+      "carryIn": 0,
+      "budgeted": 120000,
+      "suggested": 120000
+    }
+  ]
+}

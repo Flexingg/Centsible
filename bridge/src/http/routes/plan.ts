@@ -14,7 +14,7 @@ const monthParams = { type: 'object', properties: { month: MONTH } };
 export const planRoutes =
   (deps: Deps): FastifyPluginAsync =>
   async (app) => {
-    const { plan, targets, mortgages } = deps;
+    const { plan, targets, mortgages, annual } = deps;
 
     app.get<{ Params: MonthParams }>('/v1/budgets/:budgetId/months/:month/autopilot', { schema: { params: monthParams } }, async (req) => {
       requireBudget(deps, req, req.params.budgetId);
@@ -130,6 +130,50 @@ export const planRoutes =
       targets.remove(req.params.budgetId, req.params.id);
       audit(deps, req, req.params.budgetId, 'target.removed', req.params.id);
       return reply.status(204).send();
+    });
+
+    // ── Yearly budgets: a twelfth a month, bills drawn from the rest of the year ──
+    app.get<{ Params: { budgetId: string }; Querystring: { month?: string } }>(
+      '/v1/budgets/:budgetId/annual-budgets',
+      { schema: { querystring: { type: 'object', properties: { month: MONTH } } } },
+      async (req) => {
+        requireBudget(deps, req, req.params.budgetId);
+        return annual.list(req.params.budgetId, req.query.month);
+      },
+    );
+
+    app.put<{ Params: CategoryParams; Body: { amount: number; startMonth?: number } }>(
+      '/v1/budgets/:budgetId/categories/:id/annual-budget',
+      {
+        schema: {
+          body: {
+            type: 'object',
+            required: ['amount'],
+            additionalProperties: false,
+            properties: { amount: { type: 'integer', minimum: 100 }, startMonth: { type: 'integer', minimum: 1, maximum: 12, default: 1 } },
+          },
+        },
+      },
+      async (req) => {
+        requireBudget(deps, req, req.params.budgetId, 'member');
+        const res = await annual.set(req.params.budgetId, req.params.id, req.body.amount, req.body.startMonth ?? 1);
+        audit(deps, req, req.params.budgetId, 'annual_budget.set', req.params.id, req.body);
+        return res;
+      },
+    );
+
+    app.delete<{ Params: CategoryParams }>('/v1/budgets/:budgetId/categories/:id/annual-budget', async (req, reply) => {
+      requireBudget(deps, req, req.params.budgetId, 'member');
+      annual.remove(req.params.budgetId, req.params.id);
+      audit(deps, req, req.params.budgetId, 'annual_budget.removed', req.params.id);
+      return reply.status(204).send();
+    });
+
+    app.post<{ Params: MonthParams }>('/v1/budgets/:budgetId/months/:month/annual-budgets/apply', { schema: { params: monthParams } }, async (req) => {
+      requireBudget(deps, req, req.params.budgetId, 'member');
+      const res = await annual.apply(req.params.budgetId, req.params.month);
+      audit(deps, req, req.params.budgetId, 'annual_budget.applied', req.params.month, { changes: res.changes.length });
+      return res;
     });
 
     // ── Mortgages: terms kept by the bridge, balances in Actual's accounts ──

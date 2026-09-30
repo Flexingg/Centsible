@@ -9,6 +9,10 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
@@ -65,7 +69,16 @@ data class RulesData(val rules: List<Rule>, val names: Describe.Names, val payee
     val scheduleRuleCount get() = rules.count { it.scheduleId != null }
 }
 
-data class RulesUiState(val data: Loadable<RulesData> = Loadable.Loading, val canEdit: Boolean = false, val message: String? = null)
+data class RulesUiState(
+    val data: Loadable<RulesData> = Loadable.Loading,
+    val canEdit: Boolean = false,
+    val message: String? = null,
+    /** "Run all rules" is going. */
+    val running: Boolean = false,
+)
+
+/** How far back "Run all rules" goes. */
+enum class RunAllPeriod(val label: String, val days: Long?) { Month("Last 30 days", 30), Quarter("Last 3 months", 91), Year("Last year", 365), All("Everything", null) }
 
 @HiltViewModel
 class RulesViewModel @Inject constructor(
@@ -73,6 +86,7 @@ class RulesViewModel @Inject constructor(
     private val engine: BudgetEngine,
     private val selectedBudget: SelectedBudget,
     private val sessions: SessionStore,
+    private val tools: app.centsible.core.domain.RuleTools,
     changes: BudgetChanges,
 ) : ViewModel() {
     private val state = MutableStateFlow(RulesUiState())
@@ -111,6 +125,17 @@ class RulesViewModel @Inject constructor(
     fun delete(id: String) = act("Rule deleted") { planning.deleteRule(selectedBudget(), id) }
     fun messageShown() = state.update { it.copy(message = null) }
 
+    /** Every rule again on what's come in over [period], as if it had just been imported. */
+    fun runAll(period: RunAllPeriod) = viewModelScope.launch {
+        state.update { it.copy(running = true) }
+        val since = period.days?.let { java.time.LocalDate.now().minusDays(it).toString() }
+        runCatching { tools.runAll(selectedBudget(), since) }
+            .onSuccess { (checked, changed) ->
+                state.update { it.copy(running = false, message = if (changed == 0) "Checked $checked, nothing to change" else "Changed $changed of $checked transactions") }
+            }
+            .onFailure { e -> state.update { it.copy(running = false, message = e.userMessage()) } }
+    }
+
     private fun act(success: String, block: suspend () -> Unit) = viewModelScope.launch {
         runCatching { block() }
             .onSuccess { state.update { it.copy(message = success) } }
@@ -121,7 +146,7 @@ class RulesViewModel @Inject constructor(
 @Composable
 fun RulesRoute(onBack: () -> Unit, onOpenRule: (String?) -> Unit = {}, viewModel: RulesViewModel = hiltViewModel()) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    RulesScreen(state, onBack, onOpen = onOpenRule, onRetry = { viewModel.refresh() }, onMessageShown = viewModel::messageShown)
+    RulesScreen(state, onBack, onOpen = onOpenRule, onRetry = { viewModel.refresh() }, onMessageShown = viewModel::messageShown, onRunAll = viewModel::runAll)
 }
 
 @Composable
@@ -132,10 +157,12 @@ fun RulesScreen(
     onOpen: (String?) -> Unit = {},
     onRetry: () -> Unit = {},
     onMessageShown: () -> Unit = {},
+    onRunAll: (RunAllPeriod) -> Unit = {},
 ) {
     val colors = CentsibleTheme.colors
     val snackbar = remember { SnackbarHostState() }
     var query by remember { mutableStateOf("") }
+    var askRunAll by remember { mutableStateOf(false) }
     LaunchedEffect(state.message) { state.message?.let { snackbar.showSnackbar(it); onMessageShown() } }
     Scaffold(
         containerColor = colors.canvas,
@@ -144,6 +171,9 @@ fun RulesScreen(
             Row(Modifier.fillMaxWidth().padding(4.dp), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Back") }
                 Text("Rules", style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
+                if (state.canEdit && state.data is Loadable.Ready) {
+                    TextButton(onClick = { askRunAll = true }, enabled = !state.running) { Text(if (state.running) "Running…" else "Run all") }
+                }
                 if (state.canEdit) TextButton(onClick = { onOpen(null) }) { Text("Add") }
             }
         },
@@ -202,4 +232,35 @@ fun RulesScreen(
         }
     }
 
+    if (askRunAll) RunAllDialog(onRun = { askRunAll = false; onRunAll(it) }, onDismiss = { askRunAll = false })
+}
+
+@Composable
+private fun RunAllDialog(onRun: (RunAllPeriod) -> Unit, onDismiss: () -> Unit) {
+    var period by remember { mutableStateOf(RunAllPeriod.Quarter) }
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Run all rules") },
+        text = {
+            Column {
+                Text(
+                    "Every rule runs again on these transactions, as if they had just been imported. Reconciled ones are left alone.",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                Spacer(Modifier.height(8.dp))
+                RunAllPeriod.entries.forEach { p ->
+                    Row(
+                        Modifier.fillMaxWidth().selectable(period == p, role = androidx.compose.ui.semantics.Role.RadioButton) { period = p }.padding(vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        androidx.compose.material3.RadioButton(selected = period == p, onClick = null)
+                        Spacer(Modifier.width(8.dp))
+                        Text(p.label, style = MaterialTheme.typography.bodyLarge)
+                    }
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = { onRun(period) }) { Text("Run") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
 }

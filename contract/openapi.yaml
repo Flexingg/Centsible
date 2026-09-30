@@ -801,6 +801,37 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/TransferMatches' }
 
+  /v1/budgets/{budgetId}/transfers/candidates:
+    get:
+      tags: [budgets]
+      operationId: transferCandidates
+      summary: "The other side of a transaction, to link by hand: transactions in other accounts that aren't transfers yet. The same amount going the other way first (exact), then the closest dates. Without q, two months either side; q searches payee, notes and amount over a year either side."
+      parameters:
+        - $ref: '#/components/parameters/BudgetId'
+        - { name: transactionId, in: query, required: true, schema: { type: string } }
+        - { name: q, in: query, schema: { type: string } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 30 } }
+      responses:
+        '200':
+          description: Candidates
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [transaction, items]
+                properties:
+                  transaction: { $ref: '#/components/schemas/Transaction' }
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      required: [transaction, exact, days]
+                      properties:
+                        transaction: { $ref: '#/components/schemas/Transaction' }
+                        exact: { type: boolean, description: The same amount going the other way }
+                        days: { type: integer }
+        '404': { $ref: '#/components/responses/Problem' }
+
   /v1/budgets/{budgetId}/transfers/link:
     post:
       tags: [budgets]
@@ -1486,6 +1517,87 @@ paths:
         '204': { description: Removed }
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
+
+  /v1/budgets/{budgetId}/annual-budgets:
+    get:
+      tags: [plan]
+      operationId: listAnnualBudgets
+      summary: "Yearly budgets (kept by the bridge): a yearly amount budgeted a twelfth a month. What isn't spent stays in the category, so it snowballs; a bill takes what it needs from the rest of the year, and once the year's amount is used up, later months get nothing. The last month budgets whatever is left. The bridge applies them after each bank sync and hourly."
+      parameters:
+        - $ref: '#/components/parameters/BudgetId'
+        - { name: month, in: query, schema: { $ref: '#/components/schemas/Month' } }
+      responses:
+        '200':
+          description: Each yearly category and this month's amount
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [month, items]
+                properties:
+                  month: { $ref: '#/components/schemas/Month' }
+                  items: { type: array, items: { $ref: '#/components/schemas/AnnualBudget' } }
+        '423': { $ref: '#/components/responses/Problem' }
+
+  /v1/budgets/{budgetId}/categories/{id}/annual-budget:
+    put:
+      tags: [plan]
+      operationId: setAnnualBudget
+      summary: Sets (or changes) a category's yearly amount and applies it to this month.
+      parameters:
+        - $ref: '#/components/parameters/BudgetId'
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [amount]
+              properties:
+                amount: { type: integer, minimum: 100 }
+                startMonth: { type: integer, minimum: 1, maximum: 12, description: The month the budget year starts (1 is January) }
+      responses:
+        '200':
+          description: This month for that category
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AnnualBudget' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+    delete:
+      tags: [plan]
+      operationId: removeAnnualBudget
+      summary: Stops managing it; budgets already set stay.
+      parameters:
+        - $ref: '#/components/parameters/BudgetId'
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        '204': { description: Removed }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+
+  /v1/budgets/{budgetId}/months/{month}/annual-budgets/apply:
+    post:
+      tags: [plan]
+      operationId: applyAnnualBudgets
+      summary: Sets the month's budget for every yearly category now.
+      parameters:
+        - $ref: '#/components/parameters/BudgetId'
+        - { name: month, in: path, required: true, schema: { $ref: '#/components/schemas/Month' } }
+      responses:
+        '200':
+          description: What changed
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [month, changes]
+                properties:
+                  month: { $ref: '#/components/schemas/Month' }
+                  changes: { type: array, items: { type: object, required: [categoryId, from, to], properties: { categoryId: { type: string }, from: { type: integer }, to: { type: integer } } } }
+        '403': { $ref: '#/components/responses/Problem' }
 
   /v1/budgets/{budgetId}/mortgages:
     get:
@@ -2520,6 +2632,25 @@ paths:
               schema: { type: object, required: [checked, changed], properties: { checked: { type: integer }, changed: { type: integer } } }
         '403': { $ref: '#/components/responses/Problem' }
 
+  /v1/budgets/{budgetId}/rules/run-all:
+    post:
+      tags: [budgets]
+      operationId: runAllRules
+      summary: Members. Runs every rule again on every transaction since `since` (all of them without it), as if just imported. Reconciled transactions are left alone.
+      parameters:
+        - $ref: '#/components/parameters/BudgetId'
+      requestBody:
+        content:
+          application/json:
+            schema: { type: object, properties: { since: { type: [string, 'null'], pattern: '^\d{4}-\d{2}-\d{2}$' } } }
+      responses:
+        '200':
+          description: How many were checked and changed
+          content:
+            application/json:
+              schema: { type: object, required: [checked, changed], properties: { checked: { type: integer }, changed: { type: integer } } }
+        '403': { $ref: '#/components/responses/Problem' }
+
   /v1/me/home:
     get:
       tags: [household]
@@ -2568,7 +2699,7 @@ paths:
     put:
       tags: [budgets]
       operationId: setCategoryAppearance
-      summary: Members. A category or a category group. Both null goes back to the defaults.
+      summary: Members. A category or a category group. Either can be set alone; a missing or null one means the default. Both null (or {}) goes back to the defaults.
       parameters:
         - $ref: '#/components/parameters/BudgetId'
         - { name: categoryId, in: path, required: true, schema: { type: string } }
@@ -2578,7 +2709,6 @@ paths:
           application/json:
             schema:
               type: object
-              required: [color, emoji]
               properties:
                 color: { type: [string, 'null'], pattern: '^#[0-9A-Fa-f]{6}$' }
                 emoji: { type: [string, 'null'] }
@@ -2722,6 +2852,21 @@ components:
         reimportDeleted: { type: boolean, description: Bring back bank transactions you deleted }
         updateDates: { type: boolean, description: Update dates of already-imported transactions }
         mapping: { $ref: '#/components/schemas/SyncMappings' }
+    AnnualBudget:
+      type: object
+      required: [categoryId, name, amount, startMonth, monthIndex, budgetedBefore, remaining, spentThisMonth, carryIn, budgeted, suggested]
+      properties:
+        categoryId: { type: string }
+        name: { type: string }
+        amount: { type: integer, description: The yearly amount }
+        startMonth: { type: integer }
+        monthIndex: { type: integer, description: This month's place in the budget year, 0 to 11 }
+        budgetedBefore: { type: integer, description: Budgeted earlier this budget year }
+        remaining: { type: integer, description: What's left of the year's amount to budget (this month included) }
+        spentThisMonth: { type: integer }
+        carryIn: { type: integer, description: What the category had coming into the month }
+        budgeted: { type: integer, description: This month's budget now }
+        suggested: { type: integer, description: What the yearly budget sets it to }
     MortgageInput:
       type: object
       required: [name, principal, rate, termMonths, firstPayment]

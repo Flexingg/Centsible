@@ -18,4 +18,7 @@ data class BatchResult(val updated: Int, val deleted: Int, val skipped: List<Ski
 /** Two transactions that look like one payment seen from both accounts. */
 data class TransferPair(val from: Transaction, val to: Transaction, val days: Int, val confident: Boolean)
 
+/** A possible other side of a transfer: [exact] is the same amount going the other way. */
+data class TransferCandidate(val transaction: Transaction, val exact: Boolean, val days: Int)
+
 data class TransferMatches(val pairs: List<TransferPair>, val auto: Boolean)

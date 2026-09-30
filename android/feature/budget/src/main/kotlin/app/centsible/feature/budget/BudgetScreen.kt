@@ -89,6 +89,7 @@ fun BudgetRoute(
             cover = { viewModel.coverOverspending() },
             openTransactions = onOpenTransactions,
             openAutomations = onOpenAutomations,
+            setAnnual = { c, a, s -> viewModel.setAnnual(c, a, s) },
         ),
     )
 }
@@ -215,6 +216,7 @@ fun BudgetScreen(
             onMove = onMove,
             onRollover = { onRollover(selected.id, it) },
             onSaveNote = { onSaveNote(selected.id, it) },
+            onAnnual = { amount, start -> plan.setAnnual(selected.id, amount, start) },
             onAutomations = { onOpenCategory(null); plan.openAutomations(selected.id, month.month) }.takeIf { state.canApplyGoals },
             onSeeTransactions = {
                 onOpenCategory(null)

@@ -18,9 +18,11 @@ import kotlinx.serialization.json.JsonElement
 @Serializable data class RuleRunDto(val updated: Int)
 @Serializable data class RerunBodyDto(val transactionIds: List<String>)
 @Serializable data class RerunDto(val checked: Int, val changed: Int)
+@Serializable data class RunAllBodyDto(val since: String? = null)
 
 class RuleToolsApi(private val client: BridgeClient) {
     suspend fun preview(budgetId: String, body: RulePreviewBodyDto): RulePreviewDto = client.send(HttpMethod.Post, "/v1/budgets/$budgetId/rules/preview", body)
     suspend fun run(budgetId: String, ruleId: String, body: RuleRunBodyDto): RuleRunDto = client.send(HttpMethod.Post, "/v1/budgets/$budgetId/rules/$ruleId/run", body)
     suspend fun rerun(budgetId: String, body: RerunBodyDto): RerunDto = client.send(HttpMethod.Post, "/v1/budgets/$budgetId/rules/rerun", body)
+    suspend fun runAll(budgetId: String, body: RunAllBodyDto): RerunDto = client.send(HttpMethod.Post, "/v1/budgets/$budgetId/rules/run-all", body)
 }

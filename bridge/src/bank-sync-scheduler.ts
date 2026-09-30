@@ -36,6 +36,7 @@ export class BankSyncScheduler {
     private readonly now: () => number = Date.now,
     private readonly backfill?: BankSyncBackfill,
     private readonly backups?: { tick(): Promise<boolean> },
+    private readonly annual?: { tick(): Promise<boolean> },
   ) {}
 
   start() {
@@ -43,6 +44,7 @@ export class BankSyncScheduler {
       void this.tick();
       void this.backfill?.tick(); // resumes a history import once SimpleFIN's quota frees up
       void this.backups?.tick(); // scheduled backups
+      void this.annual?.tick(); // yearly budgets keep up with bills entered by hand
     }, 60_000);
     this.timer.unref();
   }

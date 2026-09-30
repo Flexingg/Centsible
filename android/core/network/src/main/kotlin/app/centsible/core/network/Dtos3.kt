@@ -111,6 +111,21 @@ import kotlinx.serialization.Serializable
     val homeValue: Long? = null,
 )
 @Serializable data class HomeValueDto(val value: Long)
+@Serializable data class AnnualBudgetDto(
+    val categoryId: String,
+    val name: String = "",
+    val amount: Long,
+    val startMonth: Int = 1,
+    val monthIndex: Int = 0,
+    val budgetedBefore: Long = 0,
+    val remaining: Long = 0,
+    val spentThisMonth: Long = 0,
+    val carryIn: Long = 0,
+    val budgeted: Long = 0,
+    val suggested: Long = 0,
+)
+@Serializable data class AnnualBudgetsDto(val month: String, val items: List<AnnualBudgetDto> = emptyList())
+@Serializable data class AnnualBudgetInputDto(val amount: Long, val startMonth: Int = 1)
 @Serializable data class RecordedDto(val recorded: Int = 0, val principal: Long = 0)
 
 @Serializable data class TargetMonthDto(val month: String, val value: Long, val goal: Long)

@@ -19,6 +19,8 @@ interface TransactionTools {
     suspend fun transferMatches(budget: BudgetId): TransferMatches
     /** Makes the pair one transfer ([from] is where the money left). */
     suspend fun linkTransfer(budget: BudgetId, from: TransactionId, to: TransactionId)
+    /** The other side of [id], to link by hand; [query] searches payee, notes and amount. */
+    suspend fun transferCandidates(budget: BudgetId, id: TransactionId, query: String? = null): List<app.centsible.core.model.TransferCandidate>
     suspend fun dismissTransfer(budget: BudgetId, from: TransactionId, to: TransactionId)
     /** Link the sure ones by itself after every bank sync. */
     suspend fun setAutoTransfers(budget: BudgetId, auto: Boolean): Boolean

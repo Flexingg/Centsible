@@ -34,13 +34,13 @@ export const personalRoutes =
       return { categories: deps.store.categoryAppearance(req.params.budgetId) };
     });
 
-    app.put<{ Params: { budgetId: string; categoryId: string }; Body: { color: string | null; emoji: string | null } }>(
+    app.put<{ Params: { budgetId: string; categoryId: string }; Body: { color?: string | null; emoji?: string | null } }>(
       '/v1/budgets/:budgetId/categories/:categoryId/appearance',
       {
         schema: {
           body: {
             type: 'object',
-            required: ['color', 'emoji'],
+            // Either may be left out: just a color, or just an emoji.
             additionalProperties: false,
             properties: {
               color: { type: ['string', 'null'], pattern: '^#[0-9A-Fa-f]{6}$' },
@@ -59,9 +59,10 @@ export const personalRoutes =
         });
         if (!exists) throw ApiError.notFound(`Category ${categoryId} not found`);
         const color = req.body.color?.toUpperCase() ?? null;
-        deps.store.setCategoryAppearance(budgetId, categoryId, color, req.body.emoji);
-        audit(deps, req, budgetId, 'category.appearance', categoryId, { color, emoji: req.body.emoji });
-        return { categoryId, color, emoji: req.body.emoji };
+        const emoji = req.body.emoji ?? null;
+        deps.store.setCategoryAppearance(budgetId, categoryId, color, emoji);
+        audit(deps, req, budgetId, 'category.appearance', categoryId, { color, emoji });
+        return { categoryId, color, emoji };
       },
     );
   };

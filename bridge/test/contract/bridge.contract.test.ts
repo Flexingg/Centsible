@@ -989,7 +989,10 @@ describe('personal preferences', () => {
     const all = await call({ method: 'GET', url: `/v1/budgets/${budgetId}/appearance`, path: '/v1/budgets/{budgetId}/appearance', token: owner.accessToken });
     expect((all.body as { categories: unknown[] }).categories).toContainEqual({ categoryId: food, color: '#7FD1A8', emoji: '🥑' });
     recordFixture('appearance', all.body);
-    await call({ method: 'PUT', url: url(food), path: PATH, token: owner.accessToken, body: { color: null, emoji: null } });
+    // Just an emoji, or just a color: the phone leaves the other one out.
+    expect((await call({ method: 'PUT', url: url(food), path: PATH, token: owner.accessToken, body: { emoji: '🍋' } })).body).toEqual({ categoryId: food, color: null, emoji: '🍋' });
+    expect((await call({ method: 'PUT', url: url(food), path: PATH, token: owner.accessToken, body: { color: '#112233' } })).body).toEqual({ categoryId: food, color: '#112233', emoji: null });
+    await call({ method: 'PUT', url: url(food), path: PATH, token: owner.accessToken, body: {} });
     const after = await call({ method: 'GET', url: `/v1/budgets/${budgetId}/appearance`, path: '/v1/budgets/{budgetId}/appearance', token: owner.accessToken });
     expect((after.body as { categories: { categoryId: string }[] }).categories.some((c: { categoryId: string }) => c.categoryId === food)).toBe(false);
   });

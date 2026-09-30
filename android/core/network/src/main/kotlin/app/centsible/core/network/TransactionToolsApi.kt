@@ -18,6 +18,8 @@ import kotlinx.serialization.json.JsonObject
 @Serializable data class TransferMatchesDto(val pairs: List<TransferPairDto> = emptyList(), val auto: Boolean = false)
 @Serializable data class TransferPairRequestDto(val fromId: String, val toId: String)
 @Serializable data class TransferSettingsDto(val auto: Boolean)
+@Serializable data class TransferCandidateDto(val transaction: TransactionDto, val exact: Boolean = false, val days: Int = 0)
+@Serializable data class TransferCandidatesDto(val transaction: TransactionDto, val items: List<TransferCandidateDto> = emptyList())
 @Serializable data class TransferLinkedDto(val from: TransactionDto, val to: TransactionDto)
 
 class TransactionToolsApi(private val client: BridgeClient) {
@@ -26,6 +28,11 @@ class TransactionToolsApi(private val client: BridgeClient) {
     /** Built by hand so "clear the category" (null) survives. */
     suspend fun batch(budgetId: String, body: JsonObject): BatchResultDto = client.send(HttpMethod.Post, "/v1/budgets/$budgetId/transactions/batch", body)
     suspend fun transferMatches(budgetId: String): TransferMatchesDto = client.get("/v1/budgets/$budgetId/transfers/matches")
+    suspend fun transferCandidates(budgetId: String, transactionId: String, q: String?): TransferCandidatesDto =
+        client.get("/v1/budgets/$budgetId/transfers/candidates") {
+            parameter("transactionId", transactionId)
+            q?.takeIf { it.isNotBlank() }?.let { parameter("q", it) }
+        }
     suspend fun linkTransfer(budgetId: String, body: TransferPairRequestDto): TransferLinkedDto = client.send(HttpMethod.Post, "/v1/budgets/$budgetId/transfers/link", body)
     suspend fun dismissTransfer(budgetId: String, body: TransferPairRequestDto) {
         client.execute(HttpMethod.Post, "/v1/budgets/$budgetId/transfers/dismiss") {

@@ -67,9 +67,21 @@ export class RuleTools {
 
   /** Runs every rule again on these transactions, as if they had just been imported. */
   rerun(budgetId: string, ids: string[]) {
+    return this.rerunWhere(budgetId, { id: { $oneof: ids } });
+  }
+
+  /**
+   * "Run all rules": every rule again on every transaction since [since] (all of them
+   * without it). Reconciled ones are left alone; they've been checked against a statement.
+   */
+  runAll(budgetId: string, since?: string) {
+    return this.rerunWhere(budgetId, { reconciled: false, ...(since ? { date: { $gte: since } } : {}) });
+  }
+
+  private rerunWhere(budgetId: string, filter: Raw) {
     return this.host.withBudget(budgetId, 'write', async (lib) => {
       const { data } = (await api.aqlQuery(
-        api.q('transactions').filter({ id: { $oneof: ids }, is_parent: false }).options({ splits: 'inline' }).select('*'),
+        api.q('transactions').filter({ ...filter, is_parent: false, starting_balance_flag: false }).options({ splits: 'inline' }).select('*'),
       )) as { data: Raw[] };
       let changed = 0;
       for (const t of data) {

@@ -129,6 +129,13 @@ class RequestContractTest {
         call { planning.updateMortgage(b, "m1", MortgageInputDto("House", 30_000_000, 6.0, 360, "2026-01-01", extra = 20_000)) }
         call { planning.setHomeValue(b, "m1", HomeValueDto(45_000_000)) }
         call { planning.deleteMortgage(b, "m1") }
+        call { planning.setAnnualBudget(b, "c1", AnnualBudgetInputDto(120_000, 7)) }
+        call { planning.removeAnnualBudget(b, "c1") }
+        // Just an emoji, or just a color: the other field is left out of the JSON.
+        val personal = PersonalApi(client)
+        call { personal.setAppearance(b, "c1", AppearanceBodyDto(color = null, emoji = "🍋")) }
+        call { personal.setAppearance(b, "c1", AppearanceBodyDto(color = "#112233", emoji = null)) }
+        call { RuleToolsApi(client).runAll(b, RunAllBodyDto("2026-07-01")) }
         val tools = TransactionToolsApi(client)
         call { tools.linkTransfer(b, TransferPairRequestDto("o1", "i1")) }
         call { tools.dismissTransfer(b, TransferPairRequestDto("o1", "i1")) }
@@ -154,10 +161,11 @@ class RequestContractTest {
     @Suppress("UNCHECKED_CAST")
     private fun requestSchema(method: String, path: String): Map<String, Any?>? {
         val paths = spec["paths"] as Map<String, Map<String, Any?>>
-        val template = paths.keys.firstOrNull { t ->
+        // Like the server: a literal segment ("/rules/run-all") wins over a parameter ("/rules/{id}").
+        val template = paths.keys.filter { t ->
             val a = t.trim('/').split('/'); val c = path.trim('/').split('/')
             a.size == c.size && a.zip(c).all { (x, y) -> x.startsWith("{") || x == y }
-        } ?: return null
+        }.minByOrNull { t -> t.count { it == '{' } } ?: return null
         val op = paths[template]!![method.lowercase()] as? Map<String, Any?> ?: return null
         val content = (op["requestBody"] as? Map<String, Any?>)?.get("content") as? Map<String, Any?> ?: return null
         return resolve((content["application/json"] as Map<String, Any?>)["schema"] as Map<String, Any?>)

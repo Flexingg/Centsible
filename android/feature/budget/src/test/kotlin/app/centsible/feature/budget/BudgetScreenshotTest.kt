@@ -61,6 +61,12 @@ class BudgetScreenshotTest {
         app.centsible.core.uitesting.A11y.assertOk(compose)
     }
 
+    @Test fun category_sheet_yearly() {
+        val c = CategoryId("c-dining")
+        render(ready.copy(selectedCategory = c, annual = mapOf(c.raw to app.centsible.core.model.AnnualBudget(c, app.centsible.core.model.Money(120_000), 1, 8, app.centsible.core.model.Money(30_000), app.centsible.core.model.Money(10_000), app.centsible.core.model.Money(10_000)))))
+        captureScreenRoboImage("screenshots/category_sheet_yearly.png")
+    }
+
     @Test fun budget_error() {
         render(ready.copy(data = Loadable.Failed("Can't reach your bridge. Check your connection.")))
         compose.onRoot().captureRoboImage("screenshots/budget_error.png")

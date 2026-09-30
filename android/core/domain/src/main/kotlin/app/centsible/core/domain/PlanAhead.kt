@@ -37,4 +37,8 @@ interface PlanAheadGateway {
     suspend fun setHomeValue(budget: BudgetId, id: String, value: app.centsible.core.model.Money)
     /** Takes unrecorded payments' principal off the loan account; returns how many. */
     suspend fun recordPrincipal(budget: BudgetId, id: String): Int
+
+    suspend fun annualBudgets(budget: BudgetId, month: YearMonth): List<app.centsible.core.model.AnnualBudget>
+    /** Sets a yearly amount (and applies it to this month); null amount removes it. */
+    suspend fun setAnnualBudget(budget: BudgetId, category: CategoryId, amount: app.centsible.core.model.Money?, startMonth: Int = 1)
 }

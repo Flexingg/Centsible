@@ -12,6 +12,7 @@ import { StructureOps } from './actual/structure-ops.js';
 import { RuleTools } from './actual/rule-tools.js';
 import { AutomationOps } from './actual/automation-ops.js';
 import { ReviewOps } from './actual/review-ops.js';
+import { AnnualOps } from './actual/annual-ops.js';
 import { MortgageOps } from './actual/mortgage-ops.js';
 import { TargetOps } from './actual/target-ops.js';
 import { TransferOps } from './actual/transfer-ops.js';
@@ -34,7 +35,12 @@ export function createDeps(config: BridgeConfig, store: HouseholdStore, host: Ac
   const keys = new SimpleFinKeyFile(config.dataDir, config.actualDataDir);
   const bankSync = new BankSyncOps(host, store, keys);
   const transfers = new TransferOps(host, store);
-  bankSync.afterSync = (budgetId, lib) => transfers.autoLink(budgetId, lib);
+  const annual = new AnnualOps(host, store);
+  bankSync.afterSync = async (budgetId, lib) => {
+    // New transactions may be a yearly bill: cover it from the year's amount.
+    await annual.applyIn(budgetId, new Date().toISOString().slice(0, 7)).catch(() => undefined);
+    return transfers.autoLink(budgetId, lib);
+  };
   const backfill = new BankSyncBackfill(host, store, keys, log);
   const backups = new BackupService(config, host, store, log);
   return {
@@ -47,7 +53,7 @@ export function createDeps(config: BridgeConfig, store: HouseholdStore, host: Ac
     backfill,
     backups,
     server: new ServerOps(config, host, store, log),
-    scheduler: new BankSyncScheduler(host, store, bankSync, jobs, log, Date.now, backfill, backups),
+    scheduler: new BankSyncScheduler(host, store, bankSync, jobs, log, Date.now, backfill, backups, annual),
     ops: budgetOps,
     plan: new PlanOps(host, budgetOps),
     insights: new InsightsOps(host, store),
@@ -56,6 +62,7 @@ export function createDeps(config: BridgeConfig, store: HouseholdStore, host: Ac
     transfers,
     targets: new TargetOps(host, store),
     mortgages: new MortgageOps(host, store),
+    annual,
     automations: new AutomationOps(host),
     ruleTools: new RuleTools(host),
     structure: new StructureOps(host),

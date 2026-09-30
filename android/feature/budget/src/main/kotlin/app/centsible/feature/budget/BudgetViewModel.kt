@@ -51,6 +51,8 @@ data class BudgetUiState(
     val autopilotSelected: Set<CategoryId> = emptySet(),
     /** Cover-overspending sheet: the plan comes from the same autopilot call. */
     val cover: Loadable<Autopilot>? = null,
+    /** Yearly budgets by category id (bridge-kept). */
+    val annual: Map<String, app.centsible.core.model.AnnualBudget> = emptyMap(),
 ) {
     val hasPrevious get() = availableMonths.any { it < month }
     val hasNext get() = availableMonths.any { it > month }
@@ -99,6 +101,15 @@ class BudgetViewModel @Inject constructor(
     fun previousMonth() = changeMonth(-1)
     fun nextMonth() = changeMonth(+1)
     fun refresh() = viewModelScope.launch { load(refreshing = true) }
+
+    /** A yearly amount for the category (null stops it); this month follows right away. */
+    fun setAnnual(category: CategoryId, amount: Money?, startMonth: Int) = viewModelScope.launch {
+        state.update { it.copy(saving = true) }
+        runCatching { planAhead.setAnnualBudget(budget, category, amount, startMonth) }
+            .onSuccess { state.update { it.copy(saving = false, message = if (amount == null) "Yearly budget stopped. This month's budget stays." else "Yearly budget saved") } }
+            .onFailure { e -> state.update { it.copy(saving = false, message = e.userMessage()) } }
+        load(refreshing = true)
+    }
     fun openCategory(id: CategoryId?) {
         state.update { it.copy(selectedCategory = id, note = null, noteLoaded = false) }
         if (id != null && state.value.canEditNotes) viewModelScope.launch {
@@ -207,6 +218,9 @@ class BudgetViewModel @Inject constructor(
         val month = state.value.month
         runCatching { engine.budgetMonth(budget, month) }
             .onSuccess { m -> if (state.value.month == month) state.update { it.copy(data = Loadable.Ready(m)) } }
+        // An older bridge has no yearly budgets: the rest still loads.
+        runCatching { planAhead.annualBudgets(budget, month) }
+            .onSuccess { a -> if (state.value.month == month) state.update { it.copy(annual = a.associateBy { x -> x.categoryId.raw }) } }
             .onFailure { e -> state.update { it.copy(data = if (current is Loadable.Ready) current.copy(refreshing = false) else Loadable.Failed(e.userMessage()), message = e.userMessage()) } }
     }
 

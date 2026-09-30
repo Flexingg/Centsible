@@ -43,6 +43,8 @@ data class ReviewUiState(
     val message: String? = null,
     /** Just categorized a merchant's transaction: offer a rule so the next ones are done too. */
     val rulePrompt: RulePrompt? = null,
+    /** The card being linked to its other side (a card payment). */
+    val linking: Transaction? = null,
 ) {
     val left get() = (data as? Loadable.Ready)?.value?.let { (it.total - it.done).coerceAtLeast(it.queue.size) } ?: 0
 }
@@ -195,6 +197,15 @@ class ReviewViewModel @Inject constructor(
     }
 
     fun messageShown() = state.update { it.copy(message = null) }
+
+    fun linkTransfer(t: Transaction?) = state.update { it.copy(linking = t) }
+
+    /** Linked: both sides count as reviewed on the bridge, so both leave the queue. */
+    fun transferLinked(t: Transaction, otherId: app.centsible.core.model.TransactionId, accountName: String) {
+        state.update { it.copy(linking = null, message = "Linked to $accountName as a transfer") }
+        updateData { d -> d.copy(queue = d.queue.filter { it.id != otherId }, done = d.done + if (d.queue.any { it.id == otherId }) 1 else 0) }
+        pop(t)
+    }
     fun rulePromptShown() = state.update { it.copy(rulePrompt = null) }
 
     private fun pop(t: Transaction) {

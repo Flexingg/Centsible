@@ -239,6 +239,23 @@ export const transactionRoutes =
       return transfers.matches(req.params.budgetId);
     });
 
+    app.get<{ Params: BudgetParams; Querystring: { transactionId: string; q?: string; limit?: number } }>(
+      '/v1/budgets/:budgetId/transfers/candidates',
+      {
+        schema: {
+          querystring: {
+            type: 'object',
+            required: ['transactionId'],
+            properties: { transactionId: { type: 'string' }, q: { type: 'string', maxLength: 100 }, limit: { type: 'integer', minimum: 1, maximum: 100, default: 30 } },
+          },
+        },
+      },
+      async (req) => {
+        requireBudget(deps, req, req.params.budgetId);
+        return transfers.candidates(req.params.budgetId, req.query.transactionId, req.query.q || undefined, req.query.limit ?? 30);
+      },
+    );
+
     app.post<{ Params: BudgetParams; Body: { fromId: string; toId: string } }>(
       '/v1/budgets/:budgetId/transfers/link',
       {

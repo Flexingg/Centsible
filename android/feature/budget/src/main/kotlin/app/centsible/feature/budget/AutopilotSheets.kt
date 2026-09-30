@@ -52,6 +52,8 @@ data class BudgetPlanActions(
     val openTransactions: (app.centsible.core.extensions.Destination.TransactionsFor) -> Unit = {},
     /** The automations screen, or one category's automations. */
     val openAutomations: (app.centsible.core.model.CategoryId?, app.centsible.core.model.YearMonth) -> Unit = { _, _ -> },
+    /** A category's yearly amount (null stops it) and the month its year starts. */
+    val setAnnual: (app.centsible.core.model.CategoryId, app.centsible.core.model.Money?, Int) -> Unit = { _, _, _ -> },
 )
 
 /**

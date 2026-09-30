@@ -170,6 +170,18 @@ export const planningRoutes =
       },
     );
 
+    // "Run all rules": every rule on every transaction since a date (or all), except reconciled ones.
+    app.post<{ Params: BudgetParams; Body: { since?: string | null } | undefined }>(
+      '/v1/budgets/:budgetId/rules/run-all',
+      { schema: { body: { type: ['object', 'null'], additionalProperties: false, properties: { since: { type: ['string', 'null'], pattern: '^\\d{4}-\\d{2}-\\d{2}$' } } } } },
+      async (req) => {
+        requireBudget(deps, req, req.params.budgetId, 'member');
+        const res = await deps.ruleTools.runAll(req.params.budgetId, req.body?.since ?? undefined);
+        audit(deps, req, req.params.budgetId, 'rules.run_all', undefined, { since: req.body?.since ?? null, ...res });
+        return res;
+      },
+    );
+
     app.delete<{ Params: IdParams }>('/v1/budgets/:budgetId/rules/:id', async (req, reply) => {
       write(req, req.params.budgetId);
       await planning.deleteRule(req.params.budgetId, req.params.id);

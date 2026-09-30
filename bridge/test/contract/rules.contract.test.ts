@@ -157,4 +157,29 @@ describe('running rules', () => {
     const after = await app.inject({ method: 'GET', url: `/v1/budgets/${b}/transactions/${t.body.id}`, headers: { authorization: `Bearer ${viewer}` } });
     expect(after.json().notes).toBe('FORMULA CAFE');
   });
+
+  it('runs all rules on everything since a date, but not on reconciled ones', async () => {
+    const t = await spend(M, -2200, actual.categories.General!, 'Run All Deli');
+    const old = await spend(shift(M, -3), -2300, actual.categories.General!, 'Run All Deli');
+    await call('POST', '/rules', '/rules', owner, {
+      conditionsOp: 'and',
+      conditions: [{ field: 'payee', op: 'is', value: t.body.payeeId, type: 'id' }],
+      actions: [{ field: 'category', op: 'set', value: actual.categories.Food, type: 'id' }],
+    });
+    expect((await call('POST', '/rules/run-all', '/rules/run-all', viewer, {})).status).toBe(403);
+    const res = await call('POST', '/rules/run-all', '/rules/run-all', owner, { since: `${M}-01` });
+    expect(res.body.changed).toBeGreaterThanOrEqual(1);
+    const get = async (id: string) => (await app.inject({ method: 'GET', url: `/v1/budgets/${b}/transactions/${id}`, headers: { authorization: `Bearer ${viewer}` } })).json();
+    expect((await get(t.body.id)).categoryId).toBe(actual.categories.Food);
+    // Older than the date: left as it was.
+    expect((await get(old.body.id)).categoryId).toBe(actual.categories.General);
+    // Without a date: everything, except what's reconciled.
+    await host.withBudget(b, 'write', async () => {
+      await api.updateTransaction(old.body.id, { reconciled: true });
+      await new Promise((r) => setTimeout(r, 0));
+    });
+    const all = await call('POST', '/rules/run-all', '/rules/run-all', owner);
+    expect(all.body.checked).toBeGreaterThan(res.body.checked);
+    expect((await get(old.body.id)).categoryId).toBe(actual.categories.General);
+  });
 });

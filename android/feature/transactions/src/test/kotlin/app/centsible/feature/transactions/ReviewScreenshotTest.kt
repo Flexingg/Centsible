@@ -54,6 +54,22 @@ class ReviewScreenshotTest {
         app.centsible.core.uitesting.A11y.assertOk(compose)
     }
 
+    @Test fun link_transfer_sheet() {
+        val names = SampleHousehold.accounts.associate { it.id.raw to it.name }
+        val base = SampleHousehold.transactions.first { !it.isTransfer && !it.isParent }
+        val checking = SampleHousehold.accounts[0]
+        val card = SampleHousehold.accounts.first { it.id != checking.id }
+        val t = base.copy(accountId = checking.id, amount = app.centsible.core.model.Money(-123456), payeeName = "CAPITAL ONE ONLINE PMT", date = "2026-09-24", categoryId = null)
+        fun c(id: String, amount: Long, payee: String, date: String, exact: Boolean, days: Int) =
+            app.centsible.core.model.TransferCandidate(base.copy(id = app.centsible.core.model.TransactionId(id), accountId = card.id, amount = app.centsible.core.model.Money(amount), payeeName = payee, date = date), exact, days)
+        val state = LinkTransferState(
+            candidates = listOf(c("a", 123456, "PAYMENT - THANK YOU", "2026-09-26", true, 2), c("b", 4321, "Refund from Hardware", "2026-09-23", false, 1), c("c", 2500, "Statement credit", "2026-09-20", false, 4)),
+            accountNames = names,
+        )
+        compose.setContent { CentsibleTheme(darkTheme = false) { LinkTransferContent(t, state, onQuery = {}, onPick = {}, onDismiss = {}) } }
+        com.github.takahirom.roborazzi.captureScreenRoboImage("screenshots/link_transfer_sheet.png")
+    }
+
     @Test fun category_picker_create() {
         val state = app.centsible.core.ui.CategoryPickerState(groups = SampleHousehold.budgetMonth.groups.map { g ->
             app.centsible.core.model.CategoryGroup(g.id, g.name, isIncome = g.isIncome, hidden = g.hidden, categories = g.categories.map { app.centsible.core.model.Category(it.id, it.name, g.id, isIncome = g.isIncome, hidden = it.hidden) })

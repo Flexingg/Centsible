@@ -2,6 +2,7 @@ package app.centsible.feature.budget
 
 import app.centsible.core.designsystem.component.toggleRow
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -66,6 +67,7 @@ internal fun CategorySheet(
     onSaveNote: (String) -> Unit = {},
     onSeeTransactions: (() -> Unit)? = null,
     onAutomations: (() -> Unit)? = null,
+    onAnnual: (Money?, Int) -> Unit = { _, _ -> },
 ) {
     var mode by remember { mutableStateOf(SheetMode.Details) }
     ModalBottomSheet(
@@ -76,7 +78,7 @@ internal fun CategorySheet(
         Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp).navigationBarsPadding().padding(bottom = 16.dp)) {
             when (mode) {
                 SheetMode.Details -> {
-                    CategoryDetails(category, state, onAssign, onRollover, onMoveMoney = { mode = SheetMode.Move }, onSeeTransactions = onSeeTransactions, onAutomations = onAutomations)
+                    CategoryDetails(category, state, onAssign, onRollover, onMoveMoney = { mode = SheetMode.Move }, onSeeTransactions = onSeeTransactions, onAutomations = onAutomations, onAnnual = onAnnual)
                     if (state.canEditNotes) NoteEditor(category.id, state, onSaveNote)
                 }
                 SheetMode.Move -> MoveMoneyForm(category, month, onBack = { mode = SheetMode.Details }, onMove = { from, to, amount ->
@@ -97,6 +99,7 @@ private fun CategoryDetails(
     onMoveMoney: () -> Unit,
     onSeeTransactions: (() -> Unit)? = null,
     onAutomations: (() -> Unit)? = null,
+    onAnnual: (Money?, Int) -> Unit = { _, _ -> },
 ) {
     val colors = CentsibleTheme.colors
     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -144,6 +147,8 @@ private fun CategoryDetails(
         if (state.canMoveMoney) {
             OutlinedButton(onClick = onMoveMoney, modifier = Modifier.fillMaxWidth()) { Text("Move money") }
         }
+        val income = state.data.valueOrNull?.incomeGroups?.any { g -> g.categories.any { it.id == category.id } } == true
+        if (!income) YearlyBudget(state.annual[category.id.raw], state.saving, onAnnual)
         onAutomations?.let { open ->
             androidx.compose.material3.TextButton(onClick = open, modifier = Modifier.fillMaxWidth()) { Text("Automations") }
         }
@@ -257,4 +262,84 @@ private fun NoteEditor(category: app.centsible.core.model.CategoryId, state: Bud
         )
         if (state.canEdit) androidx.compose.material3.TextButton(onClick = { onSave(text) }, enabled = text != state.note.orEmpty()) { Text("Save note") }
     }
+}
+
+/**
+ * A yearly amount: a twelfth a month, leftovers carried forward, a bill covered from the
+ * rest of the year, nothing once the year is used up. For insurance, memberships, gifts.
+ */
+@Composable
+private fun YearlyBudget(annual: app.centsible.core.model.AnnualBudget?, saving: Boolean, onSave: (Money?, Int) -> Unit) {
+    val colors = CentsibleTheme.colors
+    var editing by remember { mutableStateOf(false) }
+    Column(Modifier.fillMaxWidth().padding(top = 12.dp).background(colors.cardMuted, androidx.compose.foundation.shape.RoundedCornerShape(14.dp)).padding(14.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text("Yearly budget", style = MaterialTheme.typography.titleSmall)
+                Text(
+                    if (annual == null) "Set a yearly amount: a twelfth a month, and a big bill draws from the rest of the year."
+                    else "${MoneyFormat.format(annual.amount, showCents = false)} a year · ${MoneyFormat.format(annual.remaining, showCents = false)} left to budget this year",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = colors.textSecondary,
+                )
+                if (annual != null && annual.suggested != annual.budgeted) {
+                    Text("Updates this month to ${MoneyFormat.format(annual.suggested)} shortly", style = MaterialTheme.typography.labelSmall, color = colors.textTertiary)
+                }
+            }
+            androidx.compose.material3.TextButton(onClick = { editing = true }, enabled = !saving) { Text(if (annual == null) "Set up" else "Change") }
+        }
+    }
+    if (editing) YearlyDialog(annual, onDismiss = { editing = false }, onSave = { a, s -> editing = false; onSave(a, s) })
+}
+
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+@Composable
+private fun YearlyDialog(annual: app.centsible.core.model.AnnualBudget?, onDismiss: () -> Unit, onSave: (Money?, Int) -> Unit) {
+    val colors = CentsibleTheme.colors
+    var amount by remember { mutableStateOf(annual?.amount?.let(MoneyInput::toInput).orEmpty()) }
+    var start by remember { mutableStateOf(annual?.startMonth ?: 1) }
+    var open by remember { mutableStateOf(false) }
+    val parsed = MoneyInput.parse(amount)?.takeIf { it.minor >= 100 }
+    val monthName = { m: Int -> java.time.Month.of(m).getDisplayName(java.time.format.TextStyle.FULL, java.util.Locale.getDefault()) }
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Yearly budget") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(
+                    "Each month gets a twelfth. What isn't spent carries forward, so a quiet month leaves more for the next. When the bill comes, that month takes what it needs from the rest of the year; once the year's amount is used, the rest of the year is 0.",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                OutlinedTextField(
+                    amount, { amount = it },
+                    label = { Text("Each year") },
+                    prefix = { Text("$") },
+                    isError = amount.isNotEmpty() && parsed == null,
+                    supportingText = parsed?.let { { Text("${MoneyFormat.format(Money(Math.round(it.minor / 12.0)))} a month") } },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                androidx.compose.material3.ExposedDropdownMenuBox(expanded = open, onExpandedChange = { open = it }) {
+                    OutlinedTextField(
+                        monthName(start), {},
+                        readOnly = true,
+                        label = { Text("Year starts in") },
+                        trailingIcon = { androidx.compose.material3.ExposedDropdownMenuDefaults.TrailingIcon(open) },
+                        modifier = Modifier.fillMaxWidth().menuAnchor(androidx.compose.material3.ExposedDropdownMenuAnchorType.PrimaryNotEditable),
+                    )
+                    ExposedDropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+                        (1..12).forEach { m -> androidx.compose.material3.DropdownMenuItem(text = { Text(monthName(m)) }, onClick = { start = m; open = false }) }
+                    }
+                }
+            }
+        },
+        confirmButton = { androidx.compose.material3.TextButton(onClick = { parsed?.let { onSave(it, start) } }, enabled = parsed != null) { Text("Save") } },
+        dismissButton = {
+            Row {
+                if (annual != null) androidx.compose.material3.TextButton(onClick = { onSave(null, start) }) { Text("Stop", color = colors.negative) }
+                androidx.compose.material3.TextButton(onClick = onDismiss) { Text("Cancel") }
+            }
+        },
+    )
 }
