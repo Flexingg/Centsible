@@ -28,7 +28,7 @@ type Logger = { info: (o: unknown, m?: string) => void; warn: (o: unknown, m?: s
 export function createDeps(config: BridgeConfig, store: HouseholdStore, host: ActualHost, setup: SetupService, log: Logger): Deps {
   const jobs = new JobStore();
   const budgetOps = new BudgetOps(host);
-  const keys = new SimpleFinKeyFile(config.dataDir);
+  const keys = new SimpleFinKeyFile(config.dataDir, config.actualDataDir);
   const bankSync = new BankSyncOps(host, store, keys);
   const backfill = new BankSyncBackfill(host, store, keys, log);
   const backups = new BackupService(config, host, store, log);

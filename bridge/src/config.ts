@@ -6,6 +6,8 @@ export type BridgeConfig = {
   port: number;
   host: string;
   dataDir: string;
+  /** Actual's own data folder, mounted read-only (optional): lets history import use the SimpleFIN connection made in Actual. */
+  actualDataDir?: string;
   /** Public URL the phone uses (your Cloudflare hostname). Embedded in pairing QR codes. */
   publicUrl: string;
   trustProxy: boolean;
@@ -63,6 +65,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): BridgeConfig {
     port: Number(env.BRIDGE_PORT ?? 8787),
     host: env.BRIDGE_HOST ?? '0.0.0.0',
     dataDir,
+    actualDataDir: env.ACTUAL_DATA_DIR ? resolve(env.ACTUAL_DATA_DIR) : undefined,
     publicUrl: required(env, 'BRIDGE_PUBLIC_URL').replace(/\/+$/, ''),
     trustProxy: env.BRIDGE_TRUST_PROXY === 'true',
     actual: {

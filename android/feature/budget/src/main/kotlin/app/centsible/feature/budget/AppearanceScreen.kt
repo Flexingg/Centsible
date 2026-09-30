@@ -77,129 +77,13 @@ import kotlinx.coroutines.launch
 /** Something that can have a color and emoji: a group or a category. */
 data class Lookable(val id: String, val name: String, val isGroup: Boolean)
 
-data class AppearanceUiState(
-    val data: Loadable<List<CategoryGroup>> = Loadable.Loading,
-    val looks: Map<String, Appearance> = emptyMap(),
-    val canEdit: Boolean = false,
-    val editing: Lookable? = null,
-    val message: String? = null,
-)
-
-@HiltViewModel
-class AppearanceViewModel @Inject constructor(
-    private val personal: PersonalGateway,
-    private val engine: BudgetEngine,
-    private val selectedBudget: SelectedBudget,
-    private val sessions: SessionStore,
-) : ViewModel() {
-    private val state = MutableStateFlow(AppearanceUiState())
-    val uiState: StateFlow<AppearanceUiState> = state.asStateFlow()
-
-    init {
-        load()
-    }
-
-    fun load() = viewModelScope.launch {
-        runCatching {
-            val b = selectedBudget()
-            val groups = async { engine.categoryGroups(b) }
-            val looks = async { personal.appearance(b) }
-            groups.await().filter { !it.hidden } to looks.await()
-        }
-            .onSuccess { (g, l) -> state.update { it.copy(data = Loadable.Ready(g), looks = l, canEdit = sessions.current()?.member?.role != MemberRole.Viewer) } }
-            .onFailure { e -> state.update { it.copy(data = Loadable.Failed(e.userMessage())) } }
-    }
-
-    fun edit(item: Lookable?) = state.update { it.copy(editing = item) }
-
-    fun save(item: Lookable, appearance: Appearance) {
-        state.update { it.copy(editing = null, looks = if (appearance.color == null && appearance.emoji == null) it.looks - item.id else it.looks + (item.id to appearance)) }
-        viewModelScope.launch {
-            runCatching { personal.setAppearance(selectedBudget(), item.id, appearance) }
-                .onFailure { e -> state.update { it.copy(message = e.userMessage()) }; load() }
-        }
-    }
-}
-
 /** The palette: the icon's segment colors first, then a few more. */
 internal val PALETTE: List<Long> = Motion.Segments.map { it.toArgb().toLong() and 0xFFFFFFFFL } +
     listOf(0xFF5B7CFA, 0xFF2FB39A, 0xFFE2557A, 0xFF8C6A4F)
 
-@Composable
-fun AppearanceRoute(onBack: () -> Unit, viewModel: AppearanceViewModel = hiltViewModel()) {
-    val state by viewModel.uiState.collectAsStateWithLifecycle()
-    AppearanceScreen(state, onBack, onEdit = viewModel::edit, onSave = viewModel::save, onRetry = { viewModel.load() })
-}
-
-@Composable
-fun AppearanceScreen(state: AppearanceUiState, onBack: () -> Unit, onEdit: (Lookable?) -> Unit = {}, onSave: (Lookable, Appearance) -> Unit = { _, _ -> }, onRetry: () -> Unit = {}) {
-    val colors = CentsibleTheme.colors
-    Scaffold(
-        containerColor = colors.canvas,
-        topBar = {
-            Row(Modifier.fillMaxWidth().padding(start = 4.dp, end = 8.dp, top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Back") }
-                Text("Colors & emoji", style = MaterialTheme.typography.headlineSmall)
-            }
-        },
-    ) { padding ->
-        when (val d = state.data) {
-            Loadable.Loading -> LoadingState(Modifier.padding(padding))
-            is Loadable.Failed -> MessageState("Couldn't load categories", d.message, emoji = "🎨", actionLabel = "Try again", onAction = onRetry, modifier = Modifier.padding(padding))
-            is Loadable.Ready -> LazyColumn(
-                Modifier.fillMaxSize().padding(padding),
-                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 32.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                item {
-                    Text(
-                        "Everyone in the household sees these: on Home's dial (groups), in reports, and next to every transaction.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = colors.textSecondary,
-                        modifier = Modifier.padding(horizontal = 4.dp),
-                    )
-                }
-                d.value.forEach { g ->
-                    item(key = g.id.raw) {
-                        CentsibleCard(contentPadding = PaddingValues(0.dp)) {
-                            LookRow(Lookable(g.id.raw, g.name, isGroup = true), state.looks[g.id.raw], state.canEdit, onEdit)
-                            g.categories.filter { !it.hidden }.forEach { c ->
-                                HorizontalDivider(Modifier.padding(start = 60.dp), color = colors.border)
-                                LookRow(Lookable(c.id.raw, c.name, isGroup = false), state.looks[c.id.raw], state.canEdit, onEdit)
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-    state.editing?.let { item -> LookDialog(item, state.looks[item.id], onDismiss = { onEdit(null) }, onSave = { onSave(item, it) }) }
-}
-
-@Composable
-private fun LookRow(item: Lookable, look: Appearance?, canEdit: Boolean, onEdit: (Lookable) -> Unit) {
-    val colors = CentsibleTheme.colors
-    val color = look?.color?.let { Color(it) }
-    Row(
-        Modifier.fillMaxWidth().clickable(enabled = canEdit) { onEdit(item) }.padding(horizontal = 16.dp, vertical = if (item.isGroup) 14.dp else 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Box(
-            Modifier.size(32.dp).background(color?.copy(alpha = 0.22f) ?: colors.cardMuted, CircleShape),
-            contentAlignment = Alignment.Center,
-        ) {
-            if (item.isGroup && look?.emoji == null) Box(Modifier.size(12.dp).background(color ?: colors.textTertiary, CircleShape))
-            else Text(look?.emoji ?: CategoryEmoji.forName(item.name), fontSize = 16.sp)
-        }
-        Spacer(Modifier.width(12.dp))
-        Text(item.name, style = if (item.isGroup) MaterialTheme.typography.titleMedium else MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
-        if (look != null) Text("Custom", style = MaterialTheme.typography.labelSmall, color = colors.textTertiary)
-    }
-}
-
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun LookDialog(item: Lookable, current: Appearance?, onDismiss: () -> Unit, onSave: (Appearance) -> Unit) {
+internal fun LookDialog(item: Lookable, current: Appearance?, onDismiss: () -> Unit, onSave: (Appearance) -> Unit) {
     val colors = CentsibleTheme.colors
     var emoji by remember { mutableStateOf(current?.emoji.orEmpty()) }
     var color by remember { mutableStateOf(current?.color) }

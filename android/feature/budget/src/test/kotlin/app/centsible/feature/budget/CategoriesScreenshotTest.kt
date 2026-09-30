@@ -19,7 +19,7 @@ import org.robolectric.annotation.GraphicsMode
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(sdk = [35], qualifiers = "w411dp-h891dp-xxhdpi")
-class AppearanceScreenshotTest {
+class CategoriesScreenshotTest {
     @get:Rule val compose = createComposeRule()
 
     private val groups = SampleHousehold.budgetMonth.groups.filter { !it.isIncome }.map { g ->
@@ -30,9 +30,9 @@ class AppearanceScreenshotTest {
         groups[1].categories[0].id.raw to Appearance(0xFFEFA3C1, "🥑"),
     )
 
-    @Test fun appearance_list() {
-        compose.setContent { CentsibleTheme(darkTheme = false) { AppearanceScreen(AppearanceUiState(Loadable.Ready(groups), looks, canEdit = true), onBack = {}) } }
-        compose.onRoot().captureRoboImage("screenshots/appearance_list.png")
+    @Test fun categories_list() {
+        compose.setContent { CentsibleTheme(darkTheme = false) { CategoryManagerScreen(CategoryManagerUiState(Loadable.Ready(groups), looks, canEdit = true), CategoryManagerActions()) } }
+        compose.onRoot().captureRoboImage("screenshots/categories_list.png")
         app.centsible.core.uitesting.A11y.assertOk(compose)
     }
 }

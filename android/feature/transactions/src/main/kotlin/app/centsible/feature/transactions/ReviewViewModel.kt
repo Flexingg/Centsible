@@ -9,10 +9,12 @@ import app.centsible.core.domain.TransactionTools
 import app.centsible.core.domain.userMessage
 import app.centsible.core.model.BatchChange
 import app.centsible.core.model.CategoryId
+import app.centsible.core.model.PayeeId
 import app.centsible.core.model.Transaction
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -45,7 +47,7 @@ data class ReviewUiState(
     val left get() = (data as? Loadable.Ready)?.value?.let { (it.total - it.done).coerceAtLeast(it.queue.size) } ?: 0
 }
 
-data class RulePrompt(val payeeId: app.centsible.core.model.PayeeId, val payeeName: String, val categoryId: CategoryId, val categoryName: String?)
+data class RulePrompt(val payeeId: PayeeId, val payeeName: String, val categoryId: CategoryId, val categoryName: String?)
 
 /** The review inbox: new and uncategorized transactions as a stack of cards. */
 @HiltViewModel
@@ -62,25 +64,84 @@ class ReviewViewModel @Inject constructor(
     }
 
     fun load() = viewModelScope.launch {
-        runCatching {
-            val budget = selectedBudget()
-            val inbox = async { tools.inbox(budget, PAGE) }
-            val groups = async { engine.categoryGroups(budget) }
-            val accounts = async { engine.accounts(budget) }
-            val g = groups.await()
-            val i = inbox.await()
-            ReviewData(
-                queue = i.items,
-                total = i.total,
-                more = i.more,
-                since = i.since,
-                categoryNames = g.flatMap { it.categories }.associate { it.id.raw to it.name },
-                accountNames = accounts.await().associate { it.id.raw to it.name },
-                categories = g.filter { !it.hidden }.flatMap { grp -> grp.categories.filter { !it.hidden }.map { CategoryChoice(it.id, it.name, grp.name) } },
-            )
-        }
+        runCatching { fetch() }
             .onSuccess { d -> state.update { it.copy(data = Loadable.Ready(d)) } }
             .onFailure { e -> state.update { it.copy(data = Loadable.Failed(e.userMessage())) } }
+    }
+
+    private suspend fun fetch(): ReviewData = coroutineScope {
+        val budget = selectedBudget()
+        val inbox = async { tools.inbox(budget, PAGE) }
+        val groups = async { engine.categoryGroups(budget) }
+        val accounts = async { engine.accounts(budget) }
+        val g = groups.await()
+        val i = inbox.await()
+        ReviewData(
+            queue = i.items,
+            total = i.total,
+            more = i.more,
+            since = i.since,
+            categoryNames = g.flatMap { it.categories }.associate { it.id.raw to it.name },
+            accountNames = accounts.await().associate { it.id.raw to it.name },
+            categories = g.filter { !it.hidden }.flatMap { grp -> grp.categories.filter { !it.hidden }.map { CategoryChoice(it.id, it.name, grp.name) } },
+        )
+    }
+
+    /** Off to the rule editor for this merchant; see [resumed]. */
+    private var ruleFor: Pair<PayeeId, String?>? = null
+    /** Off to the transaction editor. */
+    private var away = false
+
+    fun makingRule(payee: PayeeId) {
+        val name = state.value.rulePrompt?.takeIf { it.payeeId == payee }?.payeeName
+            ?: state.value.data.valueOrNull?.queue?.firstOrNull { it.payeeId == payee }?.payeeName
+        ruleFor = payee to name
+        rulePromptShown()
+    }
+
+    fun leaving() {
+        away = true
+    }
+
+    /**
+     * Back from the rule editor: pick up what the rule just filed, and count those as
+     * reviewed (you just decided where that merchant goes), so they don't need a second look.
+     */
+    fun resumed() {
+        val before = state.value.data.valueOrNull ?: return
+        val rule = ruleFor
+        ruleFor = null
+        if (rule == null) {
+            if (away) {
+                away = false
+                viewModelScope.launch {
+                    // Your edits count as reviewed on the bridge, so an edited card drops out.
+                    runCatching { fetch() }.onSuccess { d ->
+                        updateData { d.copy(done = before.done, total = d.total + before.done) }
+                    }
+                }
+            }
+            return
+        }
+        away = false
+        val (payee, name) = rule
+        viewModelScope.launch {
+            runCatching {
+                val fresh = fetch()
+                val was = before.queue.associate { it.id to it.categoryId }
+                val filed = fresh.queue.filter { t ->
+                    t.payeeId == payee && t.categoryId != null && (t.id !in was || was[t.id] != t.categoryId)
+                }
+                if (filed.isNotEmpty()) tools.markReviewed(selectedBudget(), filed.map { it.id })
+                val ids = filed.map { it.id }.toSet()
+                fresh.copy(queue = fresh.queue.filter { it.id !in ids }, done = before.done + filed.size, total = fresh.total + before.done) to filed.size
+            }
+                .onSuccess { (d, n) ->
+                    val who = name ?: "that merchant"
+                    state.update { it.copy(data = Loadable.Ready(d), message = if (n > 0) "Your rule filed $n more from $who" else null) }
+                }
+                .onFailure { e -> state.update { it.copy(message = e.userMessage()) } }
+        }
     }
 
     /** Needs a category before it can be approved (on-budget, not a transfer or split). */

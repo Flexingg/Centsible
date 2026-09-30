@@ -364,7 +364,9 @@ private fun HistoryCard(o: BankSyncOverview, state: BankSyncUiState, actions: Ba
         if (!o.historyAccess) {
             // Connections made before this existed: the bridge never saw the access, only Actual did.
             Text(
-                "To import history, reconnect SimpleFIN once: create a new setup token at bridge.simplefin.org (Apps → New connection) and paste it here. If an account then shows as not linked, link it to the same account again; nothing is lost.",
+                "SimpleFIN was connected in Actual, which keeps the connection to itself. Two ways to import history:\n\n" +
+                    "• No new token: add one line to your docker-compose.yml, under the bridge's volumes: \"- ./actual-data:/actual-data:ro\", and ACTUAL_DATA_DIR: /actual-data under its environment (the compose file in the latest release has both), then run docker compose up -d.\n\n" +
+                    "• Or reconnect once here with a new setup token from bridge.simplefin.org (Apps → New connection). If an account then shows as not linked, link it to the same account again; nothing is lost.",
                 style = MaterialTheme.typography.bodyMedium,
                 modifier = Modifier.padding(top = 8.dp),
             )

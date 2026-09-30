@@ -99,6 +99,11 @@ fun ReviewRoute(
     viewModel: ReviewViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    // Coming back from the editor or the rule editor: show what changed there.
+    androidx.lifecycle.compose.LifecycleResumeEffect(Unit) {
+        viewModel.resumed()
+        onPauseOrDispose { }
+    }
     ReviewScreen(
         state,
         ReviewActions(
@@ -108,12 +113,12 @@ fun ReviewRoute(
             changeCategory = viewModel::changeCategory,
             setCategory = viewModel::setCategory,
             dismissPicker = viewModel::dismissPicker,
-            open = onOpen,
+            open = { viewModel.leaving(); onOpen(it) },
             askReviewAll = viewModel::askReviewAll,
             reviewAll = viewModel::reviewAll,
             retry = { viewModel.load() },
             messageShown = viewModel::messageShown,
-            makeRule = { p, c -> viewModel.rulePromptShown(); onMakeRule(p, c) },
+            makeRule = { p, c -> viewModel.makingRule(p); onMakeRule(p, c) },
             rulePromptShown = viewModel::rulePromptShown,
         ),
     )

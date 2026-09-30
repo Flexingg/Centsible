@@ -33,8 +33,11 @@ services:
       BRIDGE_TRUST_PROXY: "true"
       UPDATER_URL: http://updater:8080
       UPDATER_TOKEN: ${UPDATER_TOKEN:-centsible-updater}
+      ACTUAL_DATA_DIR: /actual-data
     volumes:
       - ./bridge-data:/data # also holds backups (bridge-data/backups)
+      # Read-only: lets history import use the SimpleFIN connection made in Actual's web app.
+      - ./actual-data:/actual-data:ro
     labels:
       com.centurylinklabs.watchtower.enable: "true"
 

@@ -1,5 +1,6 @@
 import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import Database from 'better-sqlite3';
 
 /**
  * The bits of the SimpleFIN protocol (simplefin.org/protocol) the bridge speaks itself.
@@ -75,19 +76,48 @@ export async function fetchWindow(accessUrl: string, accountIds: string[], start
   return { accounts: body.accounts ?? [], messages: [...new Set(messages)] };
 }
 
-/** The access URL, kept next to bridge.sqlite with owner-only permissions. */
+/**
+ * The access URL. The bridge keeps its own copy (owner-only, next to bridge.sqlite) when
+ * SimpleFIN was connected through it. When SimpleFIN was connected in Actual's web app
+ * instead, Actual holds the only copy, and its API only says whether one exists. If
+ * Actual's data folder is mounted read-only into the bridge (ACTUAL_DATA_DIR), the bridge
+ * reads it from there, so history works without a new setup token.
+ */
 export class SimpleFinKeyFile {
   private readonly path: string;
-  constructor(dataDir: string) {
+  constructor(
+    dataDir: string,
+    private readonly actualDataDir?: string,
+  ) {
     this.path = join(dataDir, 'simplefin-access');
   }
   read(): string | null {
-    return existsSync(this.path) ? readFileSync(this.path, 'utf8').trim() || null : null;
+    // Actual's copy first: it's the one everyday syncing uses, so it's never stale.
+    return this.fromActual() ?? (existsSync(this.path) ? readFileSync(this.path, 'utf8').trim() || null : null);
   }
   write(accessUrl: string) {
     writeFileSync(this.path, accessUrl, { mode: 0o600 });
   }
   clear() {
     rmSync(this.path, { force: true });
+  }
+
+  private fromActual(): string | null {
+    if (!this.actualDataDir) return null;
+    const file = [join(this.actualDataDir, 'server-files', 'account.sqlite'), join(this.actualDataDir, 'account.sqlite')].find((f) => existsSync(f));
+    if (!file) return null;
+    let db: Database.Database | undefined;
+    try {
+      db = new Database(file, { readonly: true, fileMustExist: true });
+      // Server-wide first, then one saved for a single budget file ("name:fileId").
+      const rows = db
+        .prepare("SELECT name, value FROM secrets WHERE name = 'simplefin_accessKey' OR name LIKE 'simplefin_accessKey:%' ORDER BY name = 'simplefin_accessKey' DESC")
+        .all() as { name: string; value: string | null }[];
+      return rows.map((r) => r.value?.trim() ?? '').find((v) => ACCESS_URL.test(v)) ?? null;
+    } catch {
+      return null; // not mounted, or not Actual's database: fall back to the bridge's copy
+    } finally {
+      db?.close();
+    }
   }
 }
