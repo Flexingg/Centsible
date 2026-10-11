@@ -3,6 +3,7 @@ package app.centsible.feature.budget
 import app.centsible.core.designsystem.component.toggleRow
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.background
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.foundation.layout.Arrangement
@@ -78,7 +79,14 @@ internal fun CategorySheet(
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
         containerColor = CentsibleTheme.colors.card,
     ) {
-        Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp).navigationBarsPadding().padding(bottom = 16.dp)) {
+        // Scrolls: with the history, yearly budget and notes it's taller than the screen.
+        Column(
+            Modifier.fillMaxWidth()
+                .verticalScroll(androidx.compose.foundation.rememberScrollState())
+                .padding(horizontal = 20.dp)
+                .navigationBarsPadding()
+                .padding(bottom = 16.dp),
+        ) {
             when (mode) {
                 SheetMode.Details -> {
                     CategoryDetails(category, state, onAssign, onRollover, onMoveMoney = { mode = SheetMode.Move }, onSeeTransactions = onSeeTransactions, onAutomations = onAutomations, onAnnual = onAnnual, onOffBooks = onOffBooks)
@@ -166,11 +174,11 @@ private fun CategoryDetails(
         val isIncome = state.data.valueOrNull?.incomeGroups?.any { g -> g.categories.any { it.id == category.id } } == true
         if (!isIncome) {
             val off = category.id in state.offBooks
-            Row(Modifier.fillMaxWidth().padding(top = 12.dp).toggleRow(off, !state.saving, onChange = onOffBooks), verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
+            Row(Modifier.fillMaxWidth().padding(top = 16.dp).toggleRow(off, !state.saving, onChange = onOffBooks), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f).padding(end = 16.dp)) {
                     Text("Off the books", style = MaterialTheme.typography.bodyLarge)
                     Text(
-                        "For transactions to sort out later: left out of the review queue, spending, reports and insights. Rollover goes on so its balance waits here.",
+                        "For transactions to sort out later: left out of reviews, reports and insights. Rollover goes on so its balance waits here.",
                         style = MaterialTheme.typography.bodySmall,
                         color = colors.textSecondary,
                     )
@@ -179,8 +187,8 @@ private fun CategoryDetails(
             }
         }
         if (state.canToggleRollover) {
-            Row(Modifier.fillMaxWidth().padding(top = 12.dp).toggleRow(category.carryover, !state.saving, onChange = onRollover), verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
+            Row(Modifier.fillMaxWidth().padding(top = 16.dp).toggleRow(category.carryover, !state.saving, onChange = onRollover), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f).padding(end = 16.dp)) {
                     Text("Roll over overspending", style = MaterialTheme.typography.bodyLarge)
                     Text("Carry a negative balance into next month instead of taking it from To Budget", style = MaterialTheme.typography.bodySmall, color = colors.textSecondary)
                 }
