@@ -70,6 +70,11 @@ class PlanningApi(private val client: BridgeClient) {
         client.execute(HttpMethod.Put, "${b(budgetId)}/targets/$id") { jsonBody(body) }
     }
     suspend fun deleteTarget(budgetId: String, id: String) { client.execute(HttpMethod.Delete, "${b(budgetId)}/targets/$id") }
+    suspend fun categoryHistory(budgetId: String, categoryId: String, month: String): CategoryHistoryDto =
+        client.get("${b(budgetId)}/categories/$categoryId/history") { parameter("month", month) }
+    suspend fun offBooks(budgetId: String): OffBooksDto = client.get("${b(budgetId)}/off-books")
+    suspend fun setOffBooks(budgetId: String, categoryId: String, body: OffBooksBodyDto): OffBooksDto =
+        client.send(HttpMethod.Put, "${b(budgetId)}/categories/$categoryId/off-books", body)
     suspend fun annualBudgets(budgetId: String, month: String): AnnualBudgetsDto = client.get("${b(budgetId)}/annual-budgets") { parameter("month", month) }
     suspend fun setAnnualBudget(budgetId: String, categoryId: String, body: AnnualBudgetInputDto) {
         client.execute(HttpMethod.Put, "${b(budgetId)}/categories/$categoryId/annual-budget") { jsonBody(body) }

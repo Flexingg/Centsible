@@ -1,0 +1,57 @@
+{
+  "categoryId": "541836f1-e756-4473-a5d0-6c1d3f06c7fa",
+  "name": "Food",
+  "month": "2026-10",
+  "months": [
+    {
+      "month": "2026-04",
+      "spent": 0,
+      "budgeted": 0,
+      "balance": 0
+    },
+    {
+      "month": "2026-05",
+      "spent": 0,
+      "budgeted": 0,
+      "balance": 0
+    },
+    {
+      "month": "2026-06",
+      "spent": 0,
+      "budgeted": 0,
+      "balance": 0
+    },
+    {
+      "month": "2026-07",
+      "spent": 15000,
+      "budgeted": 0,
+      "balance": -15000
+    },
+    {
+      "month": "2026-08",
+      "spent": 45000,
+      "budgeted": 0,
+      "balance": -45000
+    },
+    {
+      "month": "2026-09",
+      "spent": 30000,
+      "budgeted": 0,
+      "balance": -30000
+    },
+    {
+      "month": "2026-10",
+      "spent": 14357,
+      "budgeted": 60000,
+      "balance": 45643
+    }
+  ],
+  "averages": {
+    "avg3": 30000,
+    "avg6": 30000,
+    "avg12": 30000
+  },
+  "monthsOfHistory": 3,
+  "highest": 45000,
+  "lowest": 15000
+}

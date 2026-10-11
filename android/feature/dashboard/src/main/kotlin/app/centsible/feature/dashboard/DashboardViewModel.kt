@@ -12,6 +12,7 @@ import app.centsible.core.domain.userMessage
 import app.centsible.core.extensions.DashboardContext
 import app.centsible.core.extensions.DashboardWidget
 import app.centsible.core.extensions.Destination
+import app.centsible.core.model.withoutCategories
 import app.centsible.core.model.YearMonth
 import dagger.hilt.android.lifecycle.HiltViewModel
 import java.time.LocalDate
@@ -49,6 +50,7 @@ class DashboardViewModel @Inject constructor(
     private val allWidgets: Set<@JvmSuppressWildcards DashboardWidget>,
     private val tools: app.centsible.core.domain.TransactionTools,
     private val personal: app.centsible.core.domain.PersonalGateway,
+    private val planAhead: app.centsible.core.domain.PlanAheadGateway,
     changes: BudgetChanges,
 ) : ViewModel() {
     private val state = MutableStateFlow(DashboardUiState())
@@ -118,9 +120,12 @@ class DashboardViewModel @Inject constructor(
             val categories = async { engine.categoryGroups(budget).flatMap { it.categories }.associate { it.id.raw to it.name } }
             // Older bridges have no inbox; the card just doesn't show.
             val review = async { runCatching { tools.inbox(budget, limit = 3) }.getOrNull() }
+            // Off-the-books categories stay out of Home's numbers (the dial, spending).
+            val offBooks = async { runCatching { planAhead.offBooks(budget) }.getOrDefault(emptySet()) }
             val inbox = review.await()
+            val hidden = offBooks.await()
             DashboardContext(
-                budget, member, caps.await(), month.await(), accounts.await(), recent.await(), categories.await(), navigate = {},
+                budget, member, caps.await(), month.await()?.withoutCategories(hidden), accounts.await(), recent.await(), categories.await(), navigate = {},
                 reviewCount = inbox?.total,
                 reviewPreview = inbox?.items.orEmpty(),
             )

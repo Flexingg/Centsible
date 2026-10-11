@@ -54,6 +54,7 @@ import app.centsible.core.designsystem.theme.CentsibleTheme
 import app.centsible.core.model.BudgetCategory
 import app.centsible.core.model.BudgetGroup
 import app.centsible.core.model.BudgetMonth
+import app.centsible.core.model.withoutCategories
 import app.centsible.core.model.CategoryGroupId
 import app.centsible.core.model.CategoryId
 import app.centsible.core.model.Money
@@ -90,6 +91,7 @@ fun BudgetRoute(
             openTransactions = onOpenTransactions,
             openAutomations = onOpenAutomations,
             setAnnual = { c, a, s -> viewModel.setAnnual(c, a, s) },
+            setOffBooks = { c, on -> viewModel.setOffBooks(c, on) },
         ),
     )
 }
@@ -217,6 +219,7 @@ fun BudgetScreen(
             onRollover = { onRollover(selected.id, it) },
             onSaveNote = { onSaveNote(selected.id, it) },
             onAnnual = { amount, start -> plan.setAnnual(selected.id, amount, start) },
+            onOffBooks = { plan.setOffBooks(selected.id, it) },
             onAutomations = { onOpenCategory(null); plan.openAutomations(selected.id, month.month) }.takeIf { state.canApplyGoals },
             onSeeTransactions = {
                 onOpenCategory(null)
@@ -238,6 +241,9 @@ private fun BudgetContent(
     modifier: Modifier,
 ) {
     val collapsed = remember { mutableStateMapOf<CategoryGroupId, Boolean>() }
+    // Off-the-books categories get their own card and stay out of the totals and groups.
+    val setAside = month.groups.flatMap { it.categories }.filter { it.id in state.offBooks && !it.hidden }
+    @Suppress("NAME_SHADOWING") val month = month.withoutCategories(state.offBooks)
     LazyColumn(
         modifier.fillMaxSize(),
         contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 96.dp),
@@ -255,6 +261,9 @@ private fun BudgetContent(
                 onToggle = { collapsed[group.id] = collapsed[group.id] != true },
                 onOpenCategory = onOpenCategory,
             )
+        }
+        if (setAside.isNotEmpty()) {
+            item(key = "off-books") { OffBooksCard(setAside, onOpenCategory) }
         }
         items(month.incomeGroups.filter { !it.hidden }, key = { it.id.raw }) { IncomeCard(it) }
         if (state.canManageCategories) {
@@ -487,4 +496,25 @@ private fun HoldDialog(available: Money, onDismiss: () -> Unit, onHold: (Money) 
         confirmButton = { androidx.compose.material3.TextButton(onClick = { parsed?.let(onHold) }, enabled = parsed != null) { Text("Hold") } },
         dismissButton = { androidx.compose.material3.TextButton(onClick = onDismiss) { Text("Cancel") } },
     )
+}
+
+/** Categories set aside: transactions waiting to be matched or sorted, out of the totals. */
+@Composable
+private fun OffBooksCard(categories: List<BudgetCategory>, onOpenCategory: (CategoryId) -> Unit) {
+    val colors = CentsibleTheme.colors
+    CentsibleCard(contentPadding = PaddingValues(0.dp)) {
+        Column(Modifier.padding(start = 16.dp, end = 16.dp, top = 14.dp, bottom = 4.dp)) {
+            Text("Off the books", style = MaterialTheme.typography.titleSmall)
+            Text(
+                "Set aside to sort out later. Not in the totals above, reviews, reports or insights.",
+                style = MaterialTheme.typography.bodySmall,
+                color = colors.textTertiary,
+            )
+        }
+        categories.forEachIndexed { i, category ->
+            if (i > 0) HorizontalDivider(Modifier.padding(start = 64.dp), color = colors.border)
+            CategoryRow(category, onClick = { onOpenCategory(category.id) })
+        }
+        Spacer(Modifier.height(4.dp))
+    }
 }

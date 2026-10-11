@@ -1,3 +1,4 @@
+import * as api from '@actual-app/api';
 import type { FastifyPluginAsync } from 'fastify';
 import { AVERAGE_BASES, type Basis, type GoalInput } from '../../actual/plan-ops.js';
 import type { MortgageInput } from '../../actual/mortgage-ops.js';
@@ -14,7 +15,7 @@ const monthParams = { type: 'object', properties: { month: MONTH } };
 export const planRoutes =
   (deps: Deps): FastifyPluginAsync =>
   async (app) => {
-    const { plan, targets, mortgages, annual } = deps;
+    const { plan, targets, mortgages, annual, offBooks } = deps;
 
     app.get<{ Params: MonthParams }>('/v1/budgets/:budgetId/months/:month/autopilot', { schema: { params: monthParams } }, async (req) => {
       requireBudget(deps, req, req.params.budgetId);
@@ -131,6 +132,42 @@ export const planRoutes =
       audit(deps, req, req.params.budgetId, 'target.removed', req.params.id);
       return reply.status(204).send();
     });
+
+    // ── A category's months, for deciding what to budget ──
+    app.get<{ Params: CategoryParams; Querystring: { month?: string; months?: number } }>(
+      '/v1/budgets/:budgetId/categories/:id/history',
+      { schema: { querystring: { type: 'object', properties: { month: MONTH, months: { type: 'integer', minimum: 3, maximum: 24, default: 12 } } } } },
+      async (req) => {
+        requireBudget(deps, req, req.params.budgetId);
+        return plan.categoryHistory(req.params.budgetId, req.params.id, req.query.month, req.query.months ?? 12);
+      },
+    );
+
+    // ── Off the books: set aside, left out of reviews, reports and insights ──
+    app.get<{ Params: { budgetId: string } }>('/v1/budgets/:budgetId/off-books', async (req) => {
+      requireBudget(deps, req, req.params.budgetId);
+      return { categoryIds: offBooks.ids(req.params.budgetId) };
+    });
+
+    app.put<{ Params: CategoryParams; Body: { offBooks: boolean } }>(
+      '/v1/budgets/:budgetId/categories/:id/off-books',
+      { schema: { body: { type: 'object', required: ['offBooks'], additionalProperties: false, properties: { offBooks: { type: 'boolean' } } } } },
+      async (req) => {
+        const { budgetId, id } = req.params;
+        requireBudget(deps, req, budgetId, 'member');
+        await deps.host.withBudget(budgetId, 'write', async () => {
+          const cat = (await api.getCategories()).find((c) => c.id === id);
+          if (!cat) throw ApiError.notFound(`Category ${id} not found`);
+          if (cat.is_income) throw ApiError.validation('An income category can’t be off the books.');
+          // Its balance waits in the category instead of coming out of next month's To Budget.
+          if (req.body.offBooks) await api.setBudgetCarryover(new Date().toISOString().slice(0, 7), id, true);
+          await new Promise((r) => setTimeout(r, 0));
+        });
+        const ids = offBooks.set(budgetId, id, req.body.offBooks);
+        audit(deps, req, budgetId, 'category.off_books', id, { offBooks: req.body.offBooks });
+        return { categoryIds: ids };
+      },
+    );
 
     // ── Yearly budgets: a twelfth a month, bills drawn from the rest of the year ──
     app.get<{ Params: { budgetId: string }; Querystring: { month?: string } }>(

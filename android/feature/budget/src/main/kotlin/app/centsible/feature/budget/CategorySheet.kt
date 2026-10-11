@@ -3,6 +3,8 @@ package app.centsible.feature.budget
 import app.centsible.core.designsystem.component.toggleRow
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.background
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -68,6 +70,7 @@ internal fun CategorySheet(
     onSeeTransactions: (() -> Unit)? = null,
     onAutomations: (() -> Unit)? = null,
     onAnnual: (Money?, Int) -> Unit = { _, _ -> },
+    onOffBooks: (Boolean) -> Unit = {},
 ) {
     var mode by remember { mutableStateOf(SheetMode.Details) }
     ModalBottomSheet(
@@ -78,7 +81,7 @@ internal fun CategorySheet(
         Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp).navigationBarsPadding().padding(bottom = 16.dp)) {
             when (mode) {
                 SheetMode.Details -> {
-                    CategoryDetails(category, state, onAssign, onRollover, onMoveMoney = { mode = SheetMode.Move }, onSeeTransactions = onSeeTransactions, onAutomations = onAutomations, onAnnual = onAnnual)
+                    CategoryDetails(category, state, onAssign, onRollover, onMoveMoney = { mode = SheetMode.Move }, onSeeTransactions = onSeeTransactions, onAutomations = onAutomations, onAnnual = onAnnual, onOffBooks = onOffBooks)
                     if (state.canEditNotes) NoteEditor(category.id, state, onSaveNote)
                 }
                 SheetMode.Move -> MoveMoneyForm(category, month, onBack = { mode = SheetMode.Details }, onMove = { from, to, amount ->
@@ -100,6 +103,7 @@ private fun CategoryDetails(
     onSeeTransactions: (() -> Unit)? = null,
     onAutomations: (() -> Unit)? = null,
     onAnnual: (Money?, Int) -> Unit = { _, _ -> },
+    onOffBooks: (Boolean) -> Unit = {},
 ) {
     val colors = CentsibleTheme.colors
     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -123,8 +127,12 @@ private fun CategoryDetails(
     if (!rollover.isZero) DetailRow("Rolled over from last month", rollover)
     HorizontalDivider(Modifier.padding(vertical = 12.dp), color = colors.border)
 
+    var input by remember(category.id, category.budgeted) { mutableStateOf(MoneyInput.toInput(category.budgeted)) }
+    state.history?.takeIf { it.categoryId == category.id }?.let { h ->
+        HistoryPanel(h, onPick = if (state.canEdit) ({ m: Money -> input = MoneyInput.toInput(m) }) else null)
+        HorizontalDivider(Modifier.padding(vertical = 12.dp), color = colors.border)
+    }
     if (state.canEdit) {
-        var input by remember(category.id, category.budgeted) { mutableStateOf(MoneyInput.toInput(category.budgeted)) }
         val parsed = MoneyInput.parse(input)
         Row(verticalAlignment = Alignment.CenterVertically) {
             OutlinedTextField(
@@ -154,6 +162,21 @@ private fun CategoryDetails(
         }
         onSeeTransactions?.let { see ->
             androidx.compose.material3.TextButton(onClick = see, modifier = Modifier.fillMaxWidth()) { Text("See this month's transactions") }
+        }
+        val isIncome = state.data.valueOrNull?.incomeGroups?.any { g -> g.categories.any { it.id == category.id } } == true
+        if (!isIncome) {
+            val off = category.id in state.offBooks
+            Row(Modifier.fillMaxWidth().padding(top = 12.dp).toggleRow(off, !state.saving, onChange = onOffBooks), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("Off the books", style = MaterialTheme.typography.bodyLarge)
+                    Text(
+                        "For transactions to sort out later: left out of the review queue, spending, reports and insights. Rollover goes on so its balance waits here.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = colors.textSecondary,
+                    )
+                }
+                Switch(checked = off, onCheckedChange = null, enabled = !state.saving)
+            }
         }
         if (state.canToggleRollover) {
             Row(Modifier.fillMaxWidth().padding(top = 12.dp).toggleRow(category.carryover, !state.saving, onChange = onRollover), verticalAlignment = Alignment.CenterVertically) {
@@ -342,4 +365,112 @@ private fun YearlyDialog(annual: app.centsible.core.model.AnnualBudget?, onDismi
             }
         },
     )
+}
+
+/**
+ * What this category has cost lately, to decide what to budget: twelve months of spending
+ * as bars (this month in the accent color) with each month's budget as a tick, and the
+ * 3, 6 and 12 month averages. Tapping an average puts it in the budget field.
+ */
+@Composable
+private fun HistoryPanel(h: app.centsible.core.model.CategoryHistory, onPick: ((Money) -> Unit)?) {
+    val colors = CentsibleTheme.colors
+    StatLabel("Last 12 months")
+    SpendingBars(h, Modifier.fillMaxWidth().height(96.dp).padding(top = 8.dp))
+    Row(Modifier.fillMaxWidth().padding(top = 4.dp)) {
+        h.months.forEach { m ->
+            Text(
+                java.time.Month.of(m.month.month).getDisplayName(java.time.format.TextStyle.NARROW, java.util.Locale.getDefault()),
+                style = MaterialTheme.typography.labelSmall,
+                color = if (m.month == h.month) colors.accent else colors.textTertiary,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                modifier = Modifier.weight(1f),
+            )
+        }
+    }
+    Row(Modifier.padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+        androidx.compose.foundation.layout.Box(Modifier.width(12.dp).height(2.dp).background(colors.textPrimary))
+        Text(" budgeted   ", style = MaterialTheme.typography.labelSmall, color = colors.textTertiary)
+        androidx.compose.foundation.layout.Box(Modifier.width(12.dp).height(2.dp).background(colors.positive))
+        Text(" 3-month average", style = MaterialTheme.typography.labelSmall, color = colors.textTertiary)
+    }
+    if (h.monthsOfHistory == 0) {
+        Text("No spending before this month yet.", style = MaterialTheme.typography.bodySmall, color = colors.textTertiary, modifier = Modifier.padding(top = 8.dp))
+        return
+    }
+    Row(Modifier.fillMaxWidth().padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        listOf("3 months" to h.avg3, "6 months" to h.avg6, "12 months" to h.avg12).forEachIndexed { i, (label, amount) ->
+            val n = listOf(3, 6, 12)[i]
+            // Fewer months of history than the window: say so rather than imply more.
+            val enough = h.monthsOfHistory >= n || i == 0
+            AverageChip(
+                if (enough) label else "${h.monthsOfHistory} mo",
+                amount,
+                enabled = onPick != null && (enough || i == 0),
+                onClick = { onPick?.invoke(amount) },
+                modifier = Modifier.weight(1f),
+            )
+        }
+    }
+    Text(
+        "Averages of what was spent each month" + (if (onPick != null) "; tap one to budget it. " else ". ") +
+            "Lowest ${MoneyFormat.format(h.lowest, showCents = false)}, highest ${MoneyFormat.format(h.highest, showCents = false)}.",
+        style = MaterialTheme.typography.bodySmall,
+        color = colors.textTertiary,
+        modifier = Modifier.padding(top = 8.dp),
+    )
+}
+
+@Composable
+private fun AverageChip(label: String, amount: Money, enabled: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val colors = CentsibleTheme.colors
+    Column(
+        modifier
+            .background(colors.cardMuted, androidx.compose.foundation.shape.RoundedCornerShape(12.dp))
+            .clickable(enabled = enabled, onClickLabel = "Budget ${MoneyFormat.format(amount)}", onClick = onClick)
+            .padding(horizontal = 10.dp, vertical = 8.dp),
+    ) {
+        Text(label, style = MaterialTheme.typography.labelSmall, color = colors.textTertiary)
+        Text(MoneyFormat.format(amount, showCents = false), style = MaterialTheme.typography.titleSmall)
+    }
+}
+
+@Composable
+private fun SpendingBars(h: app.centsible.core.model.CategoryHistory, modifier: Modifier) {
+    val colors = CentsibleTheme.colors
+    val max = (h.months.maxOfOrNull { maxOf(it.spent.minor, it.budgeted.minor) } ?: 0L).coerceAtLeast(1L).toFloat()
+    val bar = colors.textTertiary.copy(alpha = 0.45f)
+    val now = colors.accent
+    val tick = colors.textPrimary
+    val avg = colors.positive
+    val avg3 = h.avg3.minor
+    val description = "Spending by month: " + h.months.joinToString { "${it.month.raw} ${MoneyFormat.format(it.spent, showCents = false)}" }
+    androidx.compose.foundation.Canvas(modifier.semantics { contentDescription = description }) {
+        val slot = size.width / h.months.size.coerceAtLeast(1)
+        val w = slot * 0.56f
+        h.months.forEachIndexed { i, m ->
+            val x = slot * i + (slot - w) / 2
+            val bh = size.height * (m.spent.minor.coerceAtLeast(0) / max)
+            if (bh > 0f) {
+                drawRoundRect(
+                    color = if (m.month == h.month) now else bar,
+                    topLeft = androidx.compose.ui.geometry.Offset(x, size.height - bh),
+                    size = androidx.compose.ui.geometry.Size(w, bh),
+                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(4.dp.toPx(), 4.dp.toPx()),
+                )
+            }
+            if (m.budgeted.minor > 0) {
+                val y = size.height * (1f - m.budgeted.minor / max)
+                drawLine(tick, androidx.compose.ui.geometry.Offset(x - 2f, y), androidx.compose.ui.geometry.Offset(x + w + 2f, y), strokeWidth = 2.dp.toPx())
+            }
+        }
+        if (avg3 > 0) {
+            val y = size.height * (1f - avg3 / max)
+            drawLine(
+                avg, androidx.compose.ui.geometry.Offset(0f, y), androidx.compose.ui.geometry.Offset(size.width, y),
+                strokeWidth = 1.5.dp.toPx(),
+                pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(8f, 6f)),
+            )
+        }
+    }
 }

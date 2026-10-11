@@ -2,6 +2,7 @@ import * as api from '@actual-app/api';
 import type { HouseholdStore } from '../auth/store.js';
 import { toTransaction } from '../mappers/index.js';
 import type { ActualHost } from './host.js';
+import { OffBooks } from './off-books.js';
 import { TX_FIELDS } from './transaction-ops.js';
 
 /** How far back a person's inbox starts the first time they open it. */
@@ -22,6 +23,10 @@ export class ReviewOps {
     private readonly store: HouseholdStore,
     private readonly now: () => number = Date.now,
   ) {}
+
+  private get offBooks() {
+    return new OffBooks(this.store);
+  }
 
   private since(memberId: string, budgetId: string) {
     let since = this.store.reviewSince(memberId, budgetId);
@@ -51,7 +56,9 @@ export class ReviewOps {
         .limit(SCAN + reviewed.size)
         .select([...TX_FIELDS, 'sort_order']),
     )) as { data: Raw[] };
-    return { since, rows: data.filter((r) => !reviewed.has(String(r.id))) };
+    // Off the books: set aside on purpose, so not for review.
+    const offBooks = new Set(this.offBooks.ids(budgetId));
+    return { since, rows: data.filter((r) => !reviewed.has(String(r.id)) && !offBooks.has(String(r.category))) };
   }
 
   inbox(budgetId: string, memberId: string, limit: number) {

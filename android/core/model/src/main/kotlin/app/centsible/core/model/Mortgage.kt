@@ -90,3 +90,20 @@ data class AnnualBudget(
     val budgeted: Money,
     val suggested: Money,
 )
+
+/** A category's months, for deciding what to budget. Spent is positive when money went out. */
+data class CategoryHistory(
+    val categoryId: CategoryId,
+    val month: YearMonth,
+    /** Oldest first, ending with [month]. */
+    val months: List<Month>,
+    val avg3: Money,
+    val avg6: Money,
+    val avg12: Money,
+    /** Finished months since the first with activity. */
+    val monthsOfHistory: Int,
+    val highest: Money,
+    val lowest: Money,
+) {
+    data class Month(val month: YearMonth, val spent: Money, val budgeted: Money)
+}

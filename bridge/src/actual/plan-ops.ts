@@ -2,6 +2,7 @@ import * as api from '@actual-app/api';
 import { ApiError } from '../errors.js';
 import type { BudgetOps } from './budget-ops.js';
 import type { ActualHost } from './host.js';
+import type { OffBooks } from './off-books.js';
 import { estimateFor } from './recurring-patterns.js';
 import { dateRange } from './report-ops.js';
 import { fromActual, toActual, type AutomationDto } from './automation-ops.js';
@@ -52,18 +53,62 @@ export class PlanOps {
   constructor(
     private readonly host: ActualHost,
     private readonly budgets: BudgetOps,
+    private readonly offBooks?: OffBooks,
   ) {}
+
+  // ── A category's story: what it's cost, month by month ─────────────────────
+
+  /**
+   * Budgeted and spent for each of the [count] months up to [month], and the average spent
+   * over the 3, 6 and 12 finished months before it, for deciding what to budget. Averages
+   * count months since the category first had activity (a new category isn't dragged down
+   * by months it didn't exist).
+   */
+  categoryHistory(budgetId: string, categoryId: string, month = currentMonth(), count = 12) {
+    return this.host.withBudget(budgetId, 'read', async () => {
+      const cat = (await api.getCategories()).find((c) => c.id === categoryId);
+      if (!cat) throw ApiError.notFound(`Category ${categoryId} not found`);
+      const available = new Set(await api.getBudgetMonths());
+      const window = [...Array(count).keys()].map((i) => addMonths(month, i - count + 1)).filter((m) => available.has(m));
+      const rows = [];
+      for (const m of window) {
+        const raw = (await api.getBudgetMonth(m)) as Raw;
+        let found: Raw | null = null;
+        for (const g of (raw.categoryGroups as Raw[] | undefined) ?? []) for (const c of (g.categories as Raw[] | undefined) ?? []) if (c.id === categoryId) found = c;
+        rows.push({ month: m, spent: -num(found?.spent), budgeted: num(found?.budgeted), balance: num(found?.balance) });
+      }
+      // Finished months only (not the one being decided), from the first with activity.
+      const finished = rows.filter((r) => r.month < month);
+      const first = finished.findIndex((r) => r.spent !== 0 || r.budgeted !== 0);
+      const active = first < 0 ? [] : finished.slice(first);
+      const avg = (n: number) => {
+        const last = active.slice(-n);
+        return last.length ? Math.round(last.reduce((s, r) => s + r.spent, 0) / last.length) : 0;
+      };
+      const spentMonths = active.map((r) => r.spent);
+      return {
+        categoryId,
+        name: cat.name,
+        month,
+        months: rows,
+        averages: { avg3: avg(3), avg6: avg(6), avg12: avg(12) },
+        monthsOfHistory: active.length,
+        highest: spentMonths.length ? Math.max(...spentMonths) : 0,
+        lowest: spentMonths.length ? Math.min(...spentMonths) : 0,
+      };
+    });
+  }
 
   // ── Autopilot ────────────────────────────────────────────────────────────
 
   autopilot(budgetId: string, month: string) {
-    return this.host.withBudget(budgetId, 'read', () => this.readAutopilot(month));
+    return this.host.withBudget(budgetId, 'read', () => this.readAutopilot(budgetId, month));
   }
 
   /** Sets the chosen categories (default: every one whose suggestion differs) to the suggestion. */
   applyAutopilot(budgetId: string, month: string, basis: Basis, categoryIds?: string[]) {
     return this.host.withBudget(budgetId, 'write', async () => {
-      const plan = await this.readAutopilot(month);
+      const plan = await this.readAutopilot(budgetId, month);
       if (categoryIds?.some((id) => !plan.suggestions.some((s) => s.categoryId === id))) throw ApiError.validation('Choose budgeted expense categories.');
       const chosen = plan.suggestions.filter((s) => (categoryIds ? categoryIds.includes(s.categoryId) : s.suggested[`avg${basis}`] !== s.budgeted));
       for (const s of chosen) await api.setBudgetAmount(month, s.categoryId, s.suggested[`avg${basis}`]);
@@ -75,7 +120,7 @@ export class PlanOps {
   /** Moves money into every overspent category: first from To Budget, then from the categories with the most left. */
   coverOverspending(budgetId: string, month: string) {
     return this.host.withBudget(budgetId, 'write', async (lib) => {
-      const plan = await this.readAutopilot(month);
+      const plan = await this.readAutopilot(budgetId, month);
       const prefs = (await api.getPreferences()) as Raw;
       const currencyCode = typeof prefs.defaultCurrencyCode === 'string' ? prefs.defaultCurrencyCode : '';
       for (const m of plan.cover.moves) {
@@ -86,14 +131,16 @@ export class PlanOps {
     });
   }
 
-  private async readAutopilot(month: string) {
+  private async readAutopilot(budgetId: string, month: string) {
     const months = await api.getBudgetMonths();
     if (!months.includes(month)) throw ApiError.notFound(`No budget data for ${month}`);
     // Averages look back from last month, never past the current month (as Actual's do).
     const anchor = month > currentMonth() ? currentMonth() : month;
     const past = [...Array(12).keys()].map((i) => addMonths(anchor, -(i + 1))).filter((m) => months.includes(m));
     const [current, ...history] = (await Promise.all([month, ...past].map((m) => api.getBudgetMonth(m)))) as Raw[];
-    const cats = expenseCategories(current!);
+    // Off the books: set aside on purpose, not something to budget for.
+    const hidden = new Set(this.offBooks?.ids(budgetId) ?? []);
+    const cats = expenseCategories(current!).filter((c) => !hidden.has(c.id));
     const historyCats = history.map(expenseCategories);
     const toBudget = num(current!.toBudget);
 

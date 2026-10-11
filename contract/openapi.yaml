@@ -1518,6 +1518,62 @@ paths:
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
 
+  /v1/budgets/{budgetId}/categories/{id}/history:
+    get:
+      tags: [plan]
+      operationId: categoryHistory
+      summary: "Budgeted and spent for each month up to `month` (12 by default), and the average spent over the 3, 6 and 12 finished months before it, counted from the category's first month with activity: for deciding what to budget."
+      parameters:
+        - $ref: '#/components/parameters/BudgetId'
+        - { name: id, in: path, required: true, schema: { type: string } }
+        - { name: month, in: query, schema: { $ref: '#/components/schemas/Month' } }
+        - { name: months, in: query, schema: { type: integer, minimum: 3, maximum: 24, default: 12 } }
+      responses:
+        '200':
+          description: History
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CategoryHistory' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '423': { $ref: '#/components/responses/Problem' }
+
+  /v1/budgets/{budgetId}/off-books:
+    get:
+      tags: [plan]
+      operationId: listOffBooks
+      summary: "Categories kept off the books: a holding place (say, for transactions still to be matched). The bridge leaves them out of the review queue, reports, insights, reviews, subscriptions and autopilot. In Actual they're ordinary categories with rollover on."
+      parameters:
+        - $ref: '#/components/parameters/BudgetId'
+      responses:
+        '200':
+          description: The categories
+          content:
+            application/json:
+              schema: { type: object, required: [categoryIds], properties: { categoryIds: { type: array, items: { type: string } } } }
+
+  /v1/budgets/{budgetId}/categories/{id}/off-books:
+    put:
+      tags: [plan]
+      operationId: setOffBooks
+      summary: Members. Puts a category off the books (turning rollover on, so its balance waits there) or back on.
+      parameters:
+        - $ref: '#/components/parameters/BudgetId'
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [offBooks], properties: { offBooks: { type: boolean } } }
+      responses:
+        '200':
+          description: All off-the-books categories now
+          content:
+            application/json:
+              schema: { type: object, required: [categoryIds], properties: { categoryIds: { type: array, items: { type: string } } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+
   /v1/budgets/{budgetId}/annual-budgets:
     get:
       tags: [plan]
@@ -2852,6 +2908,34 @@ components:
         reimportDeleted: { type: boolean, description: Bring back bank transactions you deleted }
         updateDates: { type: boolean, description: Update dates of already-imported transactions }
         mapping: { $ref: '#/components/schemas/SyncMappings' }
+    CategoryHistory:
+      type: object
+      required: [categoryId, name, month, months, averages, monthsOfHistory, highest, lowest]
+      properties:
+        categoryId: { type: string }
+        name: { type: string }
+        month: { $ref: '#/components/schemas/Month' }
+        months:
+          type: array
+          description: Oldest first, ending with `month`
+          items:
+            type: object
+            required: [month, spent, budgeted, balance]
+            properties:
+              month: { $ref: '#/components/schemas/Month' }
+              spent: { type: integer, description: Positive when money went out }
+              budgeted: { type: integer }
+              balance: { type: integer }
+        averages:
+          type: object
+          required: [avg3, avg6, avg12]
+          properties:
+            avg3: { type: integer }
+            avg6: { type: integer }
+            avg12: { type: integer }
+        monthsOfHistory: { type: integer, description: Finished months since the first with activity }
+        highest: { type: integer }
+        lowest: { type: integer }
     AnnualBudget:
       type: object
       required: [categoryId, name, amount, startMonth, monthIndex, budgetedBefore, remaining, spentThisMonth, carryIn, budgeted, suggested]

@@ -38,6 +38,11 @@ interface PlanAheadGateway {
     /** Takes unrecorded payments' principal off the loan account; returns how many. */
     suspend fun recordPrincipal(budget: BudgetId, id: String): Int
 
+    suspend fun categoryHistory(budget: BudgetId, category: CategoryId, month: YearMonth): app.centsible.core.model.CategoryHistory
+    /** Categories kept off the books (out of reviews, reports and insights). */
+    suspend fun offBooks(budget: BudgetId): Set<CategoryId>
+    suspend fun setOffBooks(budget: BudgetId, category: CategoryId, offBooks: Boolean)
+
     suspend fun annualBudgets(budget: BudgetId, month: YearMonth): List<app.centsible.core.model.AnnualBudget>
     /** Sets a yearly amount (and applies it to this month); null amount removes it. */
     suspend fun setAnnualBudget(budget: BudgetId, category: CategoryId, amount: app.centsible.core.model.Money?, startMonth: Int = 1)

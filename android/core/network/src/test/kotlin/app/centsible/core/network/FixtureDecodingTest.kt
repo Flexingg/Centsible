@@ -28,6 +28,7 @@ class FixtureDecodingTest {
         "targets" to TargetsDto.serializer(),
         "mortgage" to MortgageDto.serializer(),
         "annual-budgets" to AnnualBudgetsDto.serializer(),
+        "category-history" to CategoryHistoryDto.serializer(),
         "home-layout" to HomeLayoutDto.serializer(),
         "appearance" to AppearanceListDto.serializer(),
         "rule-preview" to RulePreviewDto.serializer(),

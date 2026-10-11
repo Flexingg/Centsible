@@ -1,5 +1,6 @@
 import * as api from '@actual-app/api';
 import { ApiError } from '../errors.js';
+import type { OffBooks } from './off-books.js';
 import type { ActualHost } from './host.js';
 
 type Row = Record<string, unknown>;
@@ -36,7 +37,16 @@ export const BUDGET_FLOW = { 'account.offbudget': false, transfer_id: null, star
 
 /** Tier 2: reports are AQL aggregations, computed by Actual's query engine. */
 export class ReportOps {
-  constructor(private readonly host: ActualHost) {}
+  constructor(
+    private readonly host: ActualHost,
+    private readonly offBooks?: OffBooks,
+  ) {}
+
+  /** [range] plus "not off the books" (both are $and lists, so they're joined, not overwritten). */
+  private scoped(budgetId: string, range: Record<string, unknown>) {
+    const hidden = (this.offBooks?.filter(budgetId).$and as unknown[] | undefined) ?? [];
+    return { $and: [...((range.$and as unknown[] | undefined) ?? []), ...hidden] };
+  }
 
   cashFlow(budgetId: string, start: string, end: string) {
     return this.host.withBudget(budgetId, 'read', async () => {
@@ -44,7 +54,7 @@ export class ReportOps {
       const { data } = (await api.aqlQuery(
         api
           .q('transactions')
-          .filter({ ...BUDGET_FLOW, ...dateRange(`${start}-01`, lastDay(end)) })
+          .filter({ ...BUDGET_FLOW, ...this.scoped(budgetId, dateRange(`${start}-01`, lastDay(end))) })
           .groupBy([{ $month: '$date' }, 'category.is_income'])
           .select([{ month: { $month: '$date' } }, { isIncome: 'category.is_income' }, { amount: { $sum: '$amount' } }]),
       )) as { data: Row[] };
@@ -65,7 +75,7 @@ export class ReportOps {
         api.aqlQuery(
           api
             .q('transactions')
-            .filter({ ...BUDGET_FLOW, ...dateRange(`${start}-01`, lastDay(end)), $or: [{ category: null }, { 'category.is_income': false }] })
+            .filter({ ...BUDGET_FLOW, ...this.scoped(budgetId, dateRange(`${start}-01`, lastDay(end))), $or: [{ category: null }, { 'category.is_income': false }] })
             .groupBy(['category'])
             .select(['category', { amount: { $sum: '$amount' } }]),
         ) as Promise<{ data: Row[] }>,
@@ -98,6 +108,8 @@ export class ReportOps {
         api.aqlQuery(
           api
             .q('transactions')
+            // Like account balances: as of today, so an entry dated later this month isn't counted yet.
+            .filter({ date: { $lte: now.toISOString().slice(0, 10) } })
             .options({ splits: 'none' })
             .groupBy(['account', { $month: '$date' }])
             .select(['account', { month: { $month: '$date' } }, { amount: { $sum: '$amount' } }]),

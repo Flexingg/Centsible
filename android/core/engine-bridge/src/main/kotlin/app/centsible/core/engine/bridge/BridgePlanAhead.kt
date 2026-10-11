@@ -92,6 +92,21 @@ class BridgePlanAhead(private val api: PlanningApi, private val onWrite: () -> U
         onWrite()
     }
 
+    override suspend fun categoryHistory(budget: BudgetId, category: CategoryId, month: YearMonth) = api.categoryHistory(budget.raw, category.raw, month.raw).let { d ->
+        app.centsible.core.model.CategoryHistory(
+            CategoryId(d.categoryId), YearMonth(d.month),
+            d.months.map { app.centsible.core.model.CategoryHistory.Month(YearMonth(it.month), Money(it.spent), Money(it.budgeted)) },
+            Money(d.averages.avg3), Money(d.averages.avg6), Money(d.averages.avg12), d.monthsOfHistory, Money(d.highest), Money(d.lowest),
+        )
+    }
+
+    override suspend fun offBooks(budget: BudgetId) = api.offBooks(budget.raw).categoryIds.map(::CategoryId).toSet()
+
+    override suspend fun setOffBooks(budget: BudgetId, category: CategoryId, offBooks: Boolean) {
+        api.setOffBooks(budget.raw, category.raw, app.centsible.core.network.OffBooksBodyDto(offBooks))
+        onWrite()
+    }
+
     override suspend fun annualBudgets(budget: BudgetId, month: YearMonth) = api.annualBudgets(budget.raw, month.raw).items.map {
         app.centsible.core.model.AnnualBudget(CategoryId(it.categoryId), Money(it.amount), it.startMonth, it.monthIndex, Money(it.remaining), Money(it.budgeted), Money(it.suggested))
     }

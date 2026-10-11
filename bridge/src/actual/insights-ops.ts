@@ -2,6 +2,7 @@ import * as api from '@actual-app/api';
 import type { HouseholdStore } from '../auth/store.js';
 import { ApiError } from '../errors.js';
 import type { ActualHost } from './host.js';
+import { OffBooks } from './off-books.js';
 import { findPatterns } from './recurring-patterns.js';
 import { BUDGET_FLOW, dateRange, lastDay } from './report-ops.js';
 
@@ -33,14 +34,15 @@ const median = (xs: number[]) => {
 const pct = (now: number, before: number) => (before === 0 ? null : Math.round(((now - before) / Math.abs(before)) * 100));
 
 /** Money in and out of the budget over [from, to]: on-budget, no transfers or starting balances, split children. */
-async function flows(from: string, to: string): Promise<Flow[]> {
+async function flows(from: string, to: string, offBooks: string[] = []): Promise<Flow[]> {
   const { data } = (await api.aqlQuery(
     api
       .q('transactions')
       .filter({ ...BUDGET_FLOW, ...dateRange(from, to) })
       .select(['id', 'date', 'amount', 'payee', 'payee.name', 'category', 'category.name', 'category.is_income']),
   )) as { data: Raw[] };
-  return data.map((r) => ({
+  const hidden = new Set(offBooks);
+  return data.filter((r) => !hidden.has(String(r.category))).map((r) => ({
     id: String(r.id),
     date: String(r.date),
     amount: Number(r.amount),
@@ -84,6 +86,10 @@ export class InsightsOps {
     private readonly store: HouseholdStore,
   ) {}
 
+  private get offBooks() {
+    return new OffBooks(this.store);
+  }
+
   // ── #10 Trends and alerts ──────────────────────────────────────────────
 
   insights(budgetId: string, month = today().slice(0, 7)) {
@@ -94,7 +100,7 @@ export class InsightsOps {
       const days = daysIn(month);
       const elapsed = month === current ? Number(now.slice(8)) : days;
       const since = `${addMonths(month, -12)}-01`;
-      const all = await flows(since, month === current ? now : lastDay(month));
+      const all = await flows(since, month === current ? now : lastDay(month), this.offBooks.ids(budgetId));
       const inMonth = all.filter((f) => f.date.startsWith(month));
       const typicalMonths = [1, 2, 3].map((i) => addMonths(month, -i));
 
@@ -247,8 +253,10 @@ export class InsightsOps {
           .q('transactions')
           .filter({ date: { $gte: since }, transfer_id: null, is_child: false, starting_balance_flag: false, payee: { $ne: null }, 'account.closed': false })
           .options({ splits: 'inline' })
-          .select(['date', 'amount', 'payee', 'account']),
+          .select(['date', 'amount', 'payee', 'account', 'category']),
       )) as { data: Raw[] };
+      const offBooks = new Set(this.offBooks.ids(budgetId));
+      history.splice(0, history.length, ...history.filter((r) => !offBooks.has(String(r.category))));
       const scheduled = new Set(((await api.getSchedules()) as unknown as Raw[]).filter((s) => !s.completed).map((s) => String(s.payee)));
       const patterns = [];
       for (const p of findPatterns(
@@ -301,8 +309,8 @@ export class InsightsOps {
       const prev = periodRange(period, iso(Date.parse(`${range.start}T00:00:00Z`) - DAY));
       const prevEnd = complete ? prev.end : minDate(prev.end, iso(Date.parse(`${prev.start}T00:00:00Z`) + (elapsedDays - 1) * DAY));
       const [all, previous, { data: months0 }] = await Promise.all([
-        flows(range.start, end),
-        flows(prev.start, prevEnd),
+        flows(range.start, end, this.offBooks.ids(budgetId)),
+        flows(prev.start, prevEnd, this.offBooks.ids(budgetId)),
         api.aqlQuery(api.q('transactions').filter(BUDGET_FLOW).groupBy([{ $month: '$date' }]).select([{ month: { $month: '$date' } }])) as Promise<{ data: Raw[] }>,
       ]);
       const availableYears = [...new Set(months0.map((r) => Number(String(r.month).slice(0, 4))))].filter(Number.isFinite).sort((a, b) => b - a);

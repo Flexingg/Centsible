@@ -65,3 +65,30 @@ sealed interface BudgetPot {
     data object ToBudget : BudgetPot
     data class Envelope(val id: CategoryId) : BudgetPot
 }
+
+/**
+ * The month without [hidden] categories (kept off the books): they leave their groups,
+ * and their budgeted, spent and balance come off the group and month totals. For what
+ * the app shows (the Home dial, spending summaries); Actual's own numbers are untouched.
+ */
+fun BudgetMonth.withoutCategories(hidden: Set<CategoryId>): BudgetMonth {
+    if (hidden.isEmpty()) return this
+    val gone = groups.flatMap { g -> g.categories.filter { it.id in hidden } }
+    if (gone.isEmpty()) return this
+    fun sum(f: (BudgetCategory) -> Money) = Money(gone.sumOf { f(it).minor })
+    return copy(
+        totalBudgeted = Money(totalBudgeted.minor - sum { it.budgeted }.minor),
+        totalSpent = Money(totalSpent.minor - sum { it.spent }.minor),
+        totalBalance = Money(totalBalance.minor - sum { it.balance }.minor),
+        groups = groups.map { g ->
+            val out = g.categories.filter { it.id in hidden }
+            if (out.isEmpty()) g
+            else g.copy(
+                budgeted = Money(g.budgeted.minor - out.sumOf { it.budgeted.minor }),
+                spent = Money(g.spent.minor - out.sumOf { it.spent.minor }),
+                balance = Money(g.balance.minor - out.sumOf { it.balance.minor }),
+                categories = g.categories - out.toSet(),
+            )
+        },
+    )
+}

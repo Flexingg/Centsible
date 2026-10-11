@@ -131,6 +131,7 @@ class RequestContractTest {
         call { planning.deleteMortgage(b, "m1") }
         call { planning.setAnnualBudget(b, "c1", AnnualBudgetInputDto(120_000, 7)) }
         call { planning.removeAnnualBudget(b, "c1") }
+        call { planning.setOffBooks(b, "c1", OffBooksBodyDto(true)) }
         // Just an emoji, or just a color: the other field is left out of the JSON.
         val personal = PersonalApi(client)
         call { personal.setAppearance(b, "c1", AppearanceBodyDto(color = null, emoji = "🍋")) }

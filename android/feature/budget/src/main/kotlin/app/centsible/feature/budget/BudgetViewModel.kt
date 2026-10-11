@@ -53,6 +53,10 @@ data class BudgetUiState(
     val cover: Loadable<Autopilot>? = null,
     /** Yearly budgets by category id (bridge-kept). */
     val annual: Map<String, app.centsible.core.model.AnnualBudget> = emptyMap(),
+    /** Categories kept off the books: shown apart, out of the totals. */
+    val offBooks: Set<CategoryId> = emptySet(),
+    /** The open category's months and averages. */
+    val history: app.centsible.core.model.CategoryHistory? = null,
 ) {
     val hasPrevious get() = availableMonths.any { it < month }
     val hasNext get() = availableMonths.any { it > month }
@@ -102,6 +106,21 @@ class BudgetViewModel @Inject constructor(
     fun nextMonth() = changeMonth(+1)
     fun refresh() = viewModelScope.launch { load(refreshing = true) }
 
+    private fun loadHistory(id: CategoryId) = viewModelScope.launch {
+        val month = state.value.month
+        runCatching { planAhead.categoryHistory(budget, id, month) }
+            .onSuccess { h -> if (state.value.selectedCategory == id) state.update { it.copy(history = h) } }
+    }
+
+    /** Off the books: set aside, out of reviews, reports, insights and these totals. */
+    fun setOffBooks(id: CategoryId, on: Boolean) = viewModelScope.launch {
+        state.update { it.copy(saving = true, offBooks = if (on) it.offBooks + id else it.offBooks - id) }
+        runCatching { planAhead.setOffBooks(budget, id, on) }
+            .onSuccess { state.update { it.copy(saving = false, message = if (on) "Off the books: left out of reviews, reports and spending" else "Back on the books") } }
+            .onFailure { e -> state.update { it.copy(saving = false, message = e.userMessage(), offBooks = if (on) it.offBooks - id else it.offBooks + id) } }
+        load(refreshing = true)
+    }
+
     /** A yearly amount for the category (null stops it); this month follows right away. */
     fun setAnnual(category: CategoryId, amount: Money?, startMonth: Int) = viewModelScope.launch {
         state.update { it.copy(saving = true) }
@@ -111,7 +130,8 @@ class BudgetViewModel @Inject constructor(
         load(refreshing = true)
     }
     fun openCategory(id: CategoryId?) {
-        state.update { it.copy(selectedCategory = id, note = null, noteLoaded = false) }
+        state.update { it.copy(selectedCategory = id, note = null, noteLoaded = false, history = it.history?.takeIf { h -> h.categoryId == id }) }
+        if (id != null) loadHistory(id)
         if (id != null && state.value.canEditNotes) viewModelScope.launch {
             val note = runCatching { planning.categoryNote(budget, id) }.getOrNull()
             if (state.value.selectedCategory == id) state.update { it.copy(note = note, noteLoaded = true) }
@@ -218,6 +238,7 @@ class BudgetViewModel @Inject constructor(
         val month = state.value.month
         runCatching { engine.budgetMonth(budget, month) }
             .onSuccess { m -> if (state.value.month == month) state.update { it.copy(data = Loadable.Ready(m)) } }
+        runCatching { planAhead.offBooks(budget) }.onSuccess { o -> state.update { it.copy(offBooks = o) } }
         // An older bridge has no yearly budgets: the rest still loads.
         runCatching { planAhead.annualBudgets(budget, month) }
             .onSuccess { a -> if (state.value.month == month) state.update { it.copy(annual = a.associateBy { x -> x.categoryId.raw }) } }

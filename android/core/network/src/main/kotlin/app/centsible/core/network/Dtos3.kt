@@ -111,6 +111,20 @@ import kotlinx.serialization.Serializable
     val homeValue: Long? = null,
 )
 @Serializable data class HomeValueDto(val value: Long)
+@Serializable data class HistoryMonthDto(val month: String, val spent: Long = 0, val budgeted: Long = 0, val balance: Long = 0)
+@Serializable data class HistoryAveragesDto(val avg3: Long = 0, val avg6: Long = 0, val avg12: Long = 0)
+@Serializable data class CategoryHistoryDto(
+    val categoryId: String,
+    val name: String = "",
+    val month: String,
+    val months: List<HistoryMonthDto> = emptyList(),
+    val averages: HistoryAveragesDto = HistoryAveragesDto(),
+    val monthsOfHistory: Int = 0,
+    val highest: Long = 0,
+    val lowest: Long = 0,
+)
+@Serializable data class OffBooksDto(val categoryIds: List<String> = emptyList())
+@Serializable data class OffBooksBodyDto(val offBooks: Boolean)
 @Serializable data class AnnualBudgetDto(
     val categoryId: String,
     val name: String = "",
