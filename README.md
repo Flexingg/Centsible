@@ -36,6 +36,19 @@ The **bridge** is a small Node service. It wraps Actual's official API behind a 
 
 The setup code works once, until the first owner exists; knowing the bridge's address isn't enough to claim it. Prefer the command line? `docker compose exec bridge node dist/admin/cli.js add-member --name "Jo" --role owner --pair` still prints an owner invite QR code.
 
+## Links into the app
+
+Other apps (Home Assistant dashboards and notifications, launcher shortcuts) can open a screen directly:
+
+| Link | Opens |
+|---|---|
+| `centsible://open/review` | your review inbox |
+| `centsible://open/transactions`, `/accounts`, `/budget`, `/net-worth`, `/recurring`, `/trends`, `/bank-sync`, `/mortgage` | that screen |
+| `centsible://open/account/<account id>` | one account |
+| `centsible://open/category/<category id>?name=Groceries[&month=2026-11]` | a category's transactions |
+
+Links only navigate; the app lock still applies. From a Home Assistant dashboard or notification, use the intent form so the link always reaches the app: `intent://open/review#Intent;scheme=centsible;package=app.centsible.budget;end`. The [Home Assistant integration](https://github.com/Flexingg/centsible-homeassistant) shows each account's and category's id as an attribute.
+
 ## Releases
 
 Update the server with `docker compose pull && docker compose up -d`.

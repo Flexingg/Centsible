@@ -168,6 +168,8 @@ private fun MainScaffold(
             else -> if (openScreen?.startsWith("review:") == true) {
                 val (_, period, date) = openScreen.split(':') + listOf("", "")
                 nav.navigate(Routes.review(period, date)) { launchSingleTop = true }
+            } else if (openScreen != null) {
+                app.centsible.core.domain.AppLinks.parse(openScreen)?.let { nav.open(it) }
             }
         }
         if (openScreen != null) onOpened()
@@ -390,6 +392,31 @@ private fun NavHostController.goToTab(route: String) = navigate(route) {
     popUpTo(graph.findStartDestination().id) { saveState = true }
     launchSingleTop = true
     restoreState = true
+}
+
+private fun NavHostController.open(link: app.centsible.core.domain.AppLink) {
+    val S = app.centsible.core.domain.AppLink.Screen
+    when (link) {
+        is app.centsible.core.domain.AppLink.To -> when (link.screen) {
+            S.Review -> go(Destination.Review)
+            S.Transactions -> go(Destination.Transactions)
+            S.Accounts -> go(Destination.Accounts)
+            S.Budget -> go(Destination.Budget)
+            S.NetWorth -> go(Destination.NetWorth)
+            S.Recurring -> go(Destination.Recurring)
+            S.Trends -> go(Destination.Trends)
+            S.BankSync -> navigate(Routes.BANK_SYNC) { launchSingleTop = true }
+            S.Mortgage -> navigate(Routes.MORTGAGE) { launchSingleTop = true }
+        }
+        is app.centsible.core.domain.AppLink.Account -> go(Destination.Account(app.centsible.core.model.AccountId(link.id)))
+        is app.centsible.core.domain.AppLink.Category -> {
+            val id = app.centsible.core.model.CategoryId(link.id)
+            go(
+                link.month?.let { Destination.TransactionsFor.month(link.name, app.centsible.core.model.YearMonth(it), categoryId = id) }
+                    ?: Destination.TransactionsFor(link.name, categoryId = id),
+            )
+        }
+    }
 }
 
 private fun NavHostController.go(d: Destination) = when (d) {

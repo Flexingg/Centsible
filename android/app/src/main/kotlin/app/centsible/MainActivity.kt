@@ -25,7 +25,7 @@ class MainActivity : ComponentActivity() {
     @Inject lateinit var appLock: AppLockSettings
 
     private var pairingLink by mutableStateOf<String?>(null)
-    /** Set by a tapped bill reminder; the app opens Recurring once, then clears it. */
+    /** Set by a tapped reminder or a centsible://open link; the app opens it once, then clears it. */
     private var openScreen by mutableStateOf<String?>(null)
     /** null until the setting is read: show nothing rather than flash balances or a prompt. */
     private var locked by mutableStateOf<Boolean?>(null)
@@ -46,7 +46,7 @@ class MainActivity : ComponentActivity() {
         splash = savedInstanceState == null
         enableEdgeToEdge()
         pairingLink = intent?.pairingLink()
-        openScreen = intent?.getStringExtra(EXTRA_OPEN)
+        openScreen = intent?.appLink() ?: intent?.getStringExtra(EXTRA_OPEN)
         lifecycleScope.launch {
             locked = AppLockPolicy.shouldLock(appLock.enabled.first(), backgroundedAt = null, now = SystemClock.elapsedRealtime())
             appLock.enabled.collect { enabled ->
@@ -84,8 +84,11 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         intent.pairingLink()?.let { pairingLink = it }
-        intent.getStringExtra(EXTRA_OPEN)?.let { openScreen = it }
+        (intent.appLink() ?: intent.getStringExtra(EXTRA_OPEN))?.let { openScreen = it }
     }
 
     private fun Intent.pairingLink(): String? = data?.takeIf { it.scheme == "actualbridge" }?.toString()
+
+    /** centsible://open/... links are handed to the app as the screen to open. */
+    private fun Intent.appLink(): String? = data?.takeIf { it.scheme == app.centsible.core.domain.AppLinks.SCHEME }?.toString()
 }
