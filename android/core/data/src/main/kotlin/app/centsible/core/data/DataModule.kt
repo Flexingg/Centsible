@@ -83,6 +83,11 @@ abstract class DataModule {
 
         @Provides
         @Singleton
+        fun teller(api: PlanningApi, changes: NotifyingBudgetEngine): app.centsible.core.domain.TellerGateway =
+            app.centsible.core.engine.bridge.BridgeTeller(api, changes::notifyChanged)
+
+        @Provides
+        @Singleton
         fun planning(api: PlanningApi, changes: NotifyingBudgetEngine): PlanningGateway = BridgePlanningGateway(api, changes::notifyChanged)
 
         @Provides

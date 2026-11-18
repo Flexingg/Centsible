@@ -18,10 +18,14 @@ import type { ActualHost } from './host.js';
 export class BudgetOps {
   constructor(private readonly host: ActualHost) {}
 
+  /** Bank links Actual doesn't know about (Teller), shown as each account's sync source. */
+  syncOverlay?: (budgetId: string) => Map<string, { syncSource: string | null; lastSync: string | null; bankSyncStatus: string | null }>;
+
   accounts(budgetId: string) {
     return this.host.withBudget(budgetId, 'read', async () => {
       const accounts = await api.getAccounts(); // tier 1
       const sync = await AccountOps.syncInfo(); // tier 2: bank link status
+      for (const [id, info] of this.syncOverlay?.(budgetId) ?? []) sync.set(id, info);
       return Promise.all(accounts.map(async (a) => toAccount(a, await api.getAccountBalance(a.id), sync.get(a.id))));
     });
   }

@@ -84,15 +84,18 @@ export class BankSyncScheduler {
     try {
       this.store.setSetting('bank_sync.last_run_at', new Date(this.now()).toISOString());
       const used = this.store.simpleFinRequestsToday();
-      if (used >= SIMPLEFIN_DAILY_QUOTA - HEADROOM) {
-        const result = { newTransactions: 0, accounts: 0, errors: [], skipped: `Skipped: ${used} SimpleFIN requests in the last day (SimpleFIN allows about ${SIMPLEFIN_DAILY_QUOTA}).` };
+      const quotaLeft = used < SIMPLEFIN_DAILY_QUOTA - HEADROOM;
+      const skippedNote = `Skipped SimpleFIN: ${used} SimpleFIN requests in the last day (SimpleFIN allows about ${SIMPLEFIN_DAILY_QUOTA}).`;
+      // Teller has no such quota: when SimpleFIN must wait, Teller accounts still sync.
+      if (!quotaLeft && !this.ops.teller?.hasLinks()) {
+        const result = { newTransactions: 0, accounts: 0, errors: [], skipped: skippedNote.replace('Skipped SimpleFIN', 'Skipped') };
         this.store.setSetting('bank_sync.last_result', result);
         this.log.warn(result, 'scheduled bank sync skipped');
         return result;
       }
-      const result = { newTransactions: 0, accounts: 0, errors: [] as string[], skipped: null };
+      const result = { newTransactions: 0, accounts: 0, errors: [] as string[], skipped: quotaLeft ? null : skippedNote };
       for (const budget of await this.host.listBudgets()) {
-        const summary = await this.runJob(budget.id).catch((err: unknown) => {
+        const summary = await this.runJob(budget.id, quotaLeft).catch((err: unknown) => {
           const message = err instanceof Error ? err.message : String(err);
           // A budget with nothing linked isn't an error worth reporting.
           if (!/No accounts are linked/.test(message)) result.errors.push(`${budget.name}: ${message}`);
@@ -112,10 +115,10 @@ export class BankSyncScheduler {
   }
 
   /** Same job as the app's button, so a phone opening the app sees it in progress. */
-  private runJob(budgetId: string): Promise<SyncSummary> {
+  private runJob(budgetId: string, simplefin = true): Promise<SyncSummary> {
     return new Promise((resolve, reject) => {
       const existing = this.jobs.running('bank-sync', budgetId);
-      const job = existing ?? this.jobs.start('bank-sync', budgetId, () => this.ops.syncAll(budgetId));
+      const job = existing ?? this.jobs.start('bank-sync', budgetId, () => this.ops.syncAll(budgetId, { simplefin }));
       const poll = setInterval(() => {
         if (job.status === 'running') return;
         clearInterval(poll);

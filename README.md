@@ -36,6 +36,19 @@ The **bridge** is a small Node service. It wraps Actual's official API behind a 
 
 The setup code works once, until the first owner exists; knowing the bridge's address isn't enough to claim it. Prefer the command line? `docker compose exec bridge node dist/admin/cli.js add-member --name "Jo" --role owner --pair` still prints an owner invite QR code.
 
+## Bank sync: SimpleFIN and Teller
+
+Accounts can sync through either provider, and you can mix them account by account. Both run on the bridge's schedule and on **Sync now**.
+
+- **SimpleFIN** (about $15 a year): set up in Actual's way, with a setup token from bridge.simplefin.org. **More → Settings → Bank sync**.
+- **Teller** (free for personal use, up to 100 bank logins): useful when a bank keeps breaking in SimpleFIN. Actual has no Teller support, so the bridge does the syncing itself and hands transactions to Actual's importer (which runs your rules).
+  1. Sign up at [teller.io](https://teller.io) and open the dashboard. Copy the **Application ID** and, under **Certificates**, create a certificate and download it with its private key.
+  2. In the app: **Bank sync → Teller → Set up**. Paste the Application ID, choose **Development** (free, real banks), and paste the certificate and private key. They stay on the bridge in `teller.json`, readable only by the bridge, and never go into backups.
+  3. **Connect a bank** opens Teller's sign-in page. Centsible never sees your bank password.
+  4. Tap each account to link it to an account in your budget. Check the preview: purchases should be negative. Some banks send card purchases positive, so switch on **Reverse signs** if they look backwards. An account that syncs through SimpleFIN now moves over to Teller, and what's already there is matched rather than duplicated.
+
+  When a bank asks you to sign in again, the account shows **needs reconnecting**. Tap **Reconnect**: the bank login is repaired in place, and the same links keep working.
+
 ## Links into the app
 
 Other apps (Home Assistant dashboards and notifications, launcher shortcuts) can open a screen directly:
@@ -43,7 +56,7 @@ Other apps (Home Assistant dashboards and notifications, launcher shortcuts) can
 | Link | Opens |
 |---|---|
 | `centsible://open/review` | your review inbox |
-| `centsible://open/transactions`, `/accounts`, `/budget`, `/net-worth`, `/recurring`, `/trends`, `/bank-sync`, `/mortgage` | that screen |
+| `centsible://open/transactions`, `/accounts`, `/budget`, `/net-worth`, `/recurring`, `/trends`, `/bank-sync`, `/teller`, `/mortgage` | that screen |
 | `centsible://open/account/<account id>` | one account |
 | `centsible://open/category/<category id>?name=Groceries[&month=2026-11]` | a category's transactions |
 

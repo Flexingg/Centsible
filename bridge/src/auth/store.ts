@@ -98,6 +98,31 @@ const MIGRATIONS: string[] = [
      emoji TEXT,
      PRIMARY KEY (budget_id, category_id)
    );`,
+  // 5: Teller bank logins ("enrollments") and which Teller account feeds which account in a
+  // budget. Access tokens and the client certificate are not here: they live in teller.json
+  // beside this file, because this database goes into backups.
+  `CREATE TABLE teller_enrollments (
+     id TEXT PRIMARY KEY,
+     institution TEXT NOT NULL,
+     user_id TEXT,
+     status TEXT NOT NULL,
+     status_code TEXT,
+     created_at TEXT NOT NULL,
+     updated_at TEXT NOT NULL
+   );
+   CREATE TABLE teller_links (
+     budget_id TEXT NOT NULL,
+     account_id TEXT NOT NULL,
+     teller_account_id TEXT NOT NULL,
+     enrollment_id TEXT NOT NULL,
+     teller_account_name TEXT NOT NULL,
+     flip INTEGER NOT NULL DEFAULT 0,
+     start_date TEXT NOT NULL,
+     last_sync_at TEXT,
+     last_error TEXT,
+     PRIMARY KEY (budget_id, account_id),
+     UNIQUE (budget_id, teller_account_id)
+   );`,
 ];
 
 const sha256 = (s: string) => createHash('sha256').update(s).digest('hex');
@@ -114,6 +139,40 @@ function pairingCode(): string {
 const normalizeCode = (c: string) => c.toUpperCase().replace(/[^A-Z0-9]/g, '');
 
 type Row = Record<string, unknown>;
+
+export type TellerEnrollmentRow = { id: string; institution: string; userId: string | null; status: 'ok' | 'disconnected' | 'revoked'; statusCode: string | null; createdAt: string; updatedAt: string };
+export type TellerLinkRow = {
+  budgetId: string;
+  accountId: string;
+  tellerAccountId: string;
+  enrollmentId: string;
+  tellerAccountName: string;
+  /** Teller's sign is the bank's; flip makes purchases negative when a bank reports them positive. */
+  flip: boolean;
+  startDate: string;
+  lastSyncAt: string | null;
+  lastError: string | null;
+};
+const toEnrollment = (r: Row): TellerEnrollmentRow => ({
+  id: String(r.id),
+  institution: String(r.institution),
+  userId: (r.user_id as string | null) ?? null,
+  status: String(r.status) as TellerEnrollmentRow['status'],
+  statusCode: (r.status_code as string | null) ?? null,
+  createdAt: String(r.created_at),
+  updatedAt: String(r.updated_at),
+});
+const toLink = (r: Row): TellerLinkRow => ({
+  budgetId: String(r.budget_id),
+  accountId: String(r.account_id),
+  tellerAccountId: String(r.teller_account_id),
+  enrollmentId: String(r.enrollment_id),
+  tellerAccountName: String(r.teller_account_name),
+  flip: Number(r.flip) === 1,
+  startDate: String(r.start_date),
+  lastSyncAt: (r.last_sync_at as string | null) ?? null,
+  lastError: (r.last_error as string | null) ?? null,
+});
 
 export class HouseholdStore {
   readonly db: Database.Database;
@@ -235,6 +294,74 @@ export class HouseholdStore {
 
   simpleFinRequestsToday(): number {
     return (this.db.prepare('SELECT COUNT(*) AS n FROM simplefin_requests WHERE at >= ?').get(this.now() - 24 * 3600 * 1000) as { n: number }).n;
+  }
+
+  // ── Teller ───────────────────────────────────────────────────────────────
+
+  tellerEnrollments(): TellerEnrollmentRow[] {
+    return (this.db.prepare('SELECT * FROM teller_enrollments ORDER BY created_at').all() as Row[]).map(toEnrollment);
+  }
+
+  tellerEnrollment(id: string): TellerEnrollmentRow | null {
+    const r = this.db.prepare('SELECT * FROM teller_enrollments WHERE id = ?').get(id) as Row | undefined;
+    return r ? toEnrollment(r) : null;
+  }
+
+  /** Adds a bank login, or marks a reconnected one healthy again (Teller keeps its id). */
+  saveTellerEnrollment(e: { id: string; institution: string; userId: string | null }) {
+    const at = nowIso();
+    this.db
+      .prepare(
+        `INSERT INTO teller_enrollments (id, institution, user_id, status, status_code, created_at, updated_at) VALUES (?, ?, ?, 'ok', NULL, ?, ?)
+         ON CONFLICT(id) DO UPDATE SET institution = excluded.institution, user_id = excluded.user_id, status = 'ok', status_code = NULL, updated_at = excluded.updated_at`,
+      )
+      .run(e.id, e.institution, e.userId, at, at);
+  }
+
+  setTellerEnrollmentStatus(id: string, status: 'ok' | 'disconnected' | 'revoked', code: string | null) {
+    this.db.prepare('UPDATE teller_enrollments SET status = ?, status_code = ?, updated_at = ? WHERE id = ?').run(status, code, nowIso(), id);
+  }
+
+  deleteTellerEnrollment(id: string) {
+    this.db.transaction(() => {
+      this.db.prepare('DELETE FROM teller_links WHERE enrollment_id = ?').run(id);
+      this.db.prepare('DELETE FROM teller_enrollments WHERE id = ?').run(id);
+    })();
+  }
+
+  tellerLinks(budgetId?: string): TellerLinkRow[] {
+    const rows = (budgetId ? this.db.prepare('SELECT * FROM teller_links WHERE budget_id = ?').all(budgetId) : this.db.prepare('SELECT * FROM teller_links').all()) as Row[];
+    return rows.map(toLink);
+  }
+
+  tellerLink(budgetId: string, accountId: string): TellerLinkRow | null {
+    const r = this.db.prepare('SELECT * FROM teller_links WHERE budget_id = ? AND account_id = ?').get(budgetId, accountId) as Row | undefined;
+    return r ? toLink(r) : null;
+  }
+
+  addTellerLink(l: Omit<TellerLinkRow, 'lastSyncAt' | 'lastError'>) {
+    this.db
+      .prepare('INSERT INTO teller_links (budget_id, account_id, teller_account_id, enrollment_id, teller_account_name, flip, start_date) VALUES (?, ?, ?, ?, ?, ?, ?)')
+      .run(l.budgetId, l.accountId, l.tellerAccountId, l.enrollmentId, l.tellerAccountName, l.flip ? 1 : 0, l.startDate);
+  }
+
+  updateTellerLink(budgetId: string, accountId: string, patch: { lastSyncAt?: string; lastError?: string | null; flip?: boolean }) {
+    const cur = this.tellerLink(budgetId, accountId);
+    if (!cur) return;
+    this.db
+      .prepare('UPDATE teller_links SET last_sync_at = ?, last_error = ?, flip = ? WHERE budget_id = ? AND account_id = ?')
+      .run(patch.lastSyncAt ?? cur.lastSyncAt, patch.lastError === undefined ? cur.lastError : patch.lastError, (patch.flip ?? cur.flip) ? 1 : 0, budgetId, accountId);
+  }
+
+  deleteTellerLink(budgetId: string, accountId: string) {
+    this.db.prepare('DELETE FROM teller_links WHERE budget_id = ? AND account_id = ?').run(budgetId, accountId);
+  }
+
+  clearTeller() {
+    this.db.transaction(() => {
+      this.db.prepare('DELETE FROM teller_links').run();
+      this.db.prepare('DELETE FROM teller_enrollments').run();
+    })();
   }
 
   // ── Members ──────────────────────────────────────────────────────────────

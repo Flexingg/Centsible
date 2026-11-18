@@ -22,6 +22,8 @@ import type { HouseholdStore } from './auth/store.js';
 import { BankSyncBackfill } from './bank-sync-backfill.js';
 import { BankSyncScheduler } from './bank-sync-scheduler.js';
 import { SimpleFinKeyFile } from './actual/simplefin-client.js';
+import { TellerVault } from './actual/teller-client.js';
+import { TellerOps } from './actual/teller-ops.js';
 import type { BridgeConfig } from './config.js';
 import type { Deps } from './http/server.js';
 import { JobStore } from './jobs.js';
@@ -35,6 +37,9 @@ export function createDeps(config: BridgeConfig, store: HouseholdStore, host: Ac
   const budgetOps = new BudgetOps(host);
   const keys = new SimpleFinKeyFile(config.dataDir, config.actualDataDir);
   const bankSync = new BankSyncOps(host, store, keys);
+  const teller = new TellerOps(host, store, new TellerVault(config.dataDir), config.tellerApiUrl);
+  bankSync.teller = teller;
+  budgetOps.syncOverlay = (budgetId) => teller.overlay(budgetId);
   const transfers = new TransferOps(host, store);
   const annual = new AnnualOps(host, store);
   const offBooks = new OffBooks(store);
@@ -52,6 +57,7 @@ export function createDeps(config: BridgeConfig, store: HouseholdStore, host: Ac
     setup,
     jobs,
     bankSync,
+    teller,
     backfill,
     backups,
     server: new ServerOps(config, host, store, log),

@@ -91,6 +91,7 @@ private object Routes {
     const val SETTINGS = "settings"
     const val RECURRING = "recurring"
     const val BANK_SYNC = "bank-sync"
+    const val TELLER = "bank-sync/teller"
     const val REPORTS = "reports"
     const val MERCHANTS = "merchants"
     const val RULES = "rules"
@@ -277,7 +278,8 @@ private fun MainScaffold(
             }
             composable(Routes.SETTINGS) { SettingsRoute(onOpenBankSync = { nav.navigate(Routes.BANK_SYNC) }) }
             composable(Routes.SERVER) { app.centsible.feature.settings.ServerRoute(onBack = { nav.popBackStack() }) }
-            composable(Routes.BANK_SYNC) { app.centsible.feature.settings.BankSyncRoute(onBack = { nav.popBackStack() }) }
+            composable(Routes.BANK_SYNC) { app.centsible.feature.settings.BankSyncRoute(onBack = { nav.popBackStack() }, onOpenTeller = { nav.navigate(Routes.TELLER) { launchSingleTop = true } }) }
+            composable(Routes.TELLER) { app.centsible.feature.settings.TellerRoute(onBack = { nav.popBackStack() }) }
             composable(Routes.RECURRING) { RecurringRoute(onBack = { nav.popBackStack() }, onFind = { nav.navigate(Routes.SUBSCRIPTIONS) { launchSingleTop = true } }) }
             composable(Routes.SUBSCRIPTIONS) { app.centsible.feature.planning.SubscriptionsRoute(onBack = { nav.popBackStack() }, onOpenTransactions = { nav.go(it) }) }
             composable(Routes.TRENDS) { app.centsible.feature.reports.TrendsRoute(onBack = { nav.popBackStack() }, onOpenTransactions = { nav.go(it) }) }
@@ -406,6 +408,7 @@ private fun NavHostController.open(link: app.centsible.core.domain.AppLink) {
             S.Recurring -> go(Destination.Recurring)
             S.Trends -> go(Destination.Trends)
             S.BankSync -> navigate(Routes.BANK_SYNC) { launchSingleTop = true }
+            S.Teller -> navigate(Routes.TELLER) { launchSingleTop = true }
             S.Mortgage -> navigate(Routes.MORTGAGE) { launchSingleTop = true }
         }
         is app.centsible.core.domain.AppLink.Account -> go(Destination.Account(app.centsible.core.model.AccountId(link.id)))

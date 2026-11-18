@@ -504,6 +504,226 @@ paths:
                       - $ref: '#/components/schemas/BackfillState'
         '403': { $ref: '#/components/responses/Problem' }
 
+  /v1/bank-sync/teller:
+    put:
+      tags: [bank-sync]
+      operationId: configureTeller
+      summary: Owners. Teller's application id and environment, and (outside the sandbox) the client certificate and private key from the Teller dashboard. The certificate can be left out to keep the stored one.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [applicationId, environment]
+              additionalProperties: false
+              properties:
+                applicationId: { type: string, minLength: 4, maxLength: 200 }
+                environment: { type: string, enum: [sandbox, development, production] }
+                certificate: { type: string, maxLength: 20000, description: PEM }
+                privateKey: { type: string, maxLength: 20000, description: PEM }
+      responses:
+        '200':
+          description: Teller set up
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TellerStatus' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+    delete:
+      tags: [bank-sync]
+      operationId: resetTeller
+      summary: Owners. Forgets Teller (certificate, bank logins, links). Imported transactions stay.
+      responses:
+        '204': { description: Reset }
+        '403': { $ref: '#/components/responses/Problem' }
+
+  /v1/bank-sync/teller/connect:
+    get:
+      tags: [bank-sync]
+      operationId: tellerConnectPage
+      security: []
+      summary: The page the app opens in a WebView to run Teller Connect. Nothing secret in it; its result goes to the app through the WebView's CentsibleTeller interface, and the app posts it to /v1/bank-sync/teller/enrollments.
+      parameters:
+        - { name: enrollmentId, in: query, schema: { type: string }, description: Reconnect this bank login instead of adding one }
+      responses:
+        '200':
+          description: HTML page
+          content:
+            text/html:
+              schema: { type: string }
+        '400': { $ref: '#/components/responses/Problem' }
+
+  /v1/bank-sync/teller/enrollments:
+    post:
+      tags: [bank-sync]
+      operationId: addTellerEnrollment
+      summary: Members. Saves a bank login from Teller Connect's onSuccess (also how a disconnected login is repaired). Checked against Teller right away.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [accessToken, enrollmentId, institution]
+              additionalProperties: false
+              properties:
+                accessToken: { type: string, minLength: 4, maxLength: 1000 }
+                enrollmentId: { type: string, minLength: 1, maxLength: 200 }
+                institution: { type: string, maxLength: 200 }
+                userId: { type: [string, 'null'], maxLength: 200 }
+      responses:
+        '201':
+          description: Saved
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TellerEnrollment' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '502': { $ref: '#/components/responses/Problem' }
+
+  /v1/bank-sync/teller/enrollments/{id}:
+    delete:
+      tags: [bank-sync]
+      operationId: removeTellerEnrollment
+      summary: Owners. Disconnects a bank login (Teller revokes it) and unlinks its accounts everywhere. Their transactions stay.
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        '204': { description: Removed }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+
+  /v1/budgets/{budgetId}/bank-sync/teller/accounts:
+    get:
+      tags: [bank-sync]
+      operationId: listTellerAccounts
+      summary: Accounts across the household's Teller bank logins, and which account in this budget each feeds.
+      parameters:
+        - $ref: '#/components/parameters/BudgetId'
+        - { name: refresh, in: query, schema: { type: boolean, default: true } }
+      responses:
+        '200':
+          description: Accounts
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/TellerAccount' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '502': { $ref: '#/components/responses/Problem' }
+        '423': { $ref: '#/components/responses/Problem' }
+
+  /v1/budgets/{budgetId}/bank-sync/teller/preview:
+    post:
+      tags: [bank-sync]
+      operationId: previewTellerAccount
+      summary: The Teller account's latest posted transactions, signed as they would import (flip reverses them). Lets the person check purchases come out negative before linking.
+      parameters:
+        - $ref: '#/components/parameters/BudgetId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [tellerAccountId]
+              additionalProperties: false
+              properties:
+                tellerAccountId: { type: string, minLength: 1 }
+                flip: { type: boolean }
+      responses:
+        '200':
+          description: Preview
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [transactions]
+                properties:
+                  transactions:
+                    type: array
+                    items:
+                      type: object
+                      required: [date, payee, amount, pending]
+                      properties:
+                        date: { $ref: '#/components/schemas/Date' }
+                        payee: { type: string }
+                        amount: { $ref: '#/components/schemas/Money' }
+                        pending: { type: boolean }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '502': { $ref: '#/components/responses/Problem' }
+
+  /v1/budgets/{budgetId}/bank-sync/teller/link:
+    post:
+      tags: [bank-sync]
+      operationId: linkTellerAccount
+      summary: Feeds an existing account from a Teller account and imports from startDate (default 30 days ago). An account syncing through SimpleFIN is unlinked from SimpleFIN first; transactions already there are matched, not duplicated.
+      parameters:
+        - $ref: '#/components/parameters/BudgetId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [tellerAccountId, accountId]
+              additionalProperties: false
+              properties:
+                tellerAccountId: { type: string, minLength: 1 }
+                accountId: { type: string, minLength: 1 }
+                flip: { type: boolean, description: Reverse Teller's signs (when the bank reports purchases as positive) }
+                startDate: { $ref: '#/components/schemas/Date' }
+      responses:
+        '201':
+          description: Linked, with the first import's outcome
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [accountId, result]
+                properties:
+                  accountId: { type: string }
+                  result: { $ref: '#/components/schemas/AccountSyncResult' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '502': { $ref: '#/components/responses/Problem' }
+        '423': { $ref: '#/components/responses/Problem' }
+
+  /v1/budgets/{budgetId}/accounts/{id}/teller:
+    patch:
+      tags: [bank-sync]
+      operationId: updateTellerLink
+      summary: Members. Changes whether a Teller-linked account's signs are reversed (affects later imports).
+      parameters:
+        - $ref: '#/components/parameters/BudgetId'
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [flip]
+              additionalProperties: false
+              properties:
+                flip: { type: boolean }
+      responses:
+        '200':
+          description: Saved
+          content:
+            application/json:
+              schema: { type: object, required: [flip], properties: { flip: { type: boolean } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+
   /v1/budgets/{budgetId}/bank-sync/simplefin/backfill:
     post:
       tags: [bank-sync]
@@ -2832,6 +3052,7 @@ components:
             historyAccess: { type: boolean, description: The bridge holds its own SimpleFIN access (needed to import older history). False for connections made before it existed; reconnect with a new setup token. }
             requestsToday: { type: integer, description: SimpleFIN requests the bridge made in the last 24 hours }
             dailyQuota: { type: integer, description: SimpleFIN Bridge asks for 24 or fewer a day }
+        teller: { $ref: '#/components/schemas/TellerStatus' }
         schedule: { $ref: '#/components/schemas/ScheduleState' }
         intervals: { type: array, items: { type: integer } }
         backfill:
@@ -2872,6 +3093,51 @@ components:
                 accounts: { type: integer }
                 errors: { type: array, items: { type: string } }
                 skipped: { type: [string, 'null'] }
+    TellerStatus:
+      type: object
+      required: [configured, applicationId, environment, hasCertificate, enrollments]
+      properties:
+        configured: { type: boolean, description: Ready to connect banks (an application id, and a certificate outside the sandbox) }
+        applicationId: { type: [string, 'null'], description: Not secret; Teller Connect needs it on the phone }
+        environment:
+          oneOf:
+            - type: 'null'
+            - { type: string, enum: [sandbox, development, production] }
+        hasCertificate: { type: boolean }
+        enrollments:
+          type: array
+          items: { $ref: '#/components/schemas/TellerEnrollment' }
+    TellerEnrollment:
+      type: object
+      description: One bank login connected through Teller Connect.
+      required: [id, institution, status, message, linkedAccounts, updatedAt]
+      properties:
+        id: { type: string }
+        institution: { type: string }
+        status: { type: string, enum: [ok, disconnected, revoked], description: "disconnected: reconnect it with Teller Connect (enrollmentId). revoked: remove it and connect again." }
+        message: { type: [string, 'null'] }
+        linkedAccounts: { type: integer }
+        updatedAt: { type: string, format: date-time }
+    TellerAccount:
+      type: object
+      required: [id, enrollmentId, institution, name, type, subtype, lastFour, balance, currency, linkedAccountId, linkedAccountName, flip]
+      properties:
+        id: { type: string }
+        enrollmentId: { type: string }
+        institution: { type: string }
+        name: { type: string }
+        type: { type: string, description: depository or credit }
+        subtype: { type: string }
+        lastFour: { type: [string, 'null'] }
+        balance:
+          description: The ledger balance as the bank reports it, in cents (its sign is the bank's)
+          oneOf:
+            - type: 'null'
+            - $ref: '#/components/schemas/Money'
+        currency: { type: string }
+        linkedAccountId: { type: [string, 'null'] }
+        linkedAccountName: { type: [string, 'null'] }
+        flip: { type: boolean }
     ExternalAccount:
       type: object
       required: [id, name, institution, balance, currency, linkedAccountId, linkedAccountName]
@@ -3105,16 +3371,17 @@ components:
         transfersLinked: { type: integer, description: Transfers linked automatically after the sync (when turned on) }
         results:
           type: array
-          items:
-            type: object
-            required: [accountId, name, newTransactions, matchedTransactions, error, status]
-            properties:
-              accountId: { type: string }
-              name: { type: string }
-              newTransactions: { type: integer }
-              matchedTransactions: { type: integer }
-              error: { type: [string, 'null'] }
-              status: { type: [string, 'null'] }
+          items: { $ref: '#/components/schemas/AccountSyncResult' }
+    AccountSyncResult:
+      type: object
+      required: [accountId, name, newTransactions, matchedTransactions, error, status]
+      properties:
+        accountId: { type: string }
+        name: { type: string }
+        newTransactions: { type: integer }
+        matchedTransactions: { type: integer }
+        error: { type: [string, 'null'] }
+        status: { type: [string, 'null'], description: "ok, reauth-required, attention-required, rate-limit-exceeded, account-missing, ... (Actual's vocabulary; Teller links use the same)" }
     SetupStatus:
       type: object
       required: [needsOwner]
@@ -3296,7 +3563,7 @@ components:
         closed: { type: boolean }
         balance: { $ref: '#/components/schemas/Money' }
         accountGroupId: { type: [string, 'null'] }
-        syncSource: { type: [string, 'null'], description: "Bank sync provider once linked in Actual (goCardless, simpleFin, pluggyai)" }
+        syncSource: { type: [string, 'null'], description: "Bank sync provider once linked (goCardless, simpleFin, pluggyai in Actual; teller through the bridge)" }
         lastSync: { type: [string, 'null'], format: date-time }
         bankSyncStatus:
           type: [string, 'null']
