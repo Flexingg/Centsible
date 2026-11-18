@@ -75,6 +75,7 @@ export class ServerOps {
       app: latest,
       updater: {
         configured: this.updaterConfigured,
+        managedBy: this.config.managedBy ?? 'docker',
         lastRequestedAt: lastUpdate?.requestedAt ?? null,
         lastUpdatedFrom: lastUpdate?.from ?? null,
         lastResult: lastUpdate?.result ?? null,
@@ -91,6 +92,9 @@ export class ServerOps {
    */
   async update(): Promise<{ requested: true }> {
     const u = this.config.updater;
+    if (!u && this.config.managedBy === 'home-assistant') {
+      throw ApiError.validation('Centsible runs as a Home Assistant app. Update it in Home Assistant: Settings → Apps → Centsible → Update.');
+    }
     if (!u) {
       throw ApiError.validation(
         'One-tap updates need the updater. Replace docker-compose.yml with the one from the newest release, then run: docker compose up -d',

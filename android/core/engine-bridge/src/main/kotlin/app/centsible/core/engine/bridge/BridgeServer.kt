@@ -21,6 +21,7 @@ class BridgeServer(private val api: ServerApi) : ServerGateway {
             d.app?.let { AppRelease(it.version, it.versionCode, it.publishedAt, it.url, it.apkUrl, it.notes) },
             d.updater.configured, d.updater.lastRequestedAt, d.updater.lastResult,
             d.disk?.free, d.disk?.total,
+            managedByHomeAssistant = d.updater.managedBy == "home-assistant",
         )
     }
 

@@ -116,6 +116,20 @@ describe('one-tap updates', () => {
     expect(res.body.detail).toMatch(/docker-compose.yml/);
   });
 
+  it('points to Home Assistant when Centsible runs as a Home Assistant app', async () => {
+    // The routes hold the ServerOps built at startup, which reads this config object.
+    config.managedBy = 'home-assistant';
+    try {
+      const status = await call('GET', '/v1/server', '/v1/server', owner);
+      expect(status.body.updater).toMatchObject({ configured: false, managedBy: 'home-assistant' });
+      const res = await call('POST', '/v1/server/update', '/v1/server/update', owner);
+      expect(res.status).toBe(400);
+      expect(res.body.detail).toMatch(/Settings → Apps → Centsible → Update/);
+    } finally {
+      delete config.managedBy;
+    }
+  });
+
   it('asks the updater, with its token, and remembers the outcome', async () => {
     const port = (updater.address() as { port: number }).port;
     deps.server = new ServerOps({ ...config, updater: { url: `http://127.0.0.1:${port}`, token: 'secret-token' } }, host, store, silent, fakeGitHub);

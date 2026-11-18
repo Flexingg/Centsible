@@ -17,6 +17,16 @@ The **bridge** is a small Node service. It wraps Actual's official API behind a 
 
 ## Run it
 
+### In Home Assistant (recommended if you run it)
+
+Actual's server and the bridge run together as one Home Assistant app, updated from Home Assistant and included in its backups. No Docker Compose, Watchtower or separate tunnel container.
+
+1. **Settings → Apps → App store → ⋮ → Repositories**, add `https://github.com/Flexingg/Centsible#home-assistant`, then install **Centsible**.
+2. Follow the app's **Documentation** tab: set the public address, start it, and use the setup code from its log. Moving from Docker Compose is a copy of two folders, described there too.
+
+### With Docker Compose
+
+
 1. From the [latest release](https://github.com/Flexingg/Centsible/releases/latest), download `docker-compose.yml` and `env.example` into one folder on your server, and rename `env.example` to `.env`. Set `BRIDGE_PUBLIC_URL` and `CLOUDFLARE_TUNNEL_TOKEN`; everything else is optional. (No need to clone this repo: the bridge image is published to `ghcr.io/flexingg/centsible-bridge`.)
 2. In the Cloudflare dashboard, give your tunnel two public hostnames:
    - `actual.example.com` → `http://actual:5006`

@@ -1,0 +1,6 @@
+# Home Assistant app repository. CI publishes this folder, with the current version, to
+# the home-assistant branch; add https://github.com/Flexingg/Centsible#home-assistant in
+# Home Assistant (Settings → Apps → App store → ⋮ → Repositories).
+name: Centsible
+url: https://github.com/Flexingg/Centsible
+maintainer: Flexingg

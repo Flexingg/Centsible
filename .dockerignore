@@ -1,0 +1,9 @@
+# Only the Home Assistant image builds from the repository root; it needs bridge/ and
+# homeassistant/ (see homeassistant/centsible/Dockerfile).
+*
+!bridge/package.json
+!bridge/package-lock.json
+!bridge/tsconfig.json
+!bridge/tsconfig.build.json
+!bridge/src/**
+!homeassistant/centsible/run.mjs

@@ -4271,6 +4271,7 @@ components:
           type: object
           required: [configured, lastRequestedAt, lastUpdatedFrom, lastResult]
           properties:
+            managedBy: { type: string, enum: [docker, home-assistant], description: "home-assistant: Centsible runs as a Home Assistant app and updates from there" }
             configured: { type: boolean }
             lastRequestedAt: { type: [string, 'null'] }
             lastUpdatedFrom: { type: [string, 'null'] }

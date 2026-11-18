@@ -81,7 +81,7 @@ async function imported(account: string, amount: number, daysAgo: number, payee:
 }
 
 const duplicates = async () => (await call('GET', '/transactions/duplicates', '/transactions/duplicates', viewer)).body.pairs as { a: any; b: any; days: number }[];
-const pairWith = (pairs: { a: any; b: any }[], id: string) => pairs.find((p) => p.a.id === id || p.b.id === id);
+const pairWith = <P extends { a: any; b: any }>(pairs: P[], id: string) => pairs.find((p) => p.a.id === id || p.b.id === id);
 
 describe('duplicates', () => {
   let typed: any;

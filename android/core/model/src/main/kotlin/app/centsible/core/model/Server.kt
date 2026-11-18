@@ -17,6 +17,8 @@ data class ServerStatus(
     val lastUpdateResult: String?,
     val diskFree: Long?,
     val diskTotal: Long?,
+    /** Centsible runs as a Home Assistant app: updates are installed there. */
+    val managedByHomeAssistant: Boolean = false,
 )
 
 data class AppRelease(val version: String, val versionCode: Int?, val publishedAt: String?, val url: String, val apkUrl: String?, val notes: String?)
