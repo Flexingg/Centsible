@@ -29,7 +29,16 @@ export async function startActual(root: string, port: number): Promise<{ url: st
   const logFd = openSync(logFile, 'w');
   const child: ChildProcess = spawn(process.execPath, [bin], {
     // IPv4 loopback: some CI sandboxes have no IPv6.
-    env: { ...process.env, NODE_ENV: 'production', ACTUAL_HOSTNAME: '127.0.0.1', ACTUAL_PORT: String(port), ACTUAL_DATA_DIR: serverData },
+    env: {
+      ...process.env,
+      NODE_ENV: 'production',
+      ACTUAL_HOSTNAME: '127.0.0.1',
+      ACTUAL_PORT: String(port),
+      ACTUAL_DATA_DIR: serverData,
+      // Since 26.11 Actual refuses SimpleFIN bridges on private addresses unless allowed;
+      // the stand-in SimpleFIN runs on loopback.
+      ACTUAL_SIMPLEFIN_ALLOWED_NETWORKS: '127.0.0.1/32',
+    },
     stdio: ['ignore', logFd, logFd],
   });
 

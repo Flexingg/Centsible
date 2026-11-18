@@ -6,6 +6,7 @@ import type { OffBooks } from './off-books.js';
 import { estimateFor } from './recurring-patterns.js';
 import { dateRange } from './report-ops.js';
 import { fromActual, toActual, type AutomationDto } from './automation-ops.js';
+import { scheduleDates } from './schedule-dates.js';
 
 type Raw = Record<string, unknown>;
 type MonthCategory = { id: string; name: string; groupName: string; budgeted: number; spent: number; balance: number };
@@ -292,9 +293,7 @@ export class PlanOps {
         const history = varies ? await paidHistory(String(s.id), typeof s.payee === 'string' ? s.payee : null, account) : [];
         let dates = [String(s.next_date)];
         if (s.date && typeof s.date === 'object') {
-          dates = await this.host
-            .internal<string[]>('schedules.upcoming', lib, 'schedule/get-upcoming-dates', { config: { ...(s.date as Raw), start: s.next_date }, count: opts.days + 1 })
-            .catch(() => [String(s.next_date)]);
+          dates = await scheduleDates(this.host, lib, s.date as Raw, String(s.next_date), opts.days + 1);
           // Actual lists occurrences from today on; an overdue one hasn't been paid yet.
           if (String(s.next_date) < from && !dates.includes(String(s.next_date))) dates.unshift(String(s.next_date));
         }

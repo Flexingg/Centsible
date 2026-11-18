@@ -1,11 +1,11 @@
 {
   "items": [
     {
-      "id": "062dabe0-a4a7-4216-9684-727301639f09",
-      "accountId": "4f50dbe9-b7f1-48f7-b629-e31d374afafd",
-      "date": "2026-09-29",
+      "id": "e4fe0343-9591-4565-a68a-557aba9417e3",
+      "accountId": "80ca1365-e5c7-40a6-bc01-17ddcc44837f",
+      "date": "2026-11-18",
       "amount": 520000,
-      "payeeId": "b8259d1f-5570-491b-8c2c-82fb06fcbe29",
+      "payeeId": "cb11644a-1ff4-4712-b0ad-a5dc403fbdb7",
       "payeeName": "Starting Balance",
       "categoryId": "506e8d9d-7ed0-4397-84e4-07a9185dc6b2",
       "notes": null,
@@ -17,11 +17,11 @@
       "subtransactions": []
     },
     {
-      "id": "71782448-8fb4-454f-89b3-3159efb861cb",
-      "accountId": "4f50dbe9-b7f1-48f7-b629-e31d374afafd",
-      "date": "2026-09-15",
+      "id": "09b6f44a-6f7b-4771-afaa-ef10f2bce4ff",
+      "accountId": "80ca1365-e5c7-40a6-bc01-17ddcc44837f",
+      "date": "2026-11-15",
       "amount": -1750,
-      "payeeId": "74d5040c-d3cd-43ba-a961-ee7daf2ffd09",
+      "payeeId": "eca99d09-21de-4bee-97b6-0a9a5e3c514a",
       "payeeName": "Corner Market",
       "categoryId": "af375fd4-d759-46b3-bffe-74a856151d57",
       "notes": "milk + bread",
@@ -33,11 +33,11 @@
       "subtransactions": []
     },
     {
-      "id": "65efad5e-bbc9-482f-9fb8-467a2b4239a6",
-      "accountId": "4f50dbe9-b7f1-48f7-b629-e31d374afafd",
-      "date": "2026-09-15",
+      "id": "e98842a8-67a1-4a96-959c-52f27e1bbbcc",
+      "accountId": "80ca1365-e5c7-40a6-bc01-17ddcc44837f",
+      "date": "2026-11-15",
       "amount": -100,
-      "payeeId": "1bf1af74-5e27-4eeb-9bf2-e8d09c1bbf6d",
+      "payeeId": "e4d6e0e3-c88a-4bea-b765-674a0b871642",
       "payeeName": "Getter",
       "categoryId": null,
       "notes": null,

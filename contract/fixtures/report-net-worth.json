@@ -1,27 +1,27 @@
 {
   "points": [
     {
-      "month": "2026-07",
-      "assets": 0,
-      "liabilities": 0,
-      "netWorth": 0
-    },
-    {
-      "month": "2026-08",
-      "assets": 0,
-      "liabilities": 0,
-      "netWorth": 0
-    },
-    {
       "month": "2026-09",
-      "assets": 2173173,
+      "assets": 0,
+      "liabilities": 0,
+      "netWorth": 0
+    },
+    {
+      "month": "2026-10",
+      "assets": 0,
+      "liabilities": 0,
+      "netWorth": 0
+    },
+    {
+      "month": "2026-11",
+      "assets": 2171987,
       "liabilities": -19872,
-      "netWorth": 2153301
+      "netWorth": 2152115
     }
   ],
   "accounts": [
     {
-      "accountId": "da39c5c7-479c-473e-8864-0c1caa05a1d8",
+      "accountId": "1acd08f5-3d33-4f22-88a8-e87b5a5ffa55",
       "name": "Brokerage",
       "offBudget": true,
       "closed": false,
@@ -32,18 +32,18 @@
       ]
     },
     {
-      "accountId": "15774009-d48c-4ddc-9370-8dd12db7ad26",
+      "accountId": "80ca1365-e5c7-40a6-bc01-17ddcc44837f",
       "name": "Joint Checking",
       "offBudget": false,
       "closed": false,
       "balances": [
         0,
         0,
-        923173
+        921987
       ]
     },
     {
-      "accountId": "54e13bbf-a13d-4c6c-a36f-345b65874410",
+      "accountId": "52cecf45-cd74-4cc2-8c32-9c32bc7c3834",
       "name": "Visa",
       "offBudget": false,
       "closed": false,
@@ -54,7 +54,7 @@
       ]
     },
     {
-      "accountId": "b2fa156e-a644-4f24-a065-dc447ea6cff2",
+      "accountId": "f3b572e5-7166-4d54-9a4b-45c7be0ae3d8",
       "name": "Kid Savings",
       "offBudget": false,
       "closed": false,

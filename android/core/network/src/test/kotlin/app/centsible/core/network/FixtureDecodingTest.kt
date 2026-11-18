@@ -60,6 +60,8 @@ class FixtureDecodingTest {
         "teller-accounts" to ItemsDto.serializer(TellerAccountDto.serializer()),
         "teller-preview" to TellerPreviewDto.serializer(),
         "teller-link" to TellerLinkedDto.serializer(),
+        "duplicates" to DuplicatePairsDto.serializer(),
+        "transaction-merged" to TransactionDto.serializer(),
         "transaction-updated" to TransactionDto.serializer(),
         "preferences" to PreferencesDto.serializer(),
         "schedule" to ScheduleDto.serializer(),

@@ -234,6 +234,42 @@ export const transactionRoutes =
     );
 
     // ── Transfers: the two sides of one payment (credit card payments, savings moves) ──
+    // ── Duplicates (merging needs Actual 26.10+) ──
+    app.get<{ Params: BudgetParams }>('/v1/budgets/:budgetId/transactions/duplicates', async (req) => {
+      requireBudget(deps, req, req.params.budgetId);
+      return deps.duplicates.find(req.params.budgetId);
+    });
+
+    app.post<{ Params: BudgetParams; Body: { ids: [string, string] } }>(
+      '/v1/budgets/:budgetId/transactions/merge',
+      {
+        schema: {
+          body: { type: 'object', required: ['ids'], additionalProperties: false, properties: { ids: { type: 'array', items: { type: 'string', minLength: 1 }, minItems: 2, maxItems: 2 } } },
+        },
+      },
+      async (req) => {
+        const auth = requireBudget(deps, req, req.params.budgetId, 'member');
+        const kept = await deps.duplicates.merge(req.params.budgetId, req.body.ids);
+        review.markReviewed(req.params.budgetId, auth.member.id, [kept.id]);
+        audit(deps, req, req.params.budgetId, 'transaction.merged', kept.id, { ids: req.body.ids });
+        return kept;
+      },
+    );
+
+    app.post<{ Params: BudgetParams; Body: { ids: [string, string] } }>(
+      '/v1/budgets/:budgetId/transactions/duplicates/dismiss',
+      {
+        schema: {
+          body: { type: 'object', required: ['ids'], additionalProperties: false, properties: { ids: { type: 'array', items: { type: 'string', minLength: 1 }, minItems: 2, maxItems: 2 } } },
+        },
+      },
+      async (req, reply) => {
+        requireBudget(deps, req, req.params.budgetId, 'member');
+        deps.duplicates.dismiss(req.params.budgetId, req.body.ids[0], req.body.ids[1]);
+        return reply.status(204).send();
+      },
+    );
+
     app.get<{ Params: BudgetParams }>('/v1/budgets/:budgetId/transfers/matches', async (req) => {
       requireBudget(deps, req, req.params.budgetId);
       return transfers.matches(req.params.budgetId);

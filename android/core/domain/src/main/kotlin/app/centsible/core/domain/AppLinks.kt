@@ -15,6 +15,7 @@ sealed interface AppLink {
         Trends("trends"),
         BankSync("bank-sync"),
         Teller("teller"),
+        Duplicates("duplicates"),
         Mortgage("mortgage"),
     }
 
@@ -29,7 +30,8 @@ sealed interface AppLink {
  *
  *     centsible://open/review                       the review inbox
  *     centsible://open/<screen>                     transactions, accounts, budget, net-worth,
- *                                                   recurring, trends, bank-sync, teller, mortgage
+ *                                                   recurring, trends, bank-sync, teller,
+ *                                                   duplicates, mortgage
  *     centsible://open/account/<id>                 one account
  *     centsible://open/category/<id>?name=Groceries[&month=2026-11]
  *

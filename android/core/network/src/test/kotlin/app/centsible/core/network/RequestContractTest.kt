@@ -148,6 +148,8 @@ class RequestContractTest {
         call { tools.linkTransfer(b, TransferPairRequestDto("o1", "i1")) }
         call { tools.dismissTransfer(b, TransferPairRequestDto("o1", "i1")) }
         call { tools.transferSettings(b, TransferSettingsDto(true)) }
+        call { tools.merge(b, TransactionPairDto(listOf("t1", "t2"))) }
+        call { tools.dismissDuplicate(b, TransactionPairDto(listOf("t1", "t2"))) }
         call { planning.dismissSubscription(b, "p1") }
         val server = ServerApi(client)
         call { server.backupSettings(BackupSettingsDto(intervalHours = 24, keep = 7)) }

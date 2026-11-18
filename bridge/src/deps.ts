@@ -17,6 +17,7 @@ import { OffBooks } from './actual/off-books.js';
 import { MortgageOps } from './actual/mortgage-ops.js';
 import { TargetOps } from './actual/target-ops.js';
 import { TransferOps } from './actual/transfer-ops.js';
+import { DuplicateOps } from './actual/duplicate-ops.js';
 import { TransactionOps } from './actual/transaction-ops.js';
 import type { HouseholdStore } from './auth/store.js';
 import { BankSyncBackfill } from './bank-sync-backfill.js';
@@ -69,6 +70,7 @@ export function createDeps(config: BridgeConfig, store: HouseholdStore, host: Ac
     transactions: new TransactionOps(host),
     review: new ReviewOps(host, store),
     transfers,
+    duplicates: new DuplicateOps(host, store),
     targets: new TargetOps(host, store),
     mortgages: new MortgageOps(host, store),
     annual,

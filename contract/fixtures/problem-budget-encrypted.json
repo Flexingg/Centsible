@@ -3,5 +3,5 @@
   "title": "Budget is encrypted",
   "status": 423,
   "code": "budget_encrypted",
-  "detail": "This budget uses end-to-end encryption. Add \"9c9d8e70-2013-47af-aedb-38ecb9da05b9=<password>\" to ACTUAL_BUDGET_PASSWORDS on the bridge and restart it."
+  "detail": "This budget uses end-to-end encryption. Add \"b9baf55e-9c89-442f-89b0-ec4811c4a96d=<password>\" to ACTUAL_BUDGET_PASSWORDS on the bridge and restart it."
 }

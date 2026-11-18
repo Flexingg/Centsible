@@ -109,6 +109,7 @@ private object Routes {
 
     const val REVIEW = "review"
     const val TRANSFERS = "transfers/match"
+    const val DUPLICATES = "transactions/duplicates"
     const val MORTGAGE = "mortgage"
     const val RULE = "rule?id={id}&payee={payee}&category={category}"
     fun rule(id: String?, payee: String? = null, category: String? = null) = "rule?id=${id.orEmpty()}&payee=${payee.orEmpty()}&category=${category.orEmpty()}"
@@ -329,10 +330,11 @@ private fun MainScaffold(
                 app.centsible.feature.budget.AutomationEditorRoute(onDone = { nav.popBackStack() })
             }
             composable(Routes.REVIEW) {
-                app.centsible.feature.transactions.ReviewRoute(onBack = { nav.popBackStack() }, onOpen = { nav.navigate(Routes.transaction(it)) }, onMakeRule = { p, c -> nav.navigate(Routes.rule(null, p.raw, c?.raw)) }, onMatchTransfers = { nav.navigate(Routes.TRANSFERS) })
+                app.centsible.feature.transactions.ReviewRoute(onBack = { nav.popBackStack() }, onOpen = { nav.navigate(Routes.transaction(it)) }, onMakeRule = { p, c -> nav.navigate(Routes.rule(null, p.raw, c?.raw)) }, onMatchTransfers = { nav.navigate(Routes.TRANSFERS) }, onFindDuplicates = { nav.navigate(Routes.DUPLICATES) })
             }
             composable(Routes.MORTGAGE) { app.centsible.feature.planning.MortgageRoute(onBack = { nav.popBackStack() }) }
             composable(Routes.TRANSFERS) { app.centsible.feature.transactions.TransfersRoute(onBack = { nav.popBackStack() }) }
+            composable(Routes.DUPLICATES) { app.centsible.feature.transactions.DuplicatesRoute(onBack = { nav.popBackStack() }) }
             composable(
                 Routes.TRANSACTIONS_FOR,
                 arguments = listOf(
@@ -409,6 +411,7 @@ private fun NavHostController.open(link: app.centsible.core.domain.AppLink) {
             S.Trends -> go(Destination.Trends)
             S.BankSync -> navigate(Routes.BANK_SYNC) { launchSingleTop = true }
             S.Teller -> navigate(Routes.TELLER) { launchSingleTop = true }
+            S.Duplicates -> navigate(Routes.DUPLICATES) { launchSingleTop = true }
             S.Mortgage -> navigate(Routes.MORTGAGE) { launchSingleTop = true }
         }
         is app.centsible.core.domain.AppLink.Account -> go(Destination.Account(app.centsible.core.model.AccountId(link.id)))

@@ -42,12 +42,17 @@ Accounts can sync through either provider, and you can mix them account by accou
 
 - **SimpleFIN** (about $15 a year): set up in Actual's way, with a setup token from bridge.simplefin.org. **More → Settings → Bank sync**.
 - **Teller** (free for personal use, up to 100 bank logins): useful when a bank keeps breaking in SimpleFIN. Actual has no Teller support, so the bridge does the syncing itself and hands transactions to Actual's importer (which runs your rules).
-  1. Sign up at [teller.io](https://teller.io) and open the dashboard. Copy the **Application ID** and, under **Certificates**, create a certificate and download it with its private key.
-  2. In the app: **Bank sync → Teller → Set up**. Paste the Application ID, choose **Development** (free, real banks), and paste the certificate and private key. They stay on the bridge in `teller.json`, readable only by the bridge, and never go into backups.
-  3. **Connect a bank** opens Teller's sign-in page. Centsible never sees your bank password.
-  4. Tap each account to link it to an account in your budget. Check the preview: purchases should be negative. Some banks send card purchases positive, so switch on **Reverse signs** if they look backwards. An account that syncs through SimpleFIN now moves over to Teller, and what's already there is matched rather than duplicated.
+  In the app, open **Bank sync → Teller**. A four-step guide walks through it:
+  1. **Make a free Teller account** at [teller.io](https://teller.io).
+  2. **Copy your Application ID** from the dashboard (it starts with `app_`).
+  3. **Add your certificate.** Under **Certificates → Create certificate**, Teller downloads your certificate and private key. Choose the downloaded files in the app (the `.zip`, or both `.pem` files); pasting the text also works. They stay on the bridge in `teller.json`, readable only by the bridge, and never go into backups. The environment defaults to **Development** (free, real banks).
+  4. **Connect a bank.** Teller opens its own sign-in page, so Centsible never sees your bank password. Then tap each account to link it to an account in your budget. Check the preview: purchases should be negative. Some banks send card purchases positive, so switch on **Reverse signs** if they look backwards. An account that syncs through SimpleFIN now moves over to Teller, and what's already there is matched rather than duplicated.
 
   When a bank asks you to sign in again, the account shows **needs reconnecting**. Tap **Reconnect**: the bank login is repaired in place, and the same links keep working.
+
+## Duplicates
+
+When a bank connection is reconnected or moved to another provider, the same purchase can come in twice. **Review → ⋮ → Find duplicates** (or the banner in Review) lists pairs: same account and amount, a few days apart. **Merge** uses Actual's own merge (Actual 26.10+), which keeps the bank's copy and carries over the category and notes from either.
 
 ## Links into the app
 
@@ -56,7 +61,7 @@ Other apps (Home Assistant dashboards and notifications, launcher shortcuts) can
 | Link | Opens |
 |---|---|
 | `centsible://open/review` | your review inbox |
-| `centsible://open/transactions`, `/accounts`, `/budget`, `/net-worth`, `/recurring`, `/trends`, `/bank-sync`, `/teller`, `/mortgage` | that screen |
+| `centsible://open/transactions`, `/accounts`, `/budget`, `/net-worth`, `/recurring`, `/trends`, `/bank-sync`, `/teller`, `/duplicates`, `/mortgage` | that screen |
 | `centsible://open/account/<account id>` | one account |
 | `centsible://open/category/<category id>?name=Groceries[&month=2026-11]` | a category's transactions |
 

@@ -21,6 +21,9 @@ import kotlinx.serialization.json.JsonObject
 @Serializable data class TransferCandidateDto(val transaction: TransactionDto, val exact: Boolean = false, val days: Int = 0)
 @Serializable data class TransferCandidatesDto(val transaction: TransactionDto, val items: List<TransferCandidateDto> = emptyList())
 @Serializable data class TransferLinkedDto(val from: TransactionDto, val to: TransactionDto)
+@Serializable data class DuplicatePairDto(val a: TransactionDto, val b: TransactionDto, val days: Int = 0)
+@Serializable data class DuplicatePairsDto(val pairs: List<DuplicatePairDto> = emptyList())
+@Serializable data class TransactionPairDto(val ids: List<String>)
 
 class TransactionToolsApi(private val client: BridgeClient) {
     suspend fun inbox(budgetId: String, limit: Int): ReviewInboxDto = client.get("/v1/budgets/$budgetId/review") { parameter("limit", limit) }
@@ -41,4 +44,12 @@ class TransactionToolsApi(private val client: BridgeClient) {
         }
     }
     suspend fun transferSettings(budgetId: String, body: TransferSettingsDto): TransferSettingsDto = client.send(HttpMethod.Put, "/v1/budgets/$budgetId/transfers/settings", body)
+    suspend fun duplicates(budgetId: String): DuplicatePairsDto = client.get("/v1/budgets/$budgetId/transactions/duplicates")
+    suspend fun merge(budgetId: String, body: TransactionPairDto): TransactionDto = client.send(HttpMethod.Post, "/v1/budgets/$budgetId/transactions/merge", body)
+    suspend fun dismissDuplicate(budgetId: String, body: TransactionPairDto) {
+        client.execute(HttpMethod.Post, "/v1/budgets/$budgetId/transactions/duplicates/dismiss") {
+            contentType(ContentType.Application.Json)
+            setBody(body)
+        }
+    }
 }

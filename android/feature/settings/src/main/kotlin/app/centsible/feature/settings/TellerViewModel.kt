@@ -42,8 +42,15 @@ data class TellerLinking(
     val preview: Loadable<List<TellerPreviewTransaction>> = Loadable.Loading,
 )
 
+/** The guided setup: make an account, copy the app id, pick the certificate, connect a bank. */
+enum class TellerStep { Account, ApplicationId, Certificate, ConnectBank }
+
 data class TellerUiState(
     val status: Loadable<TellerStatus> = Loadable.Loading,
+    /** Null once set up (or skipped): the regular Teller screen shows instead. */
+    val wizard: TellerStep? = null,
+    /** What the certificate picker found, in words ("Certificate ✓ · Private key ✓"), or why not. */
+    val certificateNote: String? = null,
     val isOwner: Boolean = false,
     val canEdit: Boolean = false,
     val editingSetup: Boolean = false,
@@ -85,7 +92,14 @@ class TellerViewModel @Inject constructor(
                 state.update {
                     it.copy(
                         status = Loadable.Ready(s),
-                        editingSetup = !s.configured && it.isOwner,
+                        // Not set up: the owner gets the guide. Set up with no bank yet: straight to connecting one.
+                        // Only on first opening, so a skipped guide stays skipped.
+                        wizard = if (it.status !is Loadable.Loading) it.wizard else when {
+                            !s.configured && it.isOwner -> TellerStep.Account
+                            s.configured && s.enrollments.isEmpty() && it.canEdit -> TellerStep.ConnectBank
+                            else -> null
+                        },
+                        editingSetup = false,
                         form = it.form.copy(applicationId = s.applicationId ?: it.form.applicationId, environment = s.environment ?: it.form.environment),
                     )
                 }
@@ -103,6 +117,30 @@ class TellerViewModel @Inject constructor(
             .onSuccess { (accounts, local) -> state.update { it.copy(accounts = Loadable.Ready(accounts), localAccounts = local) } }
             .onFailure { e -> state.update { it.copy(accounts = Loadable.Failed(e.userMessage())) } }
         refreshStatus()
+    }
+
+    // ── The guided setup ──
+
+    fun wizardTo(step: TellerStep?) = state.update { it.copy(wizard = step, message = null) }
+
+    /** Files from the picker: Teller's .zip, or the two .pem files. */
+    fun certificateFiles(files: List<Pair<String, ByteArray>>) {
+        val found = app.centsible.core.domain.TellerCertificates.extract(files)
+        state.update {
+            it.copy(
+                form = it.form.copy(certificate = found.certificate ?: it.form.certificate, privateKey = found.privateKey ?: it.form.privateKey),
+                certificateNote = found.problem ?: "Certificate ✓ · Private key ✓",
+            )
+        }
+    }
+
+    /** Saves the wizard's answers; on success the next step is connecting a bank. */
+    fun saveFromWizard() {
+        val f = state.value.form
+        act("Teller is set up") {
+            val s = teller.configure(f.applicationId, f.environment, f.certificate.ifBlank { null }, f.privateKey.ifBlank { null })
+            state.update { it.copy(status = Loadable.Ready(s), wizard = TellerStep.ConnectBank, certificateNote = null, form = it.form.copy(certificate = "", privateKey = "")) }
+        }
     }
 
     // ── Setup (owners) ──
@@ -145,7 +183,7 @@ class TellerViewModel @Inject constructor(
     /** Teller Connect succeeded: hand the bank login to the bridge, which checks it with Teller. */
     fun onConnected(result: TellerEnrollmentResult) {
         val repairing = state.value.connect?.enrollmentId != null
-        state.update { it.copy(connect = null) }
+        state.update { it.copy(connect = null, wizard = null) }
         act(if (repairing) "${result.institution.ifBlank { "The bank" }} is reconnected" else "${result.institution.ifBlank { "Bank" }} connected. Link its accounts below.") {
             teller.addEnrollment(result)
             refreshStatus()

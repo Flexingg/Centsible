@@ -45,6 +45,8 @@ data class ReviewUiState(
     val rulePrompt: RulePrompt? = null,
     /** The card being linked to its other side (a card payment). */
     val linking: Transaction? = null,
+    /** Probable duplicate pairs (0 when none, or the bridge can't look). */
+    val duplicates: Int = 0,
 ) {
     val left get() = (data as? Loadable.Ready)?.value?.let { (it.total - it.done).coerceAtLeast(it.queue.size) } ?: 0
 }
@@ -69,6 +71,12 @@ class ReviewViewModel @Inject constructor(
         runCatching { fetch() }
             .onSuccess { d -> state.update { it.copy(data = Loadable.Ready(d)) } }
             .onFailure { e -> state.update { it.copy(data = Loadable.Failed(e.userMessage())) } }
+        countDuplicates()
+    }
+
+    /** Best effort: an older bridge has no duplicate finder, and the inbox works without it. */
+    private suspend fun countDuplicates() {
+        runCatching { tools.duplicates(selectedBudget()).size }.onSuccess { n -> state.update { it.copy(duplicates = n) } }
     }
 
     private suspend fun fetch(): ReviewData = coroutineScope {
@@ -117,6 +125,7 @@ class ReviewViewModel @Inject constructor(
             if (away) {
                 away = false
                 viewModelScope.launch {
+                    countDuplicates()
                     // Your edits count as reviewed on the bridge, so an edited card drops out.
                     runCatching { fetch() }.onSuccess { d ->
                         updateData { d.copy(done = before.done, total = d.total + before.done) }

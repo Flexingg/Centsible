@@ -1,11 +1,11 @@
 {
   "items": [
     {
-      "id": "ee26fa40-c644-457a-bf68-c67d906f7113",
-      "accountId": "4f50dbe9-b7f1-48f7-b629-e31d374afafd",
-      "date": "2026-09-15",
+      "id": "12b8cfab-2801-408a-a75c-bfcdf4d0eca9",
+      "accountId": "80ca1365-e5c7-40a6-bc01-17ddcc44837f",
+      "date": "2026-11-15",
       "amount": -777,
-      "payeeId": "38d4a1c8-bf13-4437-8626-089904858736",
+      "payeeId": "910121e5-c860-4e28-abef-8dde264842a6",
       "payeeName": "After Catch Up",
       "categoryId": null,
       "notes": null,
@@ -19,5 +19,5 @@
   ],
   "total": 1,
   "more": false,
-  "since": "2026-09-29T08:04:58.036Z"
+  "since": "2026-11-18T15:30:48.359Z"
 }

@@ -10,7 +10,7 @@ import type { ActualHost, Lib } from './host.js';
  * longer count). Saving here always writes 'ui', like Actual's own automation editor.
  *
  * Actual keeps amounts in currency units (50 means $50.00); this API uses minor units
- * like everything else, converted at the edge. Verified against 26.9.0's handlers:
+ * like everything else, converted at the edge. Verified against 26.11.0's handlers:
  * budget/get-category-automations, budget/set-category-automations,
  * budget/dry-run-category-template, budget/store-note-templates,
  * budget/apply-multiple-templates.

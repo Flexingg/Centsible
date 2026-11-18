@@ -1007,6 +1007,71 @@ paths:
             application/json:
               schema: { type: object, required: [remaining], properties: { remaining: { type: integer } } }
 
+  /v1/budgets/{budgetId}/transactions/duplicates:
+    get:
+      tags: [budgets]
+      operationId: findDuplicates
+      summary: Probable duplicates from the last 120 days. Same account and amount, within 3 days, and either from different sources (Teller, another bank import, typed in) or with the same payee. Each transaction is in at most one pair.
+      parameters:
+        - $ref: '#/components/parameters/BudgetId'
+      responses:
+        '200':
+          description: Pairs, newest first
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DuplicatePairs' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '423': { $ref: '#/components/responses/Problem' }
+
+  /v1/budgets/{budgetId}/transactions/merge:
+    post:
+      tags: [budgets]
+      operationId: mergeTransactions
+      summary: Members. Merges two transactions into one with Actual's mergeTransactions (needs Actual 26.10+; see the transactions.merge capability). The bank-imported one is kept; category, notes and cleared state carry over from either. Same account and amount only.
+      parameters:
+        - $ref: '#/components/parameters/BudgetId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ids]
+              additionalProperties: false
+              properties:
+                ids: { type: array, items: { type: string, minLength: 1 }, minItems: 2, maxItems: 2 }
+      responses:
+        '200':
+          description: The transaction that was kept
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Transaction' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '501': { $ref: '#/components/responses/Problem' }
+        '423': { $ref: '#/components/responses/Problem' }
+
+  /v1/budgets/{budgetId}/transactions/duplicates/dismiss:
+    post:
+      tags: [budgets]
+      operationId: dismissDuplicate
+      summary: Members. Not a duplicate; stop suggesting this pair.
+      parameters:
+        - $ref: '#/components/parameters/BudgetId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ids]
+              additionalProperties: false
+              properties:
+                ids: { type: array, items: { type: string, minLength: 1 }, minItems: 2, maxItems: 2 }
+      responses:
+        '204': { description: Dismissed }
+        '403': { $ref: '#/components/responses/Problem' }
+
   /v1/budgets/{budgetId}/transfers/matches:
     get:
       tags: [budgets]
@@ -3346,6 +3411,19 @@ components:
       properties:
         fromId: { type: string, description: The side money left }
         toId: { type: string, description: The side money arrived }
+    DuplicatePairs:
+      type: object
+      required: [pairs]
+      properties:
+        pairs:
+          type: array
+          items:
+            type: object
+            required: [a, b, days]
+            properties:
+              a: { $ref: '#/components/schemas/Transaction' }
+              b: { $ref: '#/components/schemas/Transaction' }
+              days: { type: integer, description: Days between the two dates }
     TransferMatches:
       type: object
       required: [pairs, auto]

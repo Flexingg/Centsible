@@ -97,6 +97,9 @@ fun TellerRoute(onBack: () -> Unit, viewModel: TellerViewModel = hiltViewModel()
             editSetup = viewModel::editSetup,
             onForm = viewModel::onForm,
             saveSetup = viewModel::saveSetup,
+            wizardTo = viewModel::wizardTo,
+            certificateFiles = viewModel::certificateFiles,
+            saveFromWizard = viewModel::saveFromWizard,
             askReset = viewModel::askReset,
             reset = { viewModel.reset() },
             connect = { viewModel.openConnect(it) },
@@ -123,6 +126,9 @@ data class TellerActions(
     val editSetup: (Boolean) -> Unit = {},
     val onForm: (TellerSetupForm) -> Unit = {},
     val saveSetup: () -> Unit = {},
+    val wizardTo: (TellerStep?) -> Unit = {},
+    val certificateFiles: (List<Pair<String, ByteArray>>) -> Unit = {},
+    val saveFromWizard: () -> Unit = {},
     val askReset: (Boolean) -> Unit = {},
     val reset: () -> Unit = {},
     /** null adds a bank; an enrollment id reconnects that one. */
@@ -153,14 +159,15 @@ fun TellerScreen(state: TellerUiState, actions: TellerActions) {
         topBar = {
             Row(Modifier.fillMaxWidth().padding(start = 4.dp, end = 16.dp, top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = actions.back) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Back") }
-                Text("Teller", style = MaterialTheme.typography.headlineSmall)
+                Text(if (state.wizard != null) "Set up Teller" else "Teller", style = MaterialTheme.typography.headlineSmall, modifier = Modifier.weight(1f))
+                if (state.wizard != null) TextButton(onClick = { actions.wizardTo(null); if (state.ready?.configured != true) actions.editSetup(true) }) { Text("Skip guide") }
             }
         },
     ) { padding ->
         when (val s = state.status) {
             Loadable.Loading -> LoadingState(Modifier.padding(padding))
             is Loadable.Failed -> MessageState("Couldn't load Teller", s.message, emoji = "🏦", actionLabel = "Try again", onAction = actions.retry, modifier = Modifier.padding(padding))
-            is Loadable.Ready -> LazyColumn(
+            is Loadable.Ready -> if (state.wizard != null) TellerWizard(state.wizard, s.value, state, actions, Modifier.padding(padding)) else LazyColumn(
                 Modifier.fillMaxSize().padding(padding),
                 contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 32.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),

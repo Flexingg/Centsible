@@ -8,22 +8,22 @@
     24,
     168
   ],
-  "lastRunAt": "2026-09-28T21:39:37.437Z",
+  "lastRunAt": "2026-11-18T15:30:52.832Z",
   "lastError": null,
-  "nextRunAt": "2026-09-29T21:39:37.437Z",
-  "totalSize": 107071,
+  "nextRunAt": "2026-11-19T15:30:52.832Z",
+  "totalSize": 168574,
   "items": [
     {
-      "id": "20260928T213937Z",
-      "createdAt": "2026-09-28T21:39:37.437Z",
+      "id": "20261118T153052Z",
+      "createdAt": "2026-11-18T15:30:52.832Z",
       "trigger": "manual",
-      "size": 107071,
+      "size": 168574,
       "budgets": [
         {
-          "budgetId": "09d8609a-a45d-46a1-a269-faf414913c55",
+          "budgetId": "6e545e97-d987-45e1-a0d0-af9063d5207f",
           "name": "Household",
-          "file": "household-09d8609a.zip",
-          "size": 24827
+          "file": "household-6e545e97.zip",
+          "size": 24890
         }
       ],
       "skipped": [],

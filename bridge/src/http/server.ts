@@ -22,6 +22,7 @@ import type { JobStore } from '../jobs.js';
 import type { SetupService } from '../setup.js';
 import type { BankSyncOps } from '../actual/bank-sync-ops.js';
 import type { TellerOps } from '../actual/teller-ops.js';
+import type { DuplicateOps } from '../actual/duplicate-ops.js';
 import type { BankSyncBackfill } from '../bank-sync-backfill.js';
 import type { BankSyncScheduler } from '../bank-sync-scheduler.js';
 import type { HouseholdStore, Member, Device, Role } from '../auth/store.js';
@@ -45,6 +46,7 @@ import { bankSyncRoutes } from './routes/bank-sync.js';
 
 export type Deps = {
   teller: TellerOps;
+  duplicates: DuplicateOps;
   config: BridgeConfig;
   store: HouseholdStore;
   host: ActualHost;

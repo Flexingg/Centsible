@@ -207,7 +207,9 @@ export class BankSyncOps {
   updateSettings(budgetId: string, accountId: string, patch: Partial<BankSyncSettings>): Promise<BankSyncSettings> {
     return this.host.withBudget(budgetId, 'write', async (lib) => {
       if (!(await linkedAccounts()).some((l) => l.id === accountId)) throw ApiError.notFound('Account not found');
-      const save = (id: string, value: string) => send(lib)('preferences/save', { id, value });
+      // The public API can write synced preferences since Actual 26.10; older servers need the handler.
+      const setPref = (api as { setPreference?: (id: string, value: string) => Promise<void> }).setPreference;
+      const save = (id: string, value: string) => (typeof setPref === 'function' ? setPref(id, value) : send(lib)('preferences/save', { id, value }));
       for (const [key, [prefix]] of Object.entries(BOOLEAN_PREFS) as [keyof typeof BOOLEAN_PREFS, readonly [string, boolean]][]) {
         const v = patch[key];
         if (typeof v === 'boolean') await save(`${prefix}-${accountId}`, String(v));

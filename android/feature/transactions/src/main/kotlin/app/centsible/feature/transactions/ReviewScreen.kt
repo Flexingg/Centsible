@@ -93,6 +93,7 @@ data class ReviewActions(
     /** Opens (or with null, closes) the sheet to link this card to its other side. */
     val linkTransfer: (Transaction?) -> Unit = {},
     val transferLinked: (Transaction, TransactionId, String) -> Unit = { _, _, _ -> },
+    val findDuplicates: () -> Unit = {},
 )
 
 @Composable
@@ -101,6 +102,7 @@ fun ReviewRoute(
     onOpen: (TransactionId) -> Unit,
     onMakeRule: (app.centsible.core.model.PayeeId, CategoryId?) -> Unit = { _, _ -> },
     onMatchTransfers: () -> Unit = {},
+    onFindDuplicates: () -> Unit = {},
     viewModel: ReviewViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -128,6 +130,7 @@ fun ReviewRoute(
             matchTransfers = { viewModel.leaving(); onMatchTransfers() },
             linkTransfer = viewModel::linkTransfer,
             transferLinked = viewModel::transferLinked,
+            findDuplicates = { viewModel.leaving(); onFindDuplicates() },
         ),
     )
 }
@@ -151,9 +154,25 @@ fun ReviewScreen(state: ReviewUiState, actions: ReviewActions, today: LocalDate 
                     IconButton(onClick = { menu = true }) { Icon(Icons.Rounded.MoreVert, contentDescription = "More") }
                     DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
                         DropdownMenuItem(text = { Text("Match transfers") }, onClick = { menu = false; actions.matchTransfers() })
+                        DropdownMenuItem(text = { Text("Find duplicates") }, onClick = { menu = false; actions.findDuplicates() })
                         if (state.left > 0) DropdownMenuItem(text = { Text("Mark all reviewed") }, onClick = { menu = false; actions.askReviewAll(true) })
                     }
                 }
+            }
+        }
+        if (state.duplicates > 0) {
+            // A reconnected or switched bank sync can bring the same purchase in twice.
+            androidx.compose.material3.Surface(
+                onClick = actions.findDuplicates,
+                color = colors.warning.copy(alpha = 0.15f),
+                shape = MaterialTheme.shapes.medium,
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 4.dp),
+            ) {
+                Text(
+                    if (state.duplicates == 1) "1 transaction looks doubled up. Review it" else "${state.duplicates} transactions look doubled up. Review them",
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                )
             }
         }
         when (val data = state.data) {
