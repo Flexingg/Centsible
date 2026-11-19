@@ -1,0 +1,7 @@
+{
+  "configured": true,
+  "applicationId": "app_abc123",
+  "environment": "development",
+  "hasCertificate": true,
+  "enrollments": []
+}

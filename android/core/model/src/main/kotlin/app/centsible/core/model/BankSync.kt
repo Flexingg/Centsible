@@ -10,7 +10,12 @@ data class BankSyncOverview(
     /** False for SimpleFIN connections made before the bridge could import history; reconnecting fixes it. */
     val historyAccess: Boolean = false,
     val backfill: Backfill? = null,
-)
+    /** Null on bridges from before Teller support. */
+    val teller: TellerStatus? = null,
+) {
+    /** Some provider is set up, so syncing and the schedule apply. */
+    val anyProvider get() = simplefinConfigured || teller?.configured == true
+}
 
 /** Importing older SimpleFIN history, 90 days per request, over hours or days. */
 data class Backfill(
@@ -81,11 +86,11 @@ data class AccountSyncResult(val accountId: AccountId, val name: String, val new
 object BankSyncStatus {
     fun describe(status: String?): String? = when (status) {
         null, "ok" -> null
-        "reauth-required" -> "The bank connection needs you to sign in again at SimpleFIN."
-        "attention-required" -> "The bank connection needs your attention at SimpleFIN."
+        "reauth-required" -> "The bank connection needs you to sign in again (SimpleFIN: at bridge.simplefin.org; Teller: Reconnect in Bank sync → Teller)."
+        "attention-required" -> "The bank connection needs your attention. Check Bank sync."
         "rate-limit-exceeded" -> "Too many syncs today. Try again tomorrow."
         "timed-out" -> "The bank took too long to answer. It'll retry next sync."
-        "account-missing" -> "This account is no longer in your SimpleFIN connection."
+        "account-missing" -> "This account is no longer in your bank connection."
         else -> "The last sync failed."
     }
 }

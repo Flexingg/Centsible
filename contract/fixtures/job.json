@@ -1,10 +1,10 @@
 {
-  "id": "1905a993-7162-4951-9949-8b6114099717",
+  "id": "b9754e26-b836-4a5e-9fb2-ddb9026c5073",
   "kind": "bank-sync",
-  "budgetId": "29a88e7d-8a39-4792-bd6b-b4069ca1986d",
+  "budgetId": "67353afc-08a7-457c-ae0c-673751d220ec",
   "status": "failed",
-  "startedAt": "2026-09-28T21:39:31.200Z",
-  "finishedAt": "2026-09-28T21:39:31.200Z",
+  "startedAt": "2026-11-18T15:30:49.076Z",
+  "finishedAt": "2026-11-18T15:30:49.077Z",
   "result": null,
   "error": "This account isn't linked to a bank. Link it in Settings → Bank sync."
 }

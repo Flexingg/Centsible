@@ -1,11 +1,11 @@
 {
-  "id": "fceb3b99-81f8-468c-82ab-e9a76e8f0a7b",
+  "id": "79333bbc-4c2b-4cae-aab0-4df61b7e7754",
   "name": "Spotify",
-  "nextDate": "2026-10-05",
+  "nextDate": "2026-12-05",
   "completed": false,
   "postsTransaction": false,
-  "payeeId": "7daac583-6246-4b0a-93a3-98980679b594",
-  "accountId": "54e13bbf-a13d-4c6c-a36f-345b65874410",
+  "payeeId": "5d9e52fb-a85d-4661-af4c-518a922b41db",
+  "accountId": "52cecf45-cd74-4cc2-8c32-9c32bc7c3834",
   "amount": -1099,
   "amountMax": null,
   "amountOp": "isapprox",
@@ -13,12 +13,12 @@
     "endMode": "never",
     "interval": 1,
     "frequency": "monthly",
-    "start": "2026-10-05"
+    "start": "2026-12-05"
   },
   "date": null,
   "upcoming": [
-    "2026-10-05",
-    "2026-11-05",
-    "2026-12-05"
+    "2026-12-05",
+    "2027-01-05",
+    "2027-02-05"
   ]
 }

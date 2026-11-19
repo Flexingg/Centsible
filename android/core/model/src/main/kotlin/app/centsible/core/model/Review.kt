@@ -22,3 +22,6 @@ data class TransferPair(val from: Transaction, val to: Transaction, val days: In
 data class TransferCandidate(val transaction: Transaction, val exact: Boolean, val days: Int)
 
 data class TransferMatches(val pairs: List<TransferPair>, val auto: Boolean)
+
+/** The same transaction twice in an account (a reconnected or switched bank sync); merging keeps one. */
+data class DuplicatePair(val a: Transaction, val b: Transaction, val days: Int)

@@ -120,7 +120,7 @@ jobs:
     needs: bridge
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write # the home-assistant branch
       packages: write
     steps:
       - uses: actions/checkout@v7
@@ -178,6 +178,40 @@ jobs:
           push: true
           build-args: ACTUAL_VERSION=${{ steps.actual.outputs.version }}
           tags: ghcr.io/flexingg/centsible-actual:${{ steps.actual.outputs.version }},ghcr.io/flexingg/centsible-actual:latest
+      - name: Publish the Home Assistant app image
+        # Actual's server and the bridge in one image, tagged with the release, which is the
+        # app version Home Assistant offers (see the next step).
+        if: steps.publish.outputs.tags != ''
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: homeassistant/centsible/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          build-args: |
+            ACTUAL_VERSION=${{ steps.actual.outputs.version }}
+            BRIDGE_RELEASE=${{ steps.publish.outputs.release }}
+          tags: ghcr.io/flexingg/centsible-ha:${{ steps.publish.outputs.release }},ghcr.io/flexingg/centsible-ha:latest
+      - name: Publish the Home Assistant app repository
+        # Home Assistant reads https://github.com/Flexingg/Centsible#home-assistant: just the
+        # app folder, with this release as its version. A new version there is what makes
+        # Home Assistant offer the update. Force-pushed each time; it holds nothing else.
+        if: steps.publish.outputs.tags != ''
+        env:
+          RELEASE: ${{ steps.publish.outputs.release }}
+        run: |
+          out="$RUNNER_TEMP/ha-repo"
+          rm -rf "$out" && mkdir -p "$out"
+          cp homeassistant/repository.yaml "$out/"
+          cp -r homeassistant/centsible "$out/centsible"
+          rm "$out/centsible/Dockerfile" "$out/centsible/run.mjs" # the image is prebuilt
+          sed -i "s/^version: .*/version: \"$RELEASE\"/" "$out/centsible/config.yaml"
+          grep -q "^version: \"$RELEASE\"" "$out/centsible/config.yaml"
+          cd "$out"
+          git init -q -b home-assistant
+          git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" add -A
+          git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" commit -q -m "Centsible $RELEASE for Home Assistant"
+          git push -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" home-assistant
 
   release:
     # Every green push to main becomes a release with the APK attached, so a phone

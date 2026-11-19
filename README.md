@@ -17,6 +17,16 @@ The **bridge** is a small Node service. It wraps Actual's official API behind a 
 
 ## Run it
 
+### In Home Assistant (recommended if you run it)
+
+Actual's server and the bridge run together as one Home Assistant app, updated from Home Assistant and included in its backups. No Docker Compose, Watchtower or separate tunnel container.
+
+1. **Settings → Apps → App store → ⋮ → Repositories**, add `https://github.com/Flexingg/Centsible#home-assistant`, then install **Centsible**.
+2. Follow the app's **Documentation** tab: set the public address, start it, and use the setup code from its log. Moving from Docker Compose is a copy of two folders, described there too.
+
+### With Docker Compose
+
+
 1. From the [latest release](https://github.com/Flexingg/Centsible/releases/latest), download `docker-compose.yml` and `env.example` into one folder on your server, and rename `env.example` to `.env`. Set `BRIDGE_PUBLIC_URL` and `CLOUDFLARE_TUNNEL_TOKEN`; everything else is optional. (No need to clone this repo: the bridge image is published to `ghcr.io/flexingg/centsible-bridge`.)
 2. In the Cloudflare dashboard, give your tunnel two public hostnames:
    - `actual.example.com` → `http://actual:5006`
@@ -35,6 +45,37 @@ The **bridge** is a small Node service. It wraps Actual's official API behind a 
 5. Invite the rest of the household from **More → Settings → Household**: add each person, then tap **Invite** to show a QR code for them to scan.
 
 The setup code works once, until the first owner exists; knowing the bridge's address isn't enough to claim it. Prefer the command line? `docker compose exec bridge node dist/admin/cli.js add-member --name "Jo" --role owner --pair` still prints an owner invite QR code.
+
+## Bank sync: SimpleFIN and Teller
+
+Accounts can sync through either provider, and you can mix them account by account. Both run on the bridge's schedule and on **Sync now**.
+
+- **SimpleFIN** (about $15 a year): set up in Actual's way, with a setup token from bridge.simplefin.org. **More → Settings → Bank sync**.
+- **Teller** (free for personal use, up to 100 bank logins): useful when a bank keeps breaking in SimpleFIN. Actual has no Teller support, so the bridge does the syncing itself and hands transactions to Actual's importer (which runs your rules).
+  In the app, open **Bank sync → Teller**. A four-step guide walks through it:
+  1. **Make a free Teller account** at [teller.io](https://teller.io).
+  2. **Copy your Application ID** from the dashboard (it starts with `app_`).
+  3. **Add your certificate.** Under **Certificates → Create certificate**, Teller downloads your certificate and private key. Choose the downloaded files in the app (the `.zip`, or both `.pem` files); pasting the text also works. They stay on the bridge in `teller.json`, readable only by the bridge, and never go into backups. The environment defaults to **Development** (free, real banks).
+  4. **Connect a bank.** Teller opens its own sign-in page, so Centsible never sees your bank password. Then tap each account to link it to an account in your budget. Check the preview: purchases should be negative. Some banks send card purchases positive, so switch on **Reverse signs** if they look backwards. An account that syncs through SimpleFIN now moves over to Teller, and what's already there is matched rather than duplicated.
+
+  When a bank asks you to sign in again, the account shows **needs reconnecting**. Tap **Reconnect**: the bank login is repaired in place, and the same links keep working.
+
+## Duplicates
+
+When a bank connection is reconnected or moved to another provider, the same purchase can come in twice. **Review → ⋮ → Find duplicates** (or the banner in Review) lists pairs: same account and amount, a few days apart. **Merge** uses Actual's own merge (Actual 26.10+), which keeps the bank's copy and carries over the category and notes from either.
+
+## Links into the app
+
+Other apps (Home Assistant dashboards and notifications, launcher shortcuts) can open a screen directly:
+
+| Link | Opens |
+|---|---|
+| `centsible://open/review` | your review inbox |
+| `centsible://open/transactions`, `/accounts`, `/budget`, `/net-worth`, `/recurring`, `/trends`, `/bank-sync`, `/teller`, `/duplicates`, `/mortgage` | that screen |
+| `centsible://open/account/<account id>` | one account |
+| `centsible://open/category/<category id>?name=Groceries[&month=2026-11]` | a category's transactions |
+
+Links only navigate; the app lock still applies. From a Home Assistant dashboard or notification, use the intent form so the link always reaches the app: `intent://open/review#Intent;scheme=centsible;package=app.centsible.budget;end`. The [Home Assistant integration](https://github.com/Flexingg/centsible-homeassistant) shows each account's and category's id as an attribute.
 
 ## Releases
 

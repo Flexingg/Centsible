@@ -1,0 +1,11 @@
+{
+  "accountId": "a0a7b02c-e2c3-49f4-984c-8f5ed8fbb3a8",
+  "result": {
+    "accountId": "a0a7b02c-e2c3-49f4-984c-8f5ed8fbb3a8",
+    "name": "Everyday Checking",
+    "newTransactions": 1,
+    "matchedTransactions": 1,
+    "error": null,
+    "status": "ok"
+  }
+}

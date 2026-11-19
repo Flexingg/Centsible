@@ -3,6 +3,7 @@ import type { HouseholdStore } from '../auth/store.js';
 import { ApiError } from '../errors.js';
 import type { ActualHost, Lib } from './host.js';
 import { claimSetupToken, SimpleFinError, type SimpleFinKeyFile } from './simplefin-client.js';
+import type { TellerOps } from './teller-ops.js';
 
 type Raw = Record<string, unknown>;
 type Send = (name: string, args?: unknown) => Promise<unknown>;
@@ -61,6 +62,9 @@ export class BankSyncOps {
 
   /** Runs after each sync, in the same budget session (auto-linking transfers). */
   afterSync?: (budgetId: string, lib: Lib) => Promise<number>;
+
+  /** The second provider: accounts linked through Teller sync alongside SimpleFIN ones. */
+  teller?: TellerOps;
 
   /** Whether the bridge holds its own copy of the SimpleFIN access URL (needed for history backfill). */
   get historyAccess() {
@@ -203,7 +207,9 @@ export class BankSyncOps {
   updateSettings(budgetId: string, accountId: string, patch: Partial<BankSyncSettings>): Promise<BankSyncSettings> {
     return this.host.withBudget(budgetId, 'write', async (lib) => {
       if (!(await linkedAccounts()).some((l) => l.id === accountId)) throw ApiError.notFound('Account not found');
-      const save = (id: string, value: string) => send(lib)('preferences/save', { id, value });
+      // The public API can write synced preferences since Actual 26.10; older servers need the handler.
+      const setPref = (api as { setPreference?: (id: string, value: string) => Promise<void> }).setPreference;
+      const save = (id: string, value: string) => (typeof setPref === 'function' ? setPref(id, value) : send(lib)('preferences/save', { id, value }));
       for (const [key, [prefix]] of Object.entries(BOOLEAN_PREFS) as [keyof typeof BOOLEAN_PREFS, readonly [string, boolean]][]) {
         const v = patch[key];
         if (typeof v === 'boolean') await save(`${prefix}-${accountId}`, String(v));
@@ -228,12 +234,14 @@ export class BankSyncOps {
    * Syncs every linked account the way Actual's "Sync all" does: SimpleFIN accounts in
    * one batched request (quota-friendly), other providers one by one.
    */
-  syncAll(budgetId: string): Promise<SyncSummary> {
+  syncAll(budgetId: string, opts: { simplefin?: boolean } = {}): Promise<SyncSummary> {
     return this.host.withBudget(budgetId, 'write', async (lib) => {
       const linked = (await linkedAccounts()).filter((l) => l.source && !l.closed);
-      const simplefin = linked.filter((l) => l.source === 'simpleFin');
+      // The scheduler passes simplefin: false when SimpleFIN's daily quota is nearly used up.
+      const simplefin = opts.simplefin === false ? [] : linked.filter((l) => l.source === 'simpleFin');
       const others = linked.filter((l) => l.source !== 'simpleFin');
-      if (!linked.length) throw ApiError.validation('No accounts are linked to a bank yet. Link one in Settings → Bank sync.');
+      const teller = this.teller?.hasLinks(budgetId) ?? false;
+      if (!linked.length && !teller) throw ApiError.validation('No accounts are linked to a bank yet. Link one in Settings → Bank sync.');
       const results: AccountSyncResult[] = [];
       if (simplefin.length) {
         this.store.recordSimpleFinRequest();
@@ -246,7 +254,9 @@ export class BankSyncOps {
         results.push(toResult(linked, a.id, res));
       }
       await settle();
-      return linked_(await withStatuses(results, simplefin.length ? 1 : 0), await this.after(budgetId, lib));
+      const summary = await withStatuses(results, simplefin.length ? 1 : 0);
+      if (teller) addResults(summary, await this.teller!.syncIn(budgetId));
+      return linked_(summary, await this.after(budgetId, lib));
     });
   }
 
@@ -261,6 +271,11 @@ export class BankSyncOps {
       const linked = await linkedAccounts();
       const acct = linked.find((l) => l.id === accountId);
       if (!acct) throw ApiError.notFound('Account not found');
+      if (this.teller?.links(budgetId).some((l) => l.accountId === accountId)) {
+        const summary: SyncSummary = { accounts: 0, newTransactions: 0, results: [], simplefinRequests: 0 };
+        addResults(summary, await this.teller.syncIn(budgetId, [accountId]));
+        return linked_(summary, await this.after(budgetId, lib));
+      }
       if (!acct.source) throw ApiError.validation("This account isn't linked to a bank. Link it in Settings → Bank sync.");
       if (acct.source === 'simpleFin') this.store.recordSimpleFinRequest();
       const res = (await send(lib)('accounts-bank-sync', { ids: [accountId] })) as SyncResponse;
@@ -342,3 +357,9 @@ export async function readSettings(accountId: string): Promise<BankSyncSettings>
 }
 
 const linked_ = (s: SyncSummary, transfersLinked: number): SyncSummary => (transfersLinked ? { ...s, transfersLinked } : s);
+
+function addResults(s: SyncSummary, results: AccountSyncResult[]) {
+  s.results.push(...results);
+  s.accounts += results.length;
+  s.newTransactions += results.reduce((n, r) => n + r.newTransactions, 0);
+}

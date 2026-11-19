@@ -263,7 +263,7 @@ function routeConsoleToDebug(log: Logger) {
 }
 
 /**
- * Actual tags encryption failures with error codes (verified on 26.9.0); the message
+ * Actual tags encryption failures with error codes (verified on 26.11.0); the message
  * check is a fallback in case a release drops the code.
  */
 function encryptionProblem(err: unknown): 'missing' | 'wrong' | null {

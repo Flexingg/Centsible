@@ -1,7 +1,7 @@
 import { createServer, type Server } from 'node:http';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { mkdirSync, rmSync } from 'node:fs';
+import { mkdirSync, readFileSync, rmSync } from 'node:fs';
 import type { FastifyInstance } from 'fastify';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { ActualHost } from '../../src/actual/host.js';
@@ -42,12 +42,16 @@ async function call(method: string, url: string, path: string, token: string, bo
   return { status: res.statusCode, body: expectContract(method, path, res) as Record<string, any> };
 }
 
+/** The Actual release this bridge is pinned to, and a pretend newer one for GitHub's answer. */
+const PINNED = (JSON.parse(readFileSync(new URL('../../package.json', import.meta.url), 'utf8')) as { dependencies: Record<string, string> }).dependencies['@actual-app/api']!;
+const NEWER = PINNED.replace(/^(\d+)\.(\d+)\..*$/, (_, y: string, m: string) => `${y}.${Number(m) + 1}.0`);
+
 /** GitHub's "latest release" answers for Centsible and for Actual. */
 const fakeGitHub = (async (url: string | URL, init?: RequestInit) => {
   const u = String(url);
   if (!u.startsWith('https://api.github.com/')) return fetch(url, init); // the updater is a real local server
   const body = u.includes('actualbudget')
-    ? { tag_name: 'v26.10.0' }
+    ? { tag_name: `v${NEWER}` }
     : {
         tag_name: 'v0.2.99', html_url: 'https://github.com/Flexingg/Centsible/releases/tag/v0.2.99', published_at: '2026-09-28T12:00:00Z', body: 'Notes',
         assets: [{ name: 'docker-compose.yml', browser_download_url: 'https://x/compose' }, { name: 'centsible-0.2.99.apk', browser_download_url: 'https://x/app.apk' }],
@@ -95,8 +99,8 @@ describe('server status', () => {
     expect(res.status).toBe(200);
     const s = res.body;
     expect(s.bridge).toMatchObject({ version: BRIDGE_VERSION, latest: '0.2.99', updateAvailable: true });
-    expect(s.actual).toMatchObject({ pairedVersion: '26.9.0', compatibility: 'ok', newestRelease: '26.10.0', connected: true });
-    expect(s.actual.version).toMatch(/^26\.9\./);
+    expect(s.actual).toMatchObject({ pairedVersion: PINNED, compatibility: 'ok', newestRelease: NEWER, connected: true });
+    expect(s.actual.version).toBe(PINNED);
     expect(s.app).toMatchObject({ version: '0.2.99', versionCode: 99, apkUrl: 'https://x/app.apk' });
     expect(s.updater).toMatchObject({ configured: false });
     expect(s.disk.free).toBeGreaterThan(0);
@@ -110,6 +114,20 @@ describe('one-tap updates', () => {
     const res = await call('POST', '/v1/server/update', '/v1/server/update', owner);
     expect(res.status).toBe(400);
     expect(res.body.detail).toMatch(/docker-compose.yml/);
+  });
+
+  it('points to Home Assistant when Centsible runs as a Home Assistant app', async () => {
+    // The routes hold the ServerOps built at startup, which reads this config object.
+    config.managedBy = 'home-assistant';
+    try {
+      const status = await call('GET', '/v1/server', '/v1/server', owner);
+      expect(status.body.updater).toMatchObject({ configured: false, managedBy: 'home-assistant' });
+      const res = await call('POST', '/v1/server/update', '/v1/server/update', owner);
+      expect(res.status).toBe(400);
+      expect(res.body.detail).toMatch(/Settings → Apps → Centsible → Update/);
+    } finally {
+      delete config.managedBy;
+    }
   });
 
   it('asks the updater, with its token, and remembers the outcome', async () => {

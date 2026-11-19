@@ -75,12 +75,15 @@ import app.centsible.core.model.ExternalAccount
 import app.centsible.core.model.FieldMapping
 
 @Composable
-fun BankSyncRoute(onBack: () -> Unit, viewModel: BankSyncViewModel = hiltViewModel()) {
+fun BankSyncRoute(onBack: () -> Unit, onOpenTeller: () -> Unit = {}, viewModel: BankSyncViewModel = hiltViewModel()) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    // Back from the Teller screen: links and statuses may have changed.
+    androidx.lifecycle.compose.LifecycleResumeEffect(Unit) { viewModel.load(); onPauseOrDispose { } }
     BankSyncScreen(
         state,
         BankSyncActions(
             back = onBack,
+            openTeller = onOpenTeller,
             retry = { viewModel.load() },
             onToken = viewModel::onToken,
             connect = viewModel::connect,
@@ -104,6 +107,7 @@ fun BankSyncRoute(onBack: () -> Unit, viewModel: BankSyncViewModel = hiltViewMod
 
 data class BankSyncActions(
     val back: () -> Unit = {},
+    val openTeller: () -> Unit = {},
     val retry: () -> Unit = {},
     val onToken: (String) -> Unit = {},
     val connect: () -> Unit = {},
@@ -147,11 +151,10 @@ fun BankSyncScreen(state: BankSyncUiState, actions: BankSyncActions) {
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 item { SimpleFinCard(o.value, state, actions) }
-                if (o.value.simplefinConfigured) {
-                    item { AccountsCard(state, actions) }
-                    item { SyncCard(o.value, state, actions) }
-                    item { HistoryCard(o.value, state, actions) }
-                }
+                if (o.value.simplefinConfigured) item { AccountsCard(state, actions) }
+                o.value.teller?.let { t -> item { TellerCard(t, actions) } }
+                if (o.value.anyProvider) item { SyncCard(o.value, state, actions) }
+                if (o.value.simplefinConfigured) item { HistoryCard(o.value, state, actions) }
             }
         }
     }
@@ -215,6 +218,32 @@ private fun SimpleFinCard(o: BankSyncOverview, state: BankSyncUiState, actions: 
     }
 }
 
+/** Teller lives on its own screen; this is the summary and the way in. */
+@Composable
+private fun TellerCard(t: app.centsible.core.model.TellerStatus, actions: BankSyncActions) {
+    val colors = CentsibleTheme.colors
+    SectionCard("Teller", action = if (t.configured) "Manage" else "Set up", onAction = actions.openTeller) {
+        if (!t.configured) {
+            Text(
+                "A second way to connect banks, free for personal use. Useful when a bank keeps breaking in SimpleFIN.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = colors.textSecondary,
+            )
+            return@SectionCard
+        }
+        if (t.enrollments.isEmpty()) Text("Ready. No banks connected yet.", style = MaterialTheme.typography.bodyMedium, color = colors.textSecondary)
+        t.enrollments.forEach { e ->
+            Row(Modifier.fillMaxWidth().clickable(onClick = actions.openTeller).padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                val ok = e.status == app.centsible.core.model.TellerEnrollment.Status.Ok
+                Text("●", color = if (ok) colors.positive else colors.warning)
+                Spacer(Modifier.width(6.dp))
+                Text(e.institution, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+                Text(if (ok) "${e.linkedAccounts} linked" else "Needs reconnecting", style = MaterialTheme.typography.bodySmall, color = if (ok) colors.textSecondary else colors.warning)
+            }
+        }
+    }
+}
+
 @Composable
 private fun Step(n: Int, text: String) {
     Row(Modifier.padding(vertical = 3.dp)) {
@@ -272,7 +301,7 @@ private fun SyncCard(o: BankSyncOverview, state: BankSyncUiState, actions: BankS
             if (state.syncing) { app.centsible.core.designsystem.component.DialSpinner(size = 18.dp); androidx.compose.foundation.layout.Spacer(Modifier.width(8.dp)) }
             Text(if (state.syncing) "Syncing…" else "Sync all accounts now")
         }
-        Text("One SimpleFIN request covers every SimpleFIN account.", style = MaterialTheme.typography.bodySmall, color = colors.textTertiary, modifier = Modifier.padding(top = 4.dp))
+        Text("One SimpleFIN request covers every SimpleFIN account; Teller accounts sync alongside.", style = MaterialTheme.typography.bodySmall, color = colors.textTertiary, modifier = Modifier.padding(top = 4.dp))
         state.syncResults?.let { results ->
             Spacer(Modifier.height(8.dp))
             results.forEach { r ->

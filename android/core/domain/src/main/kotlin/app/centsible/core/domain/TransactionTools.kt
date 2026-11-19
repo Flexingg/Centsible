@@ -24,4 +24,10 @@ interface TransactionTools {
     suspend fun dismissTransfer(budget: BudgetId, from: TransactionId, to: TransactionId)
     /** Link the sure ones by itself after every bank sync. */
     suspend fun setAutoTransfers(budget: BudgetId, auto: Boolean): Boolean
+
+    /** Probable duplicates from the last four months (same account and amount, a few days apart). */
+    suspend fun duplicates(budget: BudgetId): List<app.centsible.core.model.DuplicatePair>
+    /** Merges the two into one (Actual keeps the bank-imported one); returns the one kept. */
+    suspend fun merge(budget: BudgetId, a: TransactionId, b: TransactionId): app.centsible.core.model.Transaction
+    suspend fun dismissDuplicate(budget: BudgetId, a: TransactionId, b: TransactionId)
 }

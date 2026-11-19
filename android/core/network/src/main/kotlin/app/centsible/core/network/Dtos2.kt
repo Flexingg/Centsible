@@ -134,6 +134,7 @@ import kotlinx.serialization.json.JsonObject
 @Serializable data class ScheduleStateDto(val intervalHours: Int, val lastRunAt: String? = null, val nextRunAt: String? = null, val lastResult: SyncRunResultDto? = null)
 @Serializable data class BankSyncOverviewDto(
     val simplefin: SimpleFinStatusDto,
+    val teller: TellerStatusDto? = null,
     val schedule: ScheduleStateDto,
     val intervals: List<Int> = listOf(0, 2, 4, 6, 12, 24),
     val backfill: BackfillDto? = null,

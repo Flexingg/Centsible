@@ -22,7 +22,7 @@ import kotlinx.serialization.Serializable
     val apkUrl: String? = null,
     val notes: String? = null,
 )
-@Serializable data class UpdaterDto(val configured: Boolean = false, val lastRequestedAt: String? = null, val lastUpdatedFrom: String? = null, val lastResult: String? = null)
+@Serializable data class UpdaterDto(val configured: Boolean = false, val managedBy: String = "docker", val lastRequestedAt: String? = null, val lastUpdatedFrom: String? = null, val lastResult: String? = null)
 @Serializable data class DiskDto(val free: Long, val total: Long)
 @Serializable data class ServerStatusDto(
     val bridge: ServerBridgeDto,

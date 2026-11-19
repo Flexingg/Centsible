@@ -31,6 +31,10 @@ export type BridgeConfig = {
   updater?: { url: string; token: string };
   /** Where releases (bridge image tags and the app's APK) are published. */
   releasesRepo?: string;
+  /** Teller's API (tests point this at a stand-in). */
+  tellerApiUrl?: string;
+  /** Who installs updates: Docker (Watchtower or by hand) or Home Assistant (the Centsible app there). */
+  managedBy?: 'docker' | 'home-assistant';
 };
 
 function required(env: NodeJS.ProcessEnv, key: string): string {
@@ -82,5 +86,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): BridgeConfig {
     logLevel: env.LOG_LEVEL ?? 'info',
     updater: env.UPDATER_URL && env.UPDATER_TOKEN ? { url: env.UPDATER_URL, token: env.UPDATER_TOKEN } : undefined,
     releasesRepo: env.BRIDGE_RELEASES_REPO || 'Flexingg/Centsible',
+    tellerApiUrl: env.TELLER_API_URL || undefined,
+    managedBy: env.BRIDGE_MANAGED_BY === 'home-assistant' ? 'home-assistant' : 'docker',
   };
 }

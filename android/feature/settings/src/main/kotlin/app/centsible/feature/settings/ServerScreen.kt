@@ -259,6 +259,12 @@ private fun ServerCard(s: ServerStatus, state: ServerUiState, actions: ServerAct
                 Text("Update available: ${s.bridgeLatest}", style = MaterialTheme.typography.bodyLarge)
                 if (!state.isOwner) {
                     Text("The household owner can install it.", style = MaterialTheme.typography.bodySmall, color = colors.textSecondary)
+                } else if (s.managedByHomeAssistant) {
+                    Text(
+                        "Install it in Home Assistant: Settings → Apps → Centsible → Update. Actual updates with it.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = colors.textSecondary,
+                    )
                 } else if (s.updaterConfigured) {
                     Button(onClick = { actions.askUpdate(true) }, modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) { Text("Update server") }
                 } else {

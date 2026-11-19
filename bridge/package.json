@@ -20,7 +20,7 @@
     "bench": "NODE_ENV=production tsx test/support/bench.ts"
   },
   "dependencies": {
-    "@actual-app/api": "26.9.0",
+    "@actual-app/api": "26.11.0",
     "adm-zip": "0.5.18",
     "better-sqlite3": "13.0.3",
     "fastify": "5.12.5",
@@ -28,7 +28,7 @@
     "qrcode": "1.5.4"
   },
   "devDependencies": {
-    "@actual-app/sync-server": "26.9.0",
+    "@actual-app/sync-server": "26.11.0",
     "@types/adm-zip": "0.5.8",
     "@types/better-sqlite3": "9.6.0",
     "@types/node": "22.20.4",

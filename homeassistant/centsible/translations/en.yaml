@@ -1,0 +1,23 @@
+configuration:
+  public_url:
+    name: Public address
+    description: The https address the phones use for Centsible, e.g. https://budget-api.example.com (your Cloudflare tunnel hostname). It goes into pairing QR codes.
+  cloudflare_access_client_id:
+    name: Cloudflare Access client ID
+    description: Optional. The service token protecting the public address; phones get it in the pairing QR code.
+  cloudflare_access_client_secret:
+    name: Cloudflare Access client secret
+  setup_code:
+    name: Setup code
+    description: Optional. A fixed first-run setup code; leave empty to get one in the log.
+  actual_password:
+    name: Actual password
+    description: Optional. Usually left empty, because the app asks for it during setup and the bridge remembers it.
+  budget_passwords:
+    name: Encrypted budget passwords
+    description: Only for budgets with end-to-end encryption, by budget sync id.
+  log_level:
+    name: Log level
+network:
+  8787/tcp: The Centsible app
+  5006/tcp: Actual's web app

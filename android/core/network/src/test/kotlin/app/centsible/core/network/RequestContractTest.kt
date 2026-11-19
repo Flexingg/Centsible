@@ -117,6 +117,13 @@ class RequestContractTest {
         val mapping = FieldMappingDto("postedDate", "notes", "payeeName")
         call { planning.updateBankSyncSettings(b, "acc", BankSyncSettingsDto(true, false, true, true, false, SyncMappingsDto(mapping, mapping))) }
         call { planning.startBackfill(b, BackfillRequestDto(years = 10)) }
+        call { planning.configureTeller(TellerConfigInputDto("app_abc123", "development", "-----BEGIN CERTIFICATE-----", "-----BEGIN PRIVATE KEY-----")) }
+        call { planning.configureTeller(TellerConfigInputDto("app_abc123", "sandbox")) } // keeps the stored certificate: fields left out
+        call { planning.addTellerEnrollment(TellerEnrollmentInputDto("token_abc", "enr_1", "Wells Fargo", "usr_1")) }
+        call { planning.addTellerEnrollment(TellerEnrollmentInputDto("token_abc", "enr_1", "")) }
+        call { planning.previewTeller(b, TellerPreviewRequestDto("acc_1", flip = true)) }
+        call { planning.linkTeller(b, TellerLinkRequestDto("acc_1", "acc", flip = false)) }
+        call { planning.setTellerFlip(b, "acc", true) }
         call { planning.applyAutopilot(b, "2026-09", ApplyAutopilotDto(3)) }
         call { planning.applyAutopilot(b, "2026-09", ApplyAutopilotDto(12, listOf("c1"))) }
         call { planning.setGoal(b, "c1", GoalInputDto("by", 120000, "2027-03")) }
@@ -141,6 +148,8 @@ class RequestContractTest {
         call { tools.linkTransfer(b, TransferPairRequestDto("o1", "i1")) }
         call { tools.dismissTransfer(b, TransferPairRequestDto("o1", "i1")) }
         call { tools.transferSettings(b, TransferSettingsDto(true)) }
+        call { tools.merge(b, TransactionPairDto(listOf("t1", "t2"))) }
+        call { tools.dismissDuplicate(b, TransactionPairDto(listOf("t1", "t2"))) }
         call { planning.dismissSubscription(b, "p1") }
         val server = ServerApi(client)
         call { server.backupSettings(BackupSettingsDto(intervalHours = 24, keep = 7)) }

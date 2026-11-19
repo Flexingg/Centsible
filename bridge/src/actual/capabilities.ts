@@ -25,6 +25,7 @@ export function capabilities(host: ActualHost) {
     'transactions.search': has('aqlQuery'),
     'transactions.splits': !host.isFeatureDisabled('transactions.splits'),
     'transactions.transfers': has('addTransactions') && has('getPayees'),
+    'transactions.merge': has('mergeTransactions'),
     'accounts.write': has('createAccount') && has('updateAccount') && has('closeAccount') && has('reopenAccount'),
     'categories.write': has('createCategory') && has('updateCategory') && has('deleteCategory') && has('createCategoryGroup'),
     preferences: has('getPreferences'),

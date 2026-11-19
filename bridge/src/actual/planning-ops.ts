@@ -1,6 +1,7 @@
 import * as api from '@actual-app/api';
 import { ApiError } from '../errors.js';
 import type { ActualHost } from './host.js';
+import { scheduleDates } from './schedule-dates.js';
 
 type Raw = Record<string, unknown>;
 
@@ -118,12 +119,9 @@ export class PlanningOps {
     let upcoming: string[] = [];
     if (!s.completed && typeof s.next_date === 'string') {
       upcoming = [s.next_date];
-      if (isRecurrence(date) && upcomingCount > 1 && !this.host.isFeatureDisabled('schedules.upcoming')) {
-        // Tier 3: Actual's own recurrence engine, so the dates match the web app exactly.
-        const dates = await this.host
-          .internal<string[]>('schedules.upcoming', lib, 'schedule/get-upcoming-dates', { config: { ...date, start: s.next_date }, count: upcomingCount })
-          .catch(() => [s.next_date as string]);
-        upcoming = dates;
+      if (isRecurrence(date) && upcomingCount > 1) {
+        // Actual's own recurrence engine, so the dates match the web app exactly.
+        upcoming = await scheduleDates(this.host, lib, date as unknown as Record<string, unknown>, s.next_date, upcomingCount);
       }
     }
     const amount = s.amount;

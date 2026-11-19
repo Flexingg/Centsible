@@ -34,6 +34,13 @@
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="actualbridge" android:host="pair" />
             </intent-filter>
+            <!-- Screen links from Home Assistant and shortcuts: centsible://open/review, …/account/<id> -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="centsible" android:host="open" />
+            </intent-filter>
         </activity>
     </application>
 </manifest>

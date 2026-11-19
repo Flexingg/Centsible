@@ -91,6 +91,7 @@ private object Routes {
     const val SETTINGS = "settings"
     const val RECURRING = "recurring"
     const val BANK_SYNC = "bank-sync"
+    const val TELLER = "bank-sync/teller"
     const val REPORTS = "reports"
     const val MERCHANTS = "merchants"
     const val RULES = "rules"
@@ -108,6 +109,7 @@ private object Routes {
 
     const val REVIEW = "review"
     const val TRANSFERS = "transfers/match"
+    const val DUPLICATES = "transactions/duplicates"
     const val MORTGAGE = "mortgage"
     const val RULE = "rule?id={id}&payee={payee}&category={category}"
     fun rule(id: String?, payee: String? = null, category: String? = null) = "rule?id=${id.orEmpty()}&payee=${payee.orEmpty()}&category=${category.orEmpty()}"
@@ -168,6 +170,8 @@ private fun MainScaffold(
             else -> if (openScreen?.startsWith("review:") == true) {
                 val (_, period, date) = openScreen.split(':') + listOf("", "")
                 nav.navigate(Routes.review(period, date)) { launchSingleTop = true }
+            } else if (openScreen != null) {
+                app.centsible.core.domain.AppLinks.parse(openScreen)?.let { nav.open(it) }
             }
         }
         if (openScreen != null) onOpened()
@@ -275,7 +279,8 @@ private fun MainScaffold(
             }
             composable(Routes.SETTINGS) { SettingsRoute(onOpenBankSync = { nav.navigate(Routes.BANK_SYNC) }) }
             composable(Routes.SERVER) { app.centsible.feature.settings.ServerRoute(onBack = { nav.popBackStack() }) }
-            composable(Routes.BANK_SYNC) { app.centsible.feature.settings.BankSyncRoute(onBack = { nav.popBackStack() }) }
+            composable(Routes.BANK_SYNC) { app.centsible.feature.settings.BankSyncRoute(onBack = { nav.popBackStack() }, onOpenTeller = { nav.navigate(Routes.TELLER) { launchSingleTop = true } }) }
+            composable(Routes.TELLER) { app.centsible.feature.settings.TellerRoute(onBack = { nav.popBackStack() }) }
             composable(Routes.RECURRING) { RecurringRoute(onBack = { nav.popBackStack() }, onFind = { nav.navigate(Routes.SUBSCRIPTIONS) { launchSingleTop = true } }) }
             composable(Routes.SUBSCRIPTIONS) { app.centsible.feature.planning.SubscriptionsRoute(onBack = { nav.popBackStack() }, onOpenTransactions = { nav.go(it) }) }
             composable(Routes.TRENDS) { app.centsible.feature.reports.TrendsRoute(onBack = { nav.popBackStack() }, onOpenTransactions = { nav.go(it) }) }
@@ -325,10 +330,11 @@ private fun MainScaffold(
                 app.centsible.feature.budget.AutomationEditorRoute(onDone = { nav.popBackStack() })
             }
             composable(Routes.REVIEW) {
-                app.centsible.feature.transactions.ReviewRoute(onBack = { nav.popBackStack() }, onOpen = { nav.navigate(Routes.transaction(it)) }, onMakeRule = { p, c -> nav.navigate(Routes.rule(null, p.raw, c?.raw)) }, onMatchTransfers = { nav.navigate(Routes.TRANSFERS) })
+                app.centsible.feature.transactions.ReviewRoute(onBack = { nav.popBackStack() }, onOpen = { nav.navigate(Routes.transaction(it)) }, onMakeRule = { p, c -> nav.navigate(Routes.rule(null, p.raw, c?.raw)) }, onMatchTransfers = { nav.navigate(Routes.TRANSFERS) }, onFindDuplicates = { nav.navigate(Routes.DUPLICATES) })
             }
             composable(Routes.MORTGAGE) { app.centsible.feature.planning.MortgageRoute(onBack = { nav.popBackStack() }) }
             composable(Routes.TRANSFERS) { app.centsible.feature.transactions.TransfersRoute(onBack = { nav.popBackStack() }) }
+            composable(Routes.DUPLICATES) { app.centsible.feature.transactions.DuplicatesRoute(onBack = { nav.popBackStack() }) }
             composable(
                 Routes.TRANSACTIONS_FOR,
                 arguments = listOf(
@@ -390,6 +396,33 @@ private fun NavHostController.goToTab(route: String) = navigate(route) {
     popUpTo(graph.findStartDestination().id) { saveState = true }
     launchSingleTop = true
     restoreState = true
+}
+
+private fun NavHostController.open(link: app.centsible.core.domain.AppLink) {
+    val S = app.centsible.core.domain.AppLink.Screen
+    when (link) {
+        is app.centsible.core.domain.AppLink.To -> when (link.screen) {
+            S.Review -> go(Destination.Review)
+            S.Transactions -> go(Destination.Transactions)
+            S.Accounts -> go(Destination.Accounts)
+            S.Budget -> go(Destination.Budget)
+            S.NetWorth -> go(Destination.NetWorth)
+            S.Recurring -> go(Destination.Recurring)
+            S.Trends -> go(Destination.Trends)
+            S.BankSync -> navigate(Routes.BANK_SYNC) { launchSingleTop = true }
+            S.Teller -> navigate(Routes.TELLER) { launchSingleTop = true }
+            S.Duplicates -> navigate(Routes.DUPLICATES) { launchSingleTop = true }
+            S.Mortgage -> navigate(Routes.MORTGAGE) { launchSingleTop = true }
+        }
+        is app.centsible.core.domain.AppLink.Account -> go(Destination.Account(app.centsible.core.model.AccountId(link.id)))
+        is app.centsible.core.domain.AppLink.Category -> {
+            val id = app.centsible.core.model.CategoryId(link.id)
+            go(
+                link.month?.let { Destination.TransactionsFor.month(link.name, app.centsible.core.model.YearMonth(it), categoryId = id) }
+                    ?: Destination.TransactionsFor(link.name, categoryId = id),
+            )
+        }
+    }
 }
 
 private fun NavHostController.go(d: Destination) = when (d) {

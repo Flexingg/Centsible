@@ -1,11 +1,11 @@
 {
   "items": [
     {
-      "id": "e4f4999b-b73c-4365-a81c-32ac3fad9fb9",
-      "accountId": "da39c5c7-479c-473e-8864-0c1caa05a1d8",
-      "date": "2026-09-28",
+      "id": "6e92548e-023c-4a22-9c2e-56576e2e1e0e",
+      "accountId": "1acd08f5-3d33-4f22-88a8-e87b5a5ffa55",
+      "date": "2026-11-18",
       "amount": 1250000,
-      "payeeId": "dff45ccd-e103-4dce-a156-5eea5cf0f884",
+      "payeeId": "cb11644a-1ff4-4712-b0ad-a5dc403fbdb7",
       "payeeName": "Starting Balance",
       "categoryId": null,
       "notes": null,
@@ -17,11 +17,11 @@
       "subtransactions": []
     },
     {
-      "id": "d5814123-9201-451b-8907-4624b172f1a9",
-      "accountId": "15774009-d48c-4ddc-9370-8dd12db7ad26",
-      "date": "2026-09-28",
+      "id": "e4fe0343-9591-4565-a68a-557aba9417e3",
+      "accountId": "80ca1365-e5c7-40a6-bc01-17ddcc44837f",
+      "date": "2026-11-18",
       "amount": 520000,
-      "payeeId": "dff45ccd-e103-4dce-a156-5eea5cf0f884",
+      "payeeId": "cb11644a-1ff4-4712-b0ad-a5dc403fbdb7",
       "payeeName": "Starting Balance",
       "categoryId": "506e8d9d-7ed0-4397-84e4-07a9185dc6b2",
       "notes": null,
@@ -33,5 +33,6 @@
       "subtransactions": []
     }
   ],
-  "nextCursor": "eyJvIjoyfQ"
+  "nextCursor": "eyJvIjoyfQ",
+  "runningBalances": null
 }

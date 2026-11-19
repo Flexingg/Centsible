@@ -63,4 +63,14 @@ class BridgeTransactionTools(private val api: TransactionToolsApi, private val o
     }
 
     override suspend fun setAutoTransfers(budget: BudgetId, auto: Boolean) = api.transferSettings(budget.raw, TransferSettingsDto(auto)).auto
+
+    override suspend fun duplicates(budget: BudgetId) =
+        api.duplicates(budget.raw).pairs.map { app.centsible.core.model.DuplicatePair(it.a.toModel(), it.b.toModel(), it.days) }
+
+    override suspend fun merge(budget: BudgetId, a: TransactionId, b: TransactionId) =
+        api.merge(budget.raw, app.centsible.core.network.TransactionPairDto(listOf(a.raw, b.raw))).toModel().also { onWrite() }
+
+    override suspend fun dismissDuplicate(budget: BudgetId, a: TransactionId, b: TransactionId) {
+        api.dismissDuplicate(budget.raw, app.centsible.core.network.TransactionPairDto(listOf(a.raw, b.raw)))
+    }
 }

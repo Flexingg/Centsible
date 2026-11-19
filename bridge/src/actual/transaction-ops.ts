@@ -63,7 +63,7 @@ export const TX_FIELDS = [
 ];
 
 /**
- * Verified against Actual 26.9.0: updateTransaction/deleteTransaction resolve one
+ * Verified against Actual 26.11.0: updateTransaction/deleteTransaction resolve one
  * macrotask before their writes are applied, so a read straight after sees old data.
  */
 const settle = () => new Promise<void>((r) => setTimeout(r, 0));
