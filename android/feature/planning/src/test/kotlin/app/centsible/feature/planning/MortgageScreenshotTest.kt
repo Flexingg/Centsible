@@ -41,6 +41,8 @@ class MortgageScreenshotTest {
         rows
     }
     private val now = schedule.last { it.date <= "2026-09-30" }
+    /** The screenshots were recorded in October 2026; the screen's "today" is pinned there. */
+    private val day = java.time.LocalDate.parse("2026-10-01")
 
     private val mortgage = Mortgage(
         id = "m1", name = "House mortgage", principal = Money(30_000_000), rate = 6.0, termMonths = 360, firstPayment = "2023-01-01",
@@ -53,13 +55,13 @@ class MortgageScreenshotTest {
     )
 
     @Test fun mortgage_list() {
-        compose.setContent { CentsibleTheme(darkTheme = false) { MortgageScreen(MortgageUiState(Loadable.Ready(listOf(mortgage.copy(schedule = emptyList()))), canEdit = true), MortgageActions()) } }
+        compose.setContent { CentsibleTheme(darkTheme = false) { MortgageScreen(MortgageUiState(Loadable.Ready(listOf(mortgage.copy(schedule = emptyList()))), canEdit = true), MortgageActions(), today = day) } }
         compose.onRoot().captureRoboImage("screenshots/mortgage_list.png")
         app.centsible.core.uitesting.A11y.assertOk(compose)
     }
 
     @Test fun mortgage_detail_dark() {
-        compose.setContent { CentsibleTheme(darkTheme = true) { MortgageScreen(MortgageUiState(Loadable.Ready(listOf(mortgage)), detail = mortgage, canEdit = true), MortgageActions()) } }
+        compose.setContent { CentsibleTheme(darkTheme = true) { MortgageScreen(MortgageUiState(Loadable.Ready(listOf(mortgage)), detail = mortgage, canEdit = true), MortgageActions(), today = day) } }
         compose.onRoot().captureRoboImage("screenshots/mortgage_detail_dark.png")
         app.centsible.core.uitesting.A11y.assertOk(compose)
     }
@@ -67,7 +69,7 @@ class MortgageScreenshotTest {
     @Test fun mortgage_setup() {
         val accounts = listOf(AccountId("a") to "Joint Checking", AccountId("b") to "High-Yield Savings")
         val payees = listOf(PayeeId("p") to "Lakeside Mortgage", PayeeId("q") to "City Power")
-        compose.setContent { CentsibleTheme(darkTheme = false) { MortgageScreen(MortgageUiState(Loadable.Ready(emptyList()), accounts = accounts, payees = payees, canEdit = true, creating = true), MortgageActions()) } }
+        compose.setContent { CentsibleTheme(darkTheme = false) { MortgageScreen(MortgageUiState(Loadable.Ready(emptyList()), accounts = accounts, payees = payees, canEdit = true, creating = true), MortgageActions(), today = day) } }
         compose.waitForIdle()
         captureScreenRoboImage("screenshots/mortgage_setup.png")
     }

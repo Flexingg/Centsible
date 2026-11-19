@@ -58,7 +58,9 @@ class BridgeBudgetEngineTest {
         val caps = engine { fixture("capabilities") }.capabilities()
         assertTrue(caps.has(Feature.BudgetEnvelope))
         assertFalse(caps.has(Feature.BudgetTracking))
-        assertEquals("26.9.0", caps.actualServerVersion)
+        // The fixture is re-recorded from a real Actual on every upgrade: compare with what it holds.
+        val recorded = Regex("\"serverVersion\":\\s*\"([^\"]+)\"").find(fixture("capabilities"))!!.groupValues[1]
+        assertEquals(recorded, caps.actualServerVersion)
     }
 
     @Test

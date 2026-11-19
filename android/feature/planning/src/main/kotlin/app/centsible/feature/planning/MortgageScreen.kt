@@ -229,7 +229,8 @@ fun MortgageRoute(onBack: () -> Unit, viewModel: MortgageViewModel = hiltViewMod
 }
 
 @Composable
-fun MortgageScreen(state: MortgageUiState, actions: MortgageActions) {
+/** [today] is a parameter so screenshot tests can pin it; the app passes the real date. */
+fun MortgageScreen(state: MortgageUiState, actions: MortgageActions, today: LocalDate = LocalDate.now()) {
     val colors = CentsibleTheme.colors
     val snackbar = remember { SnackbarHostState() }
     LaunchedEffect(state.message) { state.message?.let { snackbar.showSnackbar(it); actions.messageShown() } }
@@ -250,7 +251,7 @@ fun MortgageScreen(state: MortgageUiState, actions: MortgageActions) {
             Loadable.Loading -> LoadingState(Modifier.padding(padding))
             is Loadable.Failed -> MessageState("Couldn't load your mortgage", d.message, emoji = "🏠", actionLabel = "Try again", onAction = actions.retry, modifier = Modifier.padding(padding))
             is Loadable.Ready -> when {
-                detail != null -> MortgageDetail(detail, state, actions, Modifier.padding(padding))
+                detail != null -> MortgageDetail(detail, state, actions, today, Modifier.padding(padding))
                 d.value.isEmpty() -> MessageState(
                     "Track your mortgage",
                     "See every payment's interest and principal, when it'll be paid off, and your home's value in net worth.",
@@ -270,7 +271,7 @@ fun MortgageScreen(state: MortgageUiState, actions: MortgageActions) {
             }
         }
     }
-    if (state.creating || state.editing != null) MortgageSheet(state.editing, state, onSave = actions.save, onDelete = actions.delete, onDismiss = { actions.create(false); actions.edit(null) })
+    if (state.creating || state.editing != null) MortgageSheet(state.editing, state, today, onSave = actions.save, onDelete = actions.delete, onDismiss = { actions.create(false); actions.edit(null) })
     state.valuing?.let { m -> HomeValueDialog(m, onSave = { actions.setHomeValue(m.id, it) }, onDismiss = { actions.value(null) }) }
 }
 
@@ -336,9 +337,9 @@ internal fun standing(m: Mortgage): Pair<String, Boolean> {
 }
 
 @Composable
-private fun MortgageDetail(m: Mortgage, state: MortgageUiState, actions: MortgageActions, modifier: Modifier) {
+private fun MortgageDetail(m: Mortgage, state: MortgageUiState, actions: MortgageActions, date: LocalDate, modifier: Modifier) {
     val colors = CentsibleTheme.colors
-    val today = LocalDate.now().toString()
+    val today = date.toString()
     val years = m.schedule.groupBy { it.date.take(4) }.toList()
     LazyColumn(modifier.fillMaxSize(), contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 32.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item { MortgageCard(m, state, actions, onClick = null) }
@@ -409,13 +410,13 @@ private fun BalanceChart(m: Mortgage, today: String, modifier: Modifier) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun MortgageSheet(existing: Mortgage?, state: MortgageUiState, onSave: (String?, MortgageInput) -> Unit, onDelete: (String) -> Unit, onDismiss: () -> Unit) {
+private fun MortgageSheet(existing: Mortgage?, state: MortgageUiState, today: LocalDate, onSave: (String?, MortgageInput) -> Unit, onDelete: (String) -> Unit, onDismiss: () -> Unit) {
     val colors = CentsibleTheme.colors
     var name by remember { mutableStateOf(existing?.name ?: "Mortgage") }
     var principal by remember { mutableStateOf(existing?.principal?.let(MoneyInput::toInput).orEmpty()) }
     var rate by remember { mutableStateOf(existing?.rate?.toString().orEmpty()) }
     var years by remember { mutableStateOf(existing?.termMonths?.let { if (it % 12 == 0) (it / 12).toString() else null } ?: "30") }
-    var first by remember { mutableStateOf(existing?.firstPayment ?: LocalDate.now().withDayOfMonth(1).toString()) }
+    var first by remember { mutableStateOf(existing?.firstPayment ?: today.withDayOfMonth(1).toString()) }
     var escrow by remember { mutableStateOf(existing?.escrow?.takeIf { it.minor > 0 }?.let(MoneyInput::toInput).orEmpty()) }
     var extra by remember { mutableStateOf(existing?.extra?.takeIf { it.minor > 0 }?.let(MoneyInput::toInput).orEmpty()) }
     var payee by remember { mutableStateOf(existing?.payeeId) }

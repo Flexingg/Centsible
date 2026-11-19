@@ -11,6 +11,7 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.ui.unit.IntOffset
 import androidx.navigation.NavBackStackEntry
+import app.centsible.core.domain.AppLink.Screen as LinkScreen
 import app.centsible.core.domain.userMessage
 import kotlinx.coroutines.launch
 import androidx.compose.foundation.background
@@ -399,20 +400,19 @@ private fun NavHostController.goToTab(route: String) = navigate(route) {
 }
 
 private fun NavHostController.open(link: app.centsible.core.domain.AppLink) {
-    val S = app.centsible.core.domain.AppLink.Screen
     when (link) {
         is app.centsible.core.domain.AppLink.To -> when (link.screen) {
-            S.Review -> go(Destination.Review)
-            S.Transactions -> go(Destination.Transactions)
-            S.Accounts -> go(Destination.Accounts)
-            S.Budget -> go(Destination.Budget)
-            S.NetWorth -> go(Destination.NetWorth)
-            S.Recurring -> go(Destination.Recurring)
-            S.Trends -> go(Destination.Trends)
-            S.BankSync -> navigate(Routes.BANK_SYNC) { launchSingleTop = true }
-            S.Teller -> navigate(Routes.TELLER) { launchSingleTop = true }
-            S.Duplicates -> navigate(Routes.DUPLICATES) { launchSingleTop = true }
-            S.Mortgage -> navigate(Routes.MORTGAGE) { launchSingleTop = true }
+            LinkScreen.Review -> go(Destination.Review)
+            LinkScreen.Transactions -> go(Destination.Transactions)
+            LinkScreen.Accounts -> go(Destination.Accounts)
+            LinkScreen.Budget -> go(Destination.Budget)
+            LinkScreen.NetWorth -> go(Destination.NetWorth)
+            LinkScreen.Recurring -> go(Destination.Recurring)
+            LinkScreen.Trends -> go(Destination.Trends)
+            LinkScreen.BankSync -> navigate(Routes.BANK_SYNC) { launchSingleTop = true }
+            LinkScreen.Teller -> navigate(Routes.TELLER) { launchSingleTop = true }
+            LinkScreen.Duplicates -> navigate(Routes.DUPLICATES) { launchSingleTop = true }
+            LinkScreen.Mortgage -> navigate(Routes.MORTGAGE) { launchSingleTop = true }
         }
         is app.centsible.core.domain.AppLink.Account -> go(Destination.Account(app.centsible.core.model.AccountId(link.id)))
         is app.centsible.core.domain.AppLink.Category -> {
