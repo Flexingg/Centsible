@@ -138,6 +138,7 @@ class PlanningApi(private val client: BridgeClient) {
     suspend fun plaidAccounts(budgetId: String, refresh: Boolean = true): List<PlaidAccountDto> =
         client.get<ItemsDto<PlaidAccountDto>>("${b(budgetId)}/bank-sync/plaid/accounts") { parameter("refresh", refresh) }.items
     suspend fun linkPlaid(budgetId: String, body: PlaidLinkRequestDto): PlaidLinkedDto = client.send(HttpMethod.Post, "${b(budgetId)}/bank-sync/plaid/link", body)
+    suspend fun importPlaidHistory(budgetId: String, body: PlaidHistoryRequestDto): JobDto = client.send(HttpMethod.Post, "${b(budgetId)}/bank-sync/plaid/history", body)
 
     suspend fun unlink(budgetId: String, accountId: String) { client.execute(HttpMethod.Post, "${b(budgetId)}/accounts/$accountId/unlink") }
     suspend fun bankSyncSettings(budgetId: String, accountId: String): BankSyncSettingsDto = client.get("${b(budgetId)}/accounts/$accountId/bank-sync-settings")

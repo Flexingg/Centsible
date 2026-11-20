@@ -55,6 +55,9 @@ data class PlaidUiState(
     val options: PlaidAccount? = null,
     val confirmRemove: String? = null,
     val confirmReset: Boolean = false,
+    /** Older history to import, in months back from today (Plaid keeps up to 24). */
+    val historyMonths: Int = 24,
+    val importingHistory: Boolean = false,
     val busy: Boolean = false,
     val message: String? = null,
 ) {
@@ -62,6 +65,13 @@ data class PlaidUiState(
 
     /** Open accounts a Plaid account can feed: not already fed by Plaid (SimpleFIN ones move over). */
     val linkTargets: List<Account> get() = localAccounts.filter { !it.closed && it.syncSource != "plaid" }
+
+    /** Accounts in this budget that sync through Plaid (history import needs at least one). */
+    val linkedCount: Int get() = (accounts as? Loadable.Ready)?.value?.count { it.linkedAccountId != null } ?: 0
+
+    companion object {
+        val HISTORY_CHOICES = listOf(3, 6, 12, 24)
+    }
 }
 
 @HiltViewModel
@@ -196,6 +206,46 @@ class PlaidViewModel @Inject constructor(
             plaid.unlink(selectedBudget(), id)
             state.update { it.copy(options = null) }
             loadAccounts(refresh = false).join()
+        }
+    }
+
+    // ── Older history ──
+
+    fun historyMonths(months: Int) = state.update { it.copy(historyMonths = months) }
+
+    /**
+     * Imports history back [historyMonths] for every Plaid-linked account in this budget. A
+     * bank sync job on the bridge; this waits for it (two years can take a few minutes).
+     */
+    fun importHistory() {
+        if (state.value.importingHistory) return
+        val since = java.time.LocalDate.now().minusMonths(state.value.historyMonths.toLong()).toString()
+        state.update { it.copy(importingHistory = true) }
+        viewModelScope.launch {
+            runCatching {
+                var job = plaid.importHistory(selectedBudget(), since)
+                val deadline = System.currentTimeMillis() + 10 * 60_000
+                while (job.status == app.centsible.core.model.JobStatus.Running && System.currentTimeMillis() < deadline) {
+                    kotlinx.coroutines.delay(2_000)
+                    job = plaid.job(job.id)
+                }
+                job
+            }
+                .onSuccess { job ->
+                    val failed = job.results.filter { it.error != null }
+                    val message = when (job.status) {
+                        app.centsible.core.model.JobStatus.Succeeded -> when (val n = job.newTransactions ?: 0) {
+                            0 -> "No older transactions: everything Plaid has is already here"
+                            1 -> "Imported 1 older transaction"
+                            else -> "Imported $n older transactions"
+                        } + if (failed.isNotEmpty()) ". ${failed.joinToString { it.name }} didn't finish: ${failed.first().error}" else ""
+                        app.centsible.core.model.JobStatus.Running -> "Still importing on the bridge; check your accounts in a few minutes"
+                        else -> job.error ?: "The history import failed"
+                    }
+                    state.update { it.copy(importingHistory = false, message = message) }
+                }
+                .onFailure { e -> state.update { it.copy(importingHistory = false, message = e.userMessage()) } }
+            loadAccounts(refresh = false)
         }
     }
 

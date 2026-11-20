@@ -58,7 +58,13 @@ Accounts can sync through either provider, and you can mix them account by accou
   3. **Allow the Centsible app.** Under **Developers → API → Allowed Android package names**, add `app.centsible.budget`. Banks that sign in through their own app or website hand you back to Centsible only when it's allowed.
   4. **Connect a bank.** Plaid's own sign-in screens open, so Centsible never sees your bank password. Then tap each account to link it to an account in your budget. Purchases come in negative and payments positive, for cards too; pending transactions wait until they post, and corrections or reversals from the bank are followed. An account that syncs through SimpleFIN (or synced through Teller) now moves over to Plaid, and what's already there is matched rather than duplicated.
 
+  **Older history:** linking imports the last 30 days. In **Bank sync → Plaid → Older history**, pick 3 months to 2 years and tap **Import history**: Plaid's full history for each linked account comes in (usually up to two years, depending on the bank), matched against what's already there so nothing is duplicated.
+
   When a bank asks you to sign in again, the account shows **needs reconnecting**. Tap **Reconnect**: the bank login is repaired in place, and the same links keep working.
+
+## Account types
+
+Actual has no account types, so Centsible keeps them on the bridge: **Cash, Savings, Credit card, Investment, Mortgage, Loan**. They decide how the Accounts page groups accounts. On **Accounts → Edit types**, tap an account's type to change it, or choose **Automatic** to go back to guessing from the name and balance. Linking an account through Plaid sets its type from what the bank reports, and **Add account** asks for one.
 
 ## Duplicates
 

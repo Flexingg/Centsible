@@ -27,6 +27,14 @@ class AccountsScreenshotTest {
         app.centsible.core.uitesting.A11y.assertOk(compose)
     }
 
+    @Test fun accounts_editing_types() {
+        // Brokerage is set to Savings by hand; the rest are guessed from their names.
+        val accounts = SampleHousehold.accounts.map { if (it.name == "Brokerage") it.copy(type = app.centsible.core.model.AccountType.Savings) else it }
+        compose.setContent { CentsibleTheme(darkTheme = false) { AccountsScreen(AccountsUiState(Loadable.Ready(AccountsSummary.from(accounts)), canWrite = true), onRetry = {}, initiallyEditingTypes = true) } }
+        compose.onRoot().captureRoboImage("screenshots/accounts_editing_types.png")
+        app.centsible.core.uitesting.A11y.assertOk(compose)
+    }
+
     @Test fun accounts_large_text() {
         compose.setContent { CentsibleTheme(darkTheme = false) { app.centsible.core.uitesting.LargeText { AccountsScreen(AccountsUiState(Loadable.Ready(AccountsSummary.from(SampleHousehold.accounts)), canWrite = true), onRetry = {}) } } }
         compose.onRoot().captureRoboImage("screenshots/accounts_large_text.png")

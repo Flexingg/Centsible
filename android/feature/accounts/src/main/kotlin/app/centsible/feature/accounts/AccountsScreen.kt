@@ -56,6 +56,17 @@ import app.centsible.core.designsystem.component.MoneyText
 import app.centsible.core.designsystem.component.StatLabel
 import app.centsible.core.designsystem.theme.CentsibleTheme
 import app.centsible.core.model.Account
+import app.centsible.core.model.AccountType
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.RadioButton
+import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.ui.semantics.Role
 
 @Composable
 fun AccountsRoute(onOpenAccount: (AccountId) -> Unit, viewModel: AccountsViewModel = hiltViewModel()) {
@@ -64,7 +75,8 @@ fun AccountsRoute(onOpenAccount: (AccountId) -> Unit, viewModel: AccountsViewMod
         state,
         onRetry = { viewModel.refresh() },
         onOpenAccount = onOpenAccount,
-        onAddAccount = { name, offBudget, balance -> viewModel.addAccount(name, offBudget, balance) },
+        onAddAccount = { name, offBudget, balance, type -> viewModel.addAccount(name, offBudget, balance, type) },
+        onSetType = viewModel::setType,
         onMessageShown = viewModel::messageShown,
     )
 }
@@ -74,10 +86,15 @@ fun AccountsScreen(
     state: AccountsUiState,
     onRetry: () -> Unit,
     onOpenAccount: (AccountId) -> Unit = {},
-    onAddAccount: (String, Boolean, Money) -> Unit = { _, _, _ -> },
+    onAddAccount: (String, Boolean, Money, AccountType?) -> Unit = { _, _, _, _ -> },
+    onSetType: (AccountId, AccountType?) -> Unit = { _, _ -> },
     onMessageShown: () -> Unit = {},
+    /** Start in "Edit types" mode (for screenshots). */
+    initiallyEditingTypes: Boolean = false,
 ) {
     var adding by remember { mutableStateOf(false) }
+    var editingTypes by remember { mutableStateOf(initiallyEditingTypes) }
+    var choosingFor by remember { mutableStateOf<Account?>(null) }
     var showClosed by remember { mutableStateOf(false) }
     val snackbar = remember { SnackbarHostState() }
     LaunchedEffect(state.message) { state.message?.let { snackbar.showSnackbar(it); onMessageShown() } }
@@ -85,7 +102,8 @@ fun AccountsScreen(
         Column(Modifier.fillMaxSize().padding(padding)) {
             Row(Modifier.fillMaxWidth().padding(start = 20.dp, end = 8.dp, top = 16.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text("Accounts", style = MaterialTheme.typography.headlineMedium, modifier = Modifier.weight(1f))
-                if (state.canWrite) TextButton(onClick = { adding = true }) { Text("Add account") }
+                if (state.canWrite && state.data is Loadable.Ready) TextButton(onClick = { editingTypes = !editingTypes }) { Text(if (editingTypes) "Done" else "Edit types") }
+                if (state.canWrite && !editingTypes) TextButton(onClick = { adding = true }) { Text("Add account") }
             }
             when (val data = state.data) {
                 Loadable.Loading -> LoadingState()
@@ -94,28 +112,83 @@ fun AccountsScreen(
                     contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 96.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    item { NetWorthCard(data.value) }
-                    items(data.value.sections, key = { it.kind.name }) { SectionCard(it, onOpenAccount) }
+                    if (editingTypes) {
+                        item(key = "types-hint") {
+                            Text(
+                                "Tap an account's type to change it. It decides where the account is grouped here.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = CentsibleTheme.colors.textSecondary,
+                                modifier = Modifier.padding(horizontal = 4.dp),
+                            )
+                        }
+                    } else {
+                        item { NetWorthCard(data.value) }
+                    }
+                    items(data.value.sections, key = { it.kind.name }) { SectionCard(it, onOpenAccount, onChooseType = if (editingTypes) { a -> choosingFor = a } else null) }
                     if (data.value.closed.isNotEmpty()) {
                         item(key = "closed") {
                             TextButton(onClick = { showClosed = !showClosed }, modifier = Modifier.fillMaxWidth()) {
                                 Text(if (showClosed) "Hide closed accounts" else "Show ${data.value.closed.size} closed")
                             }
-                            if (showClosed) SectionCard(AccountSection(AccountKind.Cash, data.value.closed), onOpenAccount, title = "Closed")
+                            if (showClosed) SectionCard(AccountSection(AccountType.Cash, data.value.closed), onOpenAccount, title = "Closed", onChooseType = if (editingTypes) { a -> choosingFor = a } else null)
                         }
                     }
                 }
             }
         }
     }
-    if (adding) AddAccountDialog(onDismiss = { adding = false }, onAdd = { n, o, b -> adding = false; onAddAccount(n, o, b) })
+    if (adding) AddAccountDialog(onDismiss = { adding = false }, onAdd = { n, o, b, t -> adding = false; onAddAccount(n, o, b, t) })
+    choosingFor?.let { account ->
+        AccountTypeSheet(account, onDismiss = { choosingFor = null }, onChoose = { type -> choosingFor = null; if (type != account.type) onSetType(account.id, type) })
+    }
+}
+
+/** Picks an account's type, or "Automatic" to go back to guessing from the name. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun AccountTypeSheet(account: Account, onDismiss: () -> Unit, onChoose: (AccountType?) -> Unit) {
+    val colors = CentsibleTheme.colors
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true), containerColor = colors.card) {
+        Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp).navigationBarsPadding()) {
+            Text("${account.name} is a…", style = MaterialTheme.typography.titleLarge)
+            Spacer(Modifier.height(8.dp))
+            AccountType.entries.forEach { t ->
+                TypeOption(t.singular, typeHint(t), selected = account.type == t) { onChoose(t) }
+            }
+            TypeOption("Automatic", "Guess from the name and balance (now: ${account.guessType().singular.lowercase()})", selected = account.type == null) { onChoose(null) }
+            Spacer(Modifier.height(24.dp))
+        }
+    }
+}
+
+private fun typeHint(t: AccountType) = when (t) {
+    AccountType.Cash -> "Checking and everyday spending"
+    AccountType.Savings -> "Savings, money market, CDs"
+    AccountType.Credit -> "Credit cards and lines of credit"
+    AccountType.Investment -> "Brokerage, retirement, HSA"
+    AccountType.Mortgage -> "A home loan or HELOC"
+    AccountType.Loan -> "Auto, student and personal loans"
 }
 
 @Composable
-private fun AddAccountDialog(onDismiss: () -> Unit, onAdd: (String, Boolean, Money) -> Unit) {
+private fun TypeOption(title: String, hint: String, selected: Boolean, onClick: () -> Unit) {
+    Row(Modifier.fillMaxWidth().selectable(selected, role = Role.RadioButton, onClick = onClick).padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+        RadioButton(selected = selected, onClick = null)
+        Spacer(Modifier.width(12.dp))
+        Column {
+            Text(title, style = MaterialTheme.typography.bodyLarge)
+            Text(hint, style = MaterialTheme.typography.bodySmall, color = CentsibleTheme.colors.textSecondary)
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun AddAccountDialog(onDismiss: () -> Unit, onAdd: (String, Boolean, Money, AccountType?) -> Unit) {
     var name by remember { mutableStateOf("") }
     var balance by remember { mutableStateOf("") }
     var offBudget by remember { mutableStateOf(false) }
+    var type by remember { mutableStateOf<AccountType?>(null) }
     val parsed = if (balance.isBlank()) Money.Zero else MoneyInput.parse(balance)
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -123,6 +196,19 @@ private fun AddAccountDialog(onDismiss: () -> Unit, onAdd: (String, Boolean, Mon
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 OutlinedTextField(name, { name = it }, label = { Text("Name") }, singleLine = true)
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    AccountType.entries.forEach { t ->
+                        FilterChip(
+                            selected = type == t,
+                            onClick = {
+                                type = if (type == t) null else t
+                                // Investments and loans usually sit outside the budget.
+                                if (type != null) offBudget = type in setOf(AccountType.Investment, AccountType.Mortgage, AccountType.Loan)
+                            },
+                            label = { Text(t.singular) },
+                        )
+                    }
+                }
                 OutlinedTextField(
                     balance, { balance = it },
                     label = { Text("Current balance") },
@@ -141,7 +227,7 @@ private fun AddAccountDialog(onDismiss: () -> Unit, onAdd: (String, Boolean, Mon
                 }
             }
         },
-        confirmButton = { TextButton(onClick = { onAdd(name, offBudget, parsed!!) }, enabled = name.isNotBlank() && parsed != null) { Text("Add") } },
+        confirmButton = { TextButton(onClick = { onAdd(name, offBudget, parsed!!, type) }, enabled = name.isNotBlank() && parsed != null) { Text("Add") } },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
     )
 }
@@ -180,7 +266,7 @@ private fun Legend(label: String, color: Color, value: @Composable () -> Unit) {
 }
 
 @Composable
-private fun SectionCard(section: AccountSection, onOpen: (AccountId) -> Unit, title: String = section.kind.title) {
+private fun SectionCard(section: AccountSection, onOpen: (AccountId) -> Unit, title: String = section.kind.title, onChooseType: ((Account) -> Unit)? = null) {
     val colors = CentsibleTheme.colors
     CentsibleCard(contentPadding = PaddingValues(0.dp)) {
         Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -189,18 +275,26 @@ private fun SectionCard(section: AccountSection, onOpen: (AccountId) -> Unit, ti
         }
         section.accounts.forEachIndexed { i, account ->
             if (i > 0) HorizontalDivider(Modifier.padding(start = 16.dp), color = colors.border)
-            AccountRow(account, onClick = { onOpen(account.id) })
+            AccountRow(account, onClick = { onOpen(account.id) }, onChooseType = onChooseType?.let { f -> { f(account) } })
         }
     }
 }
 
 @Composable
-private fun AccountRow(account: Account, onClick: () -> Unit) {
+private fun AccountRow(account: Account, onClick: () -> Unit, onChooseType: (() -> Unit)? = null) {
     val colors = CentsibleTheme.colors
-    Row(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 16.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+    Row(Modifier.fillMaxWidth().clickable(onClick = onChooseType ?: onClick).padding(horizontal = 16.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f)) {
             Text(account.name, style = MaterialTheme.typography.bodyLarge)
             Text(if (account.offBudget) "Tracking" else "On budget", style = MaterialTheme.typography.labelSmall, color = colors.textTertiary)
+        }
+        if (onChooseType != null) {
+            FilterChip(
+                selected = account.type != null,
+                onClick = onChooseType,
+                label = { Text(account.kind().singular + if (account.type == null) " (guess)" else "") },
+                modifier = Modifier.padding(end = 8.dp),
+            )
         }
         MoneyText(account.balance, style = MaterialTheme.typography.bodyLarge, color = if (account.balance.isNegative) colors.negative else colors.textPrimary)
     }

@@ -21,4 +21,7 @@ interface PlaidGateway {
     suspend fun accounts(budget: BudgetId, refresh: Boolean = true): List<PlaidAccount>
     suspend fun link(budget: BudgetId, plaidAccountId: String, account: AccountId): AccountSyncResult
     suspend fun unlink(budget: BudgetId, account: AccountId)
+    /** Starts importing older history (back to [since], yyyy-MM-dd) for Plaid-linked accounts ([accounts] empty: all). A bank sync job. */
+    suspend fun importHistory(budget: BudgetId, since: String, accounts: List<AccountId> = emptyList()): app.centsible.core.model.Job
+    suspend fun job(id: String): app.centsible.core.model.Job
 }

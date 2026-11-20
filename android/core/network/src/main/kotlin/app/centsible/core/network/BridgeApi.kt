@@ -142,6 +142,8 @@ class BridgeApi(private val client: BridgeClient, private val outbox: Outbox? = 
     suspend fun preferences(budgetId: String): PreferencesDto = client.get("/v1/budgets/$budgetId/preferences")
 
     suspend fun createAccount(budgetId: String, body: NewAccountDto): AccountDto = client.send(HttpMethod.Post, "/v1/budgets/$budgetId/accounts", body)
+    suspend fun setAccountKind(budgetId: String, id: String, kind: String?): AccountDto =
+        client.send(HttpMethod.Patch, "/v1/budgets/$budgetId/accounts/$id", AccountKindPatchDto(kotlinx.serialization.json.JsonPrimitive(kind)))
     suspend fun updateAccount(budgetId: String, id: String, body: AccountPatchDto): AccountDto =
         client.send(HttpMethod.Patch, "/v1/budgets/$budgetId/accounts/$id", body)
 
