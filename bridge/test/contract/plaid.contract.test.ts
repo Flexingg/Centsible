@@ -264,6 +264,59 @@ describe('linking and syncing', () => {
     expect(quiet.result.results.every((r: any) => r.newTransactions === 0 && r.error === null)).toBe(true);
   });
 
+  it('imports older history without duplicating what is there', async () => {
+    const before = await txnsOf(simplefinChecking);
+    expect(before.some((t) => t.amount === -100)).toBe(false); // 90 days old: before the 30 days linking imported
+    const url = `/v1/budgets/${b}/bank-sync/plaid/history`;
+    const path = '/v1/budgets/{budgetId}/bank-sync/plaid/history';
+    expect((await call('POST', url, path, member, { since: '2999-01-01' })).status).toBe(202); // a job; it fails on the date
+    const bad = await waitForJob((await call('POST', url, path, member, { since: '2999-01-01' })).body.id);
+    expect(bad.status).toBe('failed');
+
+    const started = await call('POST', url, path, member, { since: daysAgo(400), accountIds: [simplefinChecking] });
+    expect(started.status).toBe(202);
+    const job = await waitForJob(started.body.id);
+    expect(job.status).toBe('succeeded');
+    expect(job.result.results).toHaveLength(1);
+    expect(job.result.results[0]).toMatchObject({ accountId: simplefinChecking, error: null, status: 'ok' });
+
+    const after = await txnsOf(simplefinChecking);
+    expect(after.filter((t) => t.amount === -100)).toHaveLength(1); // the old one arrived
+    // Everything else is as it was: no duplicates, and the reversed payroll stays gone.
+    for (const amount of [-1234, -900, -4850]) expect(after.filter((t) => t.amount === amount)).toHaveLength(1);
+    expect(after.some((t) => t.amount === 250000)).toBe(false);
+    expect(store.plaidLink(b, simplefinChecking)!.startDate).toBe(daysAgo(90) < daysAgo(400) ? daysAgo(90) : daysAgo(400));
+
+    // A sync afterwards carries on from the new position.
+    const quiet = await syncAll();
+    expect(quiet.result.results.find((r: any) => r.accountId === simplefinChecking)).toMatchObject({ newTransactions: 0, error: null });
+  });
+
+  it('gives linked accounts a type from the bank, which can be changed or cleared', async () => {
+    const accounts = async () => (await call('GET', `/v1/budgets/${b}/accounts`, '/v1/budgets/{budgetId}/accounts', viewer)).body.items as any[];
+    let list = await accounts();
+    expect(list.find((a) => a.id === simplefinChecking).kind).toBe('cash');
+    expect(list.find((a) => a.id === actual.accounts.card).kind).toBe('credit');
+    expect(list.find((a) => a.id === actual.accounts.checking).kind).toBeNull(); // never linked: not set
+
+    const url = `/v1/budgets/${b}/accounts/${actual.accounts.checking}`;
+    const path = '/v1/budgets/{budgetId}/accounts/{id}';
+    expect((await call('PATCH', url, path, viewer, { kind: 'savings' })).status).toBe(403);
+    expect((await call('PATCH', url, path, member, { kind: 'boat' })).status).toBe(400);
+    const set = await call('PATCH', url, path, member, { kind: 'savings' });
+    expect(set.status).toBe(200);
+    expect(set.body.kind).toBe('savings');
+    const renamed = await call('PATCH', url, path, member, { name: 'Rainy day' });
+    expect(renamed.body).toMatchObject({ name: 'Rainy day', kind: 'savings' }); // renaming keeps the type
+    list = await accounts();
+    expect(list.find((a) => a.id === actual.accounts.checking).kind).toBe('savings');
+    expect((await call('PATCH', url, path, member, { kind: null })).body.kind).toBeNull();
+
+    const created = await call('POST', `/v1/budgets/${b}/accounts`, '/v1/budgets/{budgetId}/accounts', member, { name: 'House loan', offBudget: true, kind: 'mortgage' });
+    expect(created.status).toBe(201);
+    expect(created.body.kind).toBe('mortgage');
+  });
+
   it('reports a bank login that needs signing in again, and recovers through update mode', async () => {
     plaid.item('item_wf').error = 'ITEM_LOGIN_REQUIRED';
     const job = await syncAll();

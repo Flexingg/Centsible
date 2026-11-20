@@ -1,9 +1,12 @@
 import type { FastifyPluginAsync } from 'fastify';
 import { audit, requireBudget, type Deps } from '../server.js';
+import { ACCOUNT_KINDS, type AccountKind } from '../../actual/account-kinds.js';
 import { MONEY, type BudgetParams } from './budgets.js';
 
 type IdParams = BudgetParams & { id: string };
 const NAME = { type: 'string', minLength: 1, maxLength: 100 };
+/** An account type, or null to clear it. */
+const KIND = { type: ['string', 'null'], enum: [...ACCOUNT_KINDS, null] };
 const TRANSFER_QUERY = { type: 'object', properties: { transferCategoryId: { type: 'string' } } };
 
 /** Accounts, categories and category groups. Members and owners may edit. */
@@ -12,7 +15,7 @@ export const structureRoutes =
   async (app) => {
     const { structure } = deps;
 
-    app.post<{ Params: BudgetParams; Body: { name: string; offBudget?: boolean; initialBalance?: number } }>(
+    app.post<{ Params: BudgetParams; Body: { name: string; offBudget?: boolean; initialBalance?: number; kind?: AccountKind | null } }>(
       '/v1/budgets/:budgetId/accounts',
       {
         schema: {
@@ -20,7 +23,7 @@ export const structureRoutes =
             type: 'object',
             required: ['name'],
             additionalProperties: false,
-            properties: { name: NAME, offBudget: { type: 'boolean' }, initialBalance: MONEY },
+            properties: { name: NAME, offBudget: { type: 'boolean' }, initialBalance: MONEY, kind: KIND },
           },
         },
       },
@@ -30,19 +33,20 @@ export const structureRoutes =
           name: req.body.name,
           offBudget: req.body.offBudget ?? false,
           initialBalance: req.body.initialBalance ?? 0,
+          kind: req.body.kind ?? null,
         });
         audit(deps, req, req.params.budgetId, 'account.created', account.id);
         return reply.status(201).send(account);
       },
     );
 
-    app.patch<{ Params: IdParams; Body: { name?: string } }>(
+    app.patch<{ Params: IdParams; Body: { name?: string; kind?: AccountKind | null } }>(
       '/v1/budgets/:budgetId/accounts/:id',
-      { schema: { body: { type: 'object', minProperties: 1, additionalProperties: false, properties: { name: NAME } } } },
+      { schema: { body: { type: 'object', minProperties: 1, additionalProperties: false, properties: { name: NAME, kind: KIND } } } },
       async (req) => {
         requireBudget(deps, req, req.params.budgetId, 'member');
         const account = await structure.updateAccount(req.params.budgetId, req.params.id, req.body);
-        audit(deps, req, req.params.budgetId, 'account.updated', req.params.id);
+        audit(deps, req, req.params.budgetId, 'account.updated', req.params.id, req.body.kind !== undefined ? { kind: req.body.kind } : undefined);
         return account;
       },
     );

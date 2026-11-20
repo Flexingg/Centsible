@@ -45,6 +45,7 @@ export function createDeps(config: BridgeConfig, store: HouseholdStore, host: Ac
   const plaid = new PlaidOps(host, store, new PlaidVault(config.dataDir), config.plaidApiUrl);
   bankSync.plaid = plaid;
   budgetOps.syncOverlay = (budgetId) => plaid.overlay(budgetId);
+  budgetOps.kinds = (budgetId) => store.accountKinds(budgetId);
   const transfers = new TransferOps(host, store);
   const annual = new AnnualOps(host, store);
   const offBooks = new OffBooks(store);
@@ -80,7 +81,7 @@ export function createDeps(config: BridgeConfig, store: HouseholdStore, host: Ac
     annual,
     automations: new AutomationOps(host),
     ruleTools: new RuleTools(host),
-    structure: new StructureOps(host),
+    structure: new StructureOps(host, store),
     planning: new PlanningOps(host),
     accountOps: new AccountOps(host),
     reports: new ReportOps(host, offBooks),

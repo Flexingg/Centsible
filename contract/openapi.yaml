@@ -607,6 +607,34 @@ paths:
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
 
+  /v1/budgets/{budgetId}/bank-sync/plaid/history:
+    post:
+      tags: [bank-sync]
+      operationId: importPlaidHistory
+      summary: Members. Imports older history for Plaid-linked accounts (all, or accountIds) back to since. Plaid holds up to two years (depending on the bank); an earlier date is moved up to that. Already-imported transactions are matched, not duplicated. Runs as a bank sync job (shares the slot with Sync now).
+      parameters:
+        - $ref: '#/components/parameters/BudgetId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [since]
+              additionalProperties: false
+              properties:
+                since: { $ref: '#/components/schemas/Date' }
+                accountIds: { type: array, items: { type: string, minLength: 1 }, maxItems: 100, description: Plaid-linked accounts in this budget; omit for all }
+      responses:
+        '202':
+          description: Job started (or the bank sync already running)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Job' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '423': { $ref: '#/components/responses/Problem' }
+
   /v1/budgets/{budgetId}/bank-sync/plaid/accounts:
     get:
       tags: [bank-sync]
@@ -855,6 +883,7 @@ paths:
                 name: { type: string, minLength: 1, maxLength: 100 }
                 offBudget: { type: boolean, default: false }
                 initialBalance: { $ref: '#/components/schemas/Money' }
+                kind: { $ref: '#/components/schemas/AccountKindInput' }
       responses:
         '201':
           description: Created account
@@ -1298,6 +1327,7 @@ paths:
     patch:
       tags: [budgets]
       operationId: updateAccount
+      summary: Members. Renames an account and/or sets its type (null clears the type, and the app guesses again).
       parameters:
         - $ref: '#/components/parameters/BudgetId'
         - $ref: '#/components/parameters/Id'
@@ -1308,14 +1338,18 @@ paths:
             schema:
               type: object
               minProperties: 1
+              additionalProperties: false
               properties:
                 name: { type: string, minLength: 1, maxLength: 100 }
+                kind: { $ref: '#/components/schemas/AccountKindInput' }
       responses:
         '200':
           description: Updated account
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Account' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
         '423': { $ref: '#/components/responses/Problem' }
 
@@ -3588,6 +3622,17 @@ components:
         bankSyncStatus:
           type: [string, 'null']
           description: Actual's result of the last bank sync for this account (ok, reauth-required, attention-required, rate-limit-exceeded, timed-out, account-missing, failed)
+        kind:
+          description: The account's type, set in Centsible (Actual has none). Null until set; linking a Plaid account sets it from what the bank reports.
+          oneOf:
+            - type: 'null'
+            - { type: string, enum: [cash, savings, credit, investment, mortgage, loan] }
+
+    AccountKindInput:
+      description: An account type, or null to clear it.
+      oneOf:
+        - type: 'null'
+        - { type: string, enum: [cash, savings, credit, investment, mortgage, loan] }
 
     Category:
       type: object

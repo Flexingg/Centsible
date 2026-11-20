@@ -1,24 +1,32 @@
 import * as api from '@actual-app/api';
 import { ApiError } from '../errors.js';
 import { toAccount, toCategory, toCategoryGroup } from '../mappers/index.js';
+import type { HouseholdStore } from '../auth/store.js';
+import type { AccountKind } from './account-kinds.js';
 import type { ActualHost } from './host.js';
 
 /** Accounts, categories and category groups (all tier 1). */
 export class StructureOps {
-  constructor(private readonly host: ActualHost) {}
+  constructor(
+    private readonly host: ActualHost,
+    /** Where account types live (Actual has none). */
+    private readonly store?: HouseholdStore,
+  ) {}
 
-  createAccount(budgetId: string, input: { name: string; offBudget: boolean; initialBalance: number }) {
+  createAccount(budgetId: string, input: { name: string; offBudget: boolean; initialBalance: number; kind?: AccountKind | null }) {
     return this.host.withBudget(budgetId, 'write', async () => {
       const id = await api.createAccount({ name: input.name.trim(), offbudget: input.offBudget }, input.initialBalance);
-      return this.account(id);
+      if (input.kind) this.store?.setAccountKind(budgetId, id, input.kind);
+      return this.account(id, budgetId);
     });
   }
 
-  updateAccount(budgetId: string, id: string, patch: { name?: string }) {
+  updateAccount(budgetId: string, id: string, patch: { name?: string; kind?: AccountKind | null }) {
     return this.host.withBudget(budgetId, 'write', async () => {
       await this.account(id);
       if (patch.name !== undefined) await api.updateAccount(id, { name: patch.name.trim() });
-      return this.account(id);
+      if (patch.kind !== undefined) this.store?.setAccountKind(budgetId, id, patch.kind);
+      return this.account(id, budgetId);
     });
   }
 
@@ -31,7 +39,8 @@ export class StructureOps {
       await api.closeAccount(id, opts.transferAccountId, opts.transferCategoryId);
       // Actual deletes an account outright when it has no transactions.
       const after = (await api.getAccounts()).find((a) => a.id === id);
-      return after ? toAccount(after, await api.getAccountBalance(id)) : null;
+      if (!after) this.store?.setAccountKind(budgetId, id, null);
+      return after ? toAccount(after, await api.getAccountBalance(id), undefined, this.kindOf(budgetId, id)) : null;
     });
   }
 
@@ -39,7 +48,7 @@ export class StructureOps {
     return this.host.withBudget(budgetId, 'write', async () => {
       await this.account(id);
       await api.reopenAccount(id);
-      return this.account(id);
+      return this.account(id, budgetId);
     });
   }
 
@@ -98,10 +107,14 @@ export class StructureOps {
     });
   }
 
-  private async account(id: string) {
+  private async account(id: string, budgetId?: string) {
     const a = (await api.getAccounts()).find((x) => x.id === id);
     if (!a) throw ApiError.notFound(`Account ${id} not found`);
-    return toAccount(a, await api.getAccountBalance(id));
+    return toAccount(a, await api.getAccountBalance(id), undefined, budgetId ? this.kindOf(budgetId, id) : null);
+  }
+
+  private kindOf(budgetId: string, id: string) {
+    return this.store?.accountKinds(budgetId).get(id) ?? null;
   }
 
   private async category(id: string) {

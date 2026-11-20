@@ -265,6 +265,16 @@ export class BankSyncOps {
     return this.afterSync ? this.afterSync(budgetId, lib).catch(() => 0) : 0;
   }
 
+  /** Older history for Plaid-linked accounts (see PlaidOps.importHistoryIn), with transfers linked afterwards like a sync. */
+  plaidHistory(budgetId: string, since: string, accountIds?: string[]): Promise<SyncSummary> {
+    return this.host.withBudget(budgetId, 'write', async (lib) => {
+      if (!this.plaid) throw ApiError.validation('Plaid is not available on this bridge.');
+      const summary: SyncSummary = { accounts: 0, newTransactions: 0, results: [], simplefinRequests: 0 };
+      addResults(summary, await this.plaid.importHistoryIn(budgetId, since, accountIds));
+      return linked_(summary, await this.after(budgetId, lib));
+    });
+  }
+
   /** One account now (a SimpleFIN account costs one request). */
   syncOne(budgetId: string, accountId: string): Promise<SyncSummary> {
     return this.host.withBudget(budgetId, 'write', async (lib) => {
