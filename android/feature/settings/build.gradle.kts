@@ -8,4 +8,6 @@ android {
 
 dependencies {
     implementation(libs.zxing.core)
+    // Plaid Link: Plaid's own bank sign-in screens (Plaid replaced Teller in 2026).
+    implementation(libs.plaid.link)
 }

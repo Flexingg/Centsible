@@ -14,7 +14,7 @@ sealed interface AppLink {
         Recurring("recurring"),
         Trends("trends"),
         BankSync("bank-sync"),
-        Teller("teller"),
+        Plaid("plaid"),
         Duplicates("duplicates"),
         Mortgage("mortgage"),
     }
@@ -30,7 +30,7 @@ sealed interface AppLink {
  *
  *     centsible://open/review                       the review inbox
  *     centsible://open/<screen>                     transactions, accounts, budget, net-worth,
- *                                                   recurring, trends, bank-sync, teller,
+ *                                                   recurring, trends, bank-sync, plaid,
  *                                                   duplicates, mortgage
  *     centsible://open/account/<id>                 one account
  *     centsible://open/category/<id>?name=Groceries[&month=2026-11]
@@ -51,6 +51,8 @@ object AppLinks {
             if (i <= 0) null else part.substring(0, i) to URLDecoder.decode(part.substring(i + 1), Charsets.UTF_8)
         }.toMap()
         return when {
+            // "teller" is from before Plaid replaced Teller; old dashboard links still land on the bank screen.
+            parts.size == 1 && parts[0].lowercase() == "teller" -> AppLink.To(AppLink.Screen.Plaid)
             parts.size == 1 -> AppLink.Screen.entries.firstOrNull { it.path == parts[0].lowercase() }?.let { AppLink.To(it) }
             parts.size == 2 && parts[0] == "account" && ID.matches(parts[1]) -> AppLink.Account(parts[1])
             parts.size == 2 && parts[0] == "category" && ID.matches(parts[1]) ->

@@ -9,7 +9,9 @@ class AppLinksTest {
     fun `opens named screens`() {
         assertEquals(AppLink.To(AppLink.Screen.Review), AppLinks.parse("centsible://open/review"))
         assertEquals(AppLink.To(AppLink.Screen.BankSync), AppLinks.parse(" centsible://open/bank-sync/ "))
-        assertEquals(AppLink.To(AppLink.Screen.Teller), AppLinks.parse("centsible://open/teller"))
+        assertEquals(AppLink.To(AppLink.Screen.Plaid), AppLinks.parse("centsible://open/plaid"))
+        // Links from before Plaid replaced Teller still open the bank screen.
+        assertEquals(AppLink.To(AppLink.Screen.Plaid), AppLinks.parse("centsible://open/teller"))
         assertEquals(AppLink.To(AppLink.Screen.NetWorth), AppLinks.parse("CENTSIBLE://open/Net-Worth"))
     }
 

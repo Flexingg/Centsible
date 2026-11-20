@@ -2,7 +2,7 @@
 
 Runs your Actual Budget server and the Centsible bridge (what the Android app talks to) together, on versions that are tested together. When a new Centsible release is out, Home Assistant offers it as an update, and Actual moves with it.
 
-Everything lives in the app's data, so **Home Assistant's backups include your budget, the household (members and paired phones) and the Teller certificate**. Keep backups encrypted (Home Assistant's default) since they hold financial data.
+Everything lives in the app's data, so **Home Assistant's backups include your budget, the household (members and paired phones) and the Plaid keys**. Keep backups encrypted (Home Assistant's default) since they hold financial data.
 
 ## First install
 

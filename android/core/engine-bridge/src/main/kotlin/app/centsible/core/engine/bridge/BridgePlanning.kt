@@ -112,43 +112,39 @@ private fun app.centsible.core.network.BackfillDto.toModel() = app.centsible.cor
 private fun app.centsible.core.network.BankSyncOverviewDto.toModel() =
     app.centsible.core.model.BankSyncOverview(
         simplefin.configured, simplefin.requestsToday, simplefin.dailyQuota, schedule.toModel(), intervals,
-        historyAccess = simplefin.historyAccess, backfill = backfill?.toModel(), teller = teller?.toModel(),
+        historyAccess = simplefin.historyAccess, backfill = backfill?.toModel(), plaid = plaid?.toModel(),
     )
 
-internal fun app.centsible.core.network.TellerStatusDto.toModel() = app.centsible.core.model.TellerStatus(
-    configured, applicationId, environment, hasCertificate, enrollments.map { it.toModel() },
+internal fun app.centsible.core.network.PlaidStatusDto.toModel() = app.centsible.core.model.PlaidStatus(
+    configured, clientId, environment, androidPackageName, items.map { it.toModel() },
 )
 
-internal fun app.centsible.core.network.TellerEnrollmentDto.toModel() = app.centsible.core.model.TellerEnrollment(
+internal fun app.centsible.core.network.PlaidItemDto.toModel() = app.centsible.core.model.PlaidItem(
     id, institution,
-    when (status) { "disconnected" -> app.centsible.core.model.TellerEnrollment.Status.Disconnected; "revoked" -> app.centsible.core.model.TellerEnrollment.Status.Revoked; else -> app.centsible.core.model.TellerEnrollment.Status.Ok },
+    when (status) { "reauth" -> app.centsible.core.model.PlaidItem.Status.Reauth; "gone" -> app.centsible.core.model.PlaidItem.Status.Gone; else -> app.centsible.core.model.PlaidItem.Status.Ok },
     message, linkedAccounts,
 )
 
-class BridgeTeller(private val api: PlanningApi, private val onWrite: () -> Unit) : app.centsible.core.domain.TellerGateway {
-    override suspend fun status() = api.bankSyncOverview().teller?.toModel()
-        ?: throw IllegalStateException("This bridge doesn't support Teller yet. Update the bridge (Settings → Server).")
-    override suspend fun configure(applicationId: String, environment: String, certificate: String?, privateKey: String?) =
-        api.configureTeller(app.centsible.core.network.TellerConfigInputDto(applicationId.trim(), environment, certificate?.trim()?.ifEmpty { null }, privateKey?.trim()?.ifEmpty { null })).toModel()
-    override suspend fun reset() = api.resetTeller()
-    override suspend fun addEnrollment(result: app.centsible.core.model.TellerEnrollmentResult) =
-        api.addTellerEnrollment(app.centsible.core.network.TellerEnrollmentInputDto(result.accessToken, result.enrollmentId, result.institution, result.userId)).toModel()
-    override suspend fun removeEnrollment(id: String) = api.removeTellerEnrollment(id).also { onWrite() }
-    override suspend fun accounts(budget: BudgetId, refresh: Boolean) = api.tellerAccounts(budget.raw, refresh).map {
-        app.centsible.core.model.TellerAccount(
-            it.id, it.enrollmentId, it.institution, it.name, it.type == "credit", it.lastFour, it.balance?.let(::Money),
-            it.linkedAccountId?.let(::AccountId), it.linkedAccountName, it.flip,
+class BridgePlaid(private val api: PlanningApi, private val onWrite: () -> Unit) : app.centsible.core.domain.PlaidGateway {
+    override suspend fun status() = api.bankSyncOverview().plaid?.toModel()
+        ?: throw IllegalStateException("This bridge doesn't support Plaid yet. Update the bridge (Settings → Server).")
+    override suspend fun configure(clientId: String, environment: String, secret: String?) =
+        api.configurePlaid(app.centsible.core.network.PlaidConfigInputDto(clientId.trim(), environment, secret?.trim()?.ifEmpty { null })).toModel()
+    override suspend fun reset() = api.resetPlaid().also { onWrite() }
+    override suspend fun linkToken(itemId: String?) = api.plaidLinkToken(app.centsible.core.network.PlaidLinkTokenRequestDto(itemId)).linkToken
+    override suspend fun addItem(result: app.centsible.core.model.PlaidLinkResult) =
+        api.addPlaidItem(app.centsible.core.network.PlaidItemInputDto(result.publicToken, result.itemId, result.institution)).toModel()
+    override suspend fun removeItem(id: String) = api.removePlaidItem(id).also { onWrite() }
+    override suspend fun accounts(budget: BudgetId, refresh: Boolean) = api.plaidAccounts(budget.raw, refresh).map {
+        app.centsible.core.model.PlaidAccount(
+            it.id, it.itemId, it.institution, it.name, it.type == "credit" || it.type == "loan", it.mask, it.balance?.let(::Money),
+            it.linkedAccountId?.let(::AccountId), it.linkedAccountName,
         )
     }
-    override suspend fun preview(budget: BudgetId, tellerAccountId: String, flip: Boolean) =
-        api.previewTeller(budget.raw, app.centsible.core.network.TellerPreviewRequestDto(tellerAccountId, flip)).transactions.map {
-            app.centsible.core.model.TellerPreviewTransaction(it.date, it.payee, Money(it.amount), it.pending)
-        }
-    override suspend fun link(budget: BudgetId, tellerAccountId: String, account: AccountId, flip: Boolean) =
-        api.linkTeller(budget.raw, app.centsible.core.network.TellerLinkRequestDto(tellerAccountId, account.raw, flip)).result.let {
+    override suspend fun link(budget: BudgetId, plaidAccountId: String, account: AccountId) =
+        api.linkPlaid(budget.raw, app.centsible.core.network.PlaidLinkRequestDto(plaidAccountId, account.raw)).result.let {
             app.centsible.core.model.AccountSyncResult(AccountId(it.accountId), it.name, it.newTransactions, it.error, it.status)
         }.also { onWrite() }
-    override suspend fun setFlip(budget: BudgetId, account: AccountId, flip: Boolean) { api.setTellerFlip(budget.raw, account.raw, flip) }
     override suspend fun unlink(budget: BudgetId, account: AccountId) = api.unlink(budget.raw, account.raw).also { onWrite() }
 }
 
