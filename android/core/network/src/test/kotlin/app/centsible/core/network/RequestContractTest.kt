@@ -82,6 +82,9 @@ class RequestContractTest {
         call { api.updateTransaction(b, "t1", buildJsonObject { put("notes", JsonNull); put("amount", -99) }) }
         call { api.createAccount(b, NewAccountDto("Savings")) }
         call { api.updateAccount(b, "acc", AccountPatchDto("Joint")) }
+        call { api.createAccount(b, NewAccountDto("House loan", offBudget = true, initialBalance = -30_000_000, kind = "mortgage")) }
+        call { api.setAccountKind(b, "acc", "savings") }
+        call { api.setAccountKind(b, "acc", null) } // clearing still sends "kind": null
         call { api.closeAccount(b, "acc", CloseAccountDto(transferAccountId = "acc2")) }
         call { api.createCategory(b, NewCategoryDto("Pets", "g1")) }
         call { api.updateCategory(b, "c1", CategoryPatchDto(hidden = true)) }
@@ -124,6 +127,8 @@ class RequestContractTest {
         call { planning.addPlaidItem(PlaidItemInputDto(publicToken = "public-production-1", institution = "Wells Fargo")) }
         call { planning.addPlaidItem(PlaidItemInputDto(itemId = "item_1")) }
         call { planning.linkPlaid(b, PlaidLinkRequestDto("acc_1", "acc")) }
+        call { planning.importPlaidHistory(b, PlaidHistoryRequestDto("2025-01-01")) }
+        call { planning.importPlaidHistory(b, PlaidHistoryRequestDto("2025-01-01", listOf("acc"))) }
         call { planning.applyAutopilot(b, "2026-09", ApplyAutopilotDto(3)) }
         call { planning.applyAutopilot(b, "2026-09", ApplyAutopilotDto(12, listOf("c1"))) }
         call { planning.setGoal(b, "c1", GoalInputDto("by", 120000, "2027-03")) }

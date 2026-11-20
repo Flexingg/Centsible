@@ -20,13 +20,16 @@ export class BudgetOps {
 
   /** Bank links Actual doesn't know about (Plaid), shown as each account's sync source. */
   syncOverlay?: (budgetId: string) => Map<string, { syncSource: string | null; lastSync: string | null; bankSyncStatus: string | null }>;
+  /** Account types set in Centsible (Actual has none). */
+  kinds?: (budgetId: string) => Map<string, string>;
 
   accounts(budgetId: string) {
     return this.host.withBudget(budgetId, 'read', async () => {
       const accounts = await api.getAccounts(); // tier 1
       const sync = await AccountOps.syncInfo(); // tier 2: bank link status
       for (const [id, info] of this.syncOverlay?.(budgetId) ?? []) sync.set(id, info);
-      return Promise.all(accounts.map(async (a) => toAccount(a, await api.getAccountBalance(a.id), sync.get(a.id))));
+      const kinds = this.kinds?.(budgetId) ?? new Map<string, string>();
+      return Promise.all(accounts.map(async (a) => toAccount(a, await api.getAccountBalance(a.id), sync.get(a.id), kinds.get(a.id) ?? null)));
     });
   }
 

@@ -146,6 +146,9 @@ class BridgePlaid(private val api: PlanningApi, private val onWrite: () -> Unit)
             app.centsible.core.model.AccountSyncResult(AccountId(it.accountId), it.name, it.newTransactions, it.error, it.status)
         }.also { onWrite() }
     override suspend fun unlink(budget: BudgetId, account: AccountId) = api.unlink(budget.raw, account.raw).also { onWrite() }
+    override suspend fun importHistory(budget: BudgetId, since: String, accounts: List<AccountId>) =
+        api.importPlaidHistory(budget.raw, app.centsible.core.network.PlaidHistoryRequestDto(since, accounts.map { it.raw }.ifEmpty { null })).toModel()
+    override suspend fun job(id: String) = api.job(id).toModel().also { if (it.status != app.centsible.core.model.JobStatus.Running) onWrite() }
 }
 
 private fun app.centsible.core.network.ScheduleStateDto.toModel() = app.centsible.core.model.SyncSchedule(

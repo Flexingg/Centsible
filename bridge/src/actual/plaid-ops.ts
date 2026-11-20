@@ -3,6 +3,7 @@ import type { HouseholdStore, PlaidItemRow, PlaidLinkRow } from '../auth/store.j
 import { ApiError } from '../errors.js';
 import type { AccountSyncResult } from './bank-sync-ops.js';
 import { linkedAccounts } from './bank-sync-ops.js';
+import { kindFromPlaid } from './account-kinds.js';
 import type { ActualHost } from './host.js';
 import {
   describePlaidCode,
@@ -20,6 +21,8 @@ type Send = (name: string, args?: unknown) => Promise<unknown>;
 const settle = () => new Promise<void>((r) => setTimeout(r, 0));
 const DAY = 24 * 3600_000;
 const CONFIG_KEY = 'plaid.config';
+/** How far back Plaid keeps transactions: Link asks for 730 days, the most it offers. */
+export const PLAID_HISTORY_DAYS = 730;
 /** The Android app's package name, which Plaid needs to finish bank sign-ins that go through the bank's own app or site. */
 export const ANDROID_PACKAGE = 'app.centsible.budget';
 
@@ -272,9 +275,28 @@ export class PlaidOps {
         await settle();
       }
       this.store.addPlaidLink({ budgetId, accountId: input.accountId, plaidAccountId: input.plaidAccountId, itemId, plaidAccountName: account.name, startDate });
+      // Give the account a type from what the bank says it is, unless one was chosen already.
+      if (!this.store.accountKinds(budgetId).has(input.accountId)) this.store.setAccountKind(budgetId, input.accountId, kindFromPlaid(account.type, account.subtype));
       const [result] = await this.syncIn(budgetId, [input.accountId]);
       return { accountId: input.accountId, result: result! };
     });
+  }
+
+  /**
+   * Imports older history for Plaid-linked accounts in [budgetId] (all, or [accountIds]):
+   * each link's start date moves back to [since] and its sync starts over from the
+   * beginning of what Plaid holds (up to two years, depending on the bank). Transactions
+   * already imported are matched by id, and ones from SimpleFIN or Teller are adopted, so
+   * nothing is duplicated. Must run inside a withBudget write session for [budgetId].
+   */
+  async importHistoryIn(budgetId: string, since: string, accountIds?: string[]): Promise<AccountSyncResult[]> {
+    const earliest = iso(Date.now() - PLAID_HISTORY_DAYS * DAY);
+    if (since > iso(Date.now())) throw ApiError.validation("That date is in the future.");
+    const from = since < earliest ? earliest : since;
+    const links = this.store.plaidLinks(budgetId).filter((l) => !accountIds?.length || accountIds.includes(l.accountId));
+    if (!links.length) throw ApiError.validation(accountIds?.length ? "Those accounts don't sync through Plaid." : 'No accounts sync through Plaid yet. Link one first.');
+    for (const l of links) this.store.resetPlaidLink(budgetId, l.accountId, from < l.startDate ? from : l.startDate);
+    return this.syncIn(budgetId, links.map((l) => l.accountId));
   }
 
   /** Stops Plaid syncing for an account (its transactions stay). False when it wasn't linked. */

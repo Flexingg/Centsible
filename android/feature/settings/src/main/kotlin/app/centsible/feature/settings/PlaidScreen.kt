@@ -98,6 +98,8 @@ fun PlaidRoute(onBack: () -> Unit, viewModel: PlaidViewModel = hiltViewModel()) 
             link = viewModel::link,
             openOptions = viewModel::openOptions,
             unlink = viewModel::unlink,
+            historyMonths = viewModel::historyMonths,
+            importHistory = viewModel::importHistory,
             messageShown = viewModel::messageShown,
         ),
     )
@@ -126,6 +128,8 @@ data class PlaidActions(
     val link: () -> Unit = {},
     val openOptions: (PlaidAccount?) -> Unit = {},
     val unlink: () -> Unit = {},
+    val historyMonths: (Int) -> Unit = {},
+    val importHistory: () -> Unit = {},
     val messageShown: () -> Unit = {},
 )
 
@@ -158,6 +162,7 @@ fun PlaidScreen(state: PlaidUiState, actions: PlaidActions) {
                 if (s.value.configured) {
                     item { BanksCard(s.value, state, actions) }
                     if (s.value.items.isNotEmpty()) item { PlaidAccountsCard(state, actions) }
+                    if (state.linkedCount > 0 && state.canEdit) item { PlaidHistoryCard(state, actions) }
                 }
             }
         }
@@ -360,6 +365,35 @@ private fun PlaidAccountsCard(state: PlaidUiState, actions: PlaidActions) {
                     }
                 }
             }
+        }
+    }
+}
+
+/** Imports older transactions for the linked accounts (Plaid keeps up to two years). */
+@Composable
+private fun PlaidHistoryCard(state: PlaidUiState, actions: PlaidActions) {
+    val colors = CentsibleTheme.colors
+    SectionCard("Older history") {
+        Text(
+            "Linking imports the last 30 days. Plaid usually keeps up to two years, depending on the bank. Transactions already here are matched, not duplicated.",
+            style = MaterialTheme.typography.bodySmall,
+            color = colors.textSecondary,
+        )
+        Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            PlaidUiState.HISTORY_CHOICES.forEach { m ->
+                FilterChip(
+                    selected = state.historyMonths == m,
+                    onClick = { actions.historyMonths(m) },
+                    enabled = !state.importingHistory,
+                    label = { Text(if (m < 12) "$m months" else if (m == 12) "1 year" else "${m / 12} years") },
+                )
+            }
+        }
+        Button(onClick = actions.importHistory, enabled = !state.importingHistory, modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
+            Text(
+                if (state.importingHistory) "Importing… this can take a few minutes"
+                else "Import history for ${state.linkedCount} linked account" + if (state.linkedCount == 1) "" else "s",
+            )
         }
     }
 }

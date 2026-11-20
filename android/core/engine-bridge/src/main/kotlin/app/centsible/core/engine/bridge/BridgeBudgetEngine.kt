@@ -68,8 +68,10 @@ class BridgeBudgetEngine @Inject constructor(private val api: BridgeApi) : Budge
 
     override suspend fun preferences(budget: BudgetId) = api.preferences(budget.raw).toModel()
 
-    override suspend fun createAccount(budget: BudgetId, name: String, offBudget: Boolean, initialBalance: Money) =
-        api.createAccount(budget.raw, NewAccountDto(name, offBudget, initialBalance.minor)).toModel()
+    override suspend fun createAccount(budget: BudgetId, name: String, offBudget: Boolean, initialBalance: Money, type: app.centsible.core.model.AccountType?) =
+        api.createAccount(budget.raw, NewAccountDto(name, offBudget, initialBalance.minor, type?.api)).toModel()
+
+    override suspend fun setAccountType(budget: BudgetId, id: AccountId, type: app.centsible.core.model.AccountType?) = api.setAccountKind(budget.raw, id.raw, type?.api).toModel()
 
     override suspend fun renameAccount(budget: BudgetId, id: AccountId, name: String) = api.updateAccount(budget.raw, id.raw, AccountPatchDto(name)).toModel()
 

@@ -13,7 +13,24 @@ data class Account(
     val lastSync: String? = null,
     /** Actual's result of the last bank sync (ok, reauth-required, ...). */
     val bankSyncStatus: String? = null,
+    /** The type set in Centsible (Actual has none); null means not set, and the app guesses. */
+    val type: AccountType? = null,
 )
+
+/** What kind of account it is: how the Accounts page groups it and how net worth counts it. */
+enum class AccountType(val api: String, val title: String, val singular: String, val isDebt: Boolean) {
+    Cash("cash", "Cash", "Cash", false),
+    Savings("savings", "Savings", "Savings", false),
+    Credit("credit", "Credit cards", "Credit card", true),
+    Investment("investment", "Investments", "Investment", false),
+    Mortgage("mortgage", "Mortgages", "Mortgage", true),
+    Loan("loan", "Loans", "Loan", true),
+    ;
+
+    companion object {
+        fun fromApi(value: String?): AccountType? = entries.firstOrNull { it.api == value }
+    }
+}
 
 data class Category(
     val id: CategoryId,

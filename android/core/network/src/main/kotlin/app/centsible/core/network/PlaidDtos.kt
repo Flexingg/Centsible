@@ -43,4 +43,5 @@ import kotlinx.serialization.Serializable
 )
 
 @Serializable data class PlaidLinkRequestDto(val plaidAccountId: String, val accountId: String, val startDate: String? = null)
+@Serializable data class PlaidHistoryRequestDto(val since: String, val accountIds: List<String>? = null)
 @Serializable data class PlaidLinkedDto(val accountId: String, val result: AccountSyncResultDto)

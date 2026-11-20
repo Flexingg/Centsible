@@ -115,6 +115,7 @@ export class MortgageOps {
       if (input.createLoanAccount && !def.loanAccountId) {
         const owed = input.currentBalance ?? scheduledBalance(def, today());
         def.loanAccountId = await api.createAccount({ name: input.name.trim(), offbudget: true }, -Math.max(0, owed));
+        this.store.setAccountKind(budgetId, def.loanAccountId, 'mortgage');
         // Payments made before today are already in that balance.
         def.recorded = (await this.payments(def)).map((p) => p.id);
       }

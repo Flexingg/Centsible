@@ -31,7 +31,7 @@ const mapping = {
 export const bankSyncRoutes =
   (deps: Deps): FastifyPluginAsync =>
   async (app) => {
-    const { bankSync, scheduler, store, backfill, plaid } = deps;
+    const { bankSync, scheduler, store, backfill, plaid, jobs } = deps;
     const overview = async () => ({
       simplefin: { ...(await bankSync.status()), requestsToday: bankSync.requestsToday(), dailyQuota: SIMPLEFIN_DAILY_QUOTA, historyAccess: bankSync.historyAccess },
       plaid: plaid.status(),
@@ -154,6 +154,29 @@ export const bankSyncRoutes =
     });
 
     // ── Per budget ──
+    app.post<{ Params: BudgetParams; Body: { since: string; accountIds?: string[] } }>(
+      '/v1/budgets/:budgetId/bank-sync/plaid/history',
+      {
+        schema: {
+          body: {
+            type: 'object',
+            required: ['since'],
+            additionalProperties: false,
+            properties: { since: DATE, accountIds: { type: 'array', items: { type: 'string', minLength: 1 }, maxItems: 100 } },
+          },
+        },
+      },
+      async (req, reply) => {
+        requireBudget(deps, req, req.params.budgetId, 'member');
+        const { budgetId } = req.params;
+        // Shares the bank sync slot: a history import and a sync of the same budget can't overlap.
+        const running = jobs.running('bank-sync', budgetId);
+        if (running) return reply.status(202).send(running);
+        audit(deps, req, budgetId, 'bank_sync.plaid_history', undefined, { since: req.body.since, accounts: req.body.accountIds?.length ?? 'all' });
+        return reply.status(202).send(jobs.start('bank-sync', budgetId, () => bankSync.plaidHistory(budgetId, req.body.since, req.body.accountIds)));
+      },
+    );
+
     app.get<{ Params: BudgetParams; Querystring: { refresh?: boolean } }>('/v1/budgets/:budgetId/bank-sync/plaid/accounts', async (req) => {
       requireBudget(deps, req, req.params.budgetId, 'member');
       return { items: await plaid.listAccounts(req.params.budgetId, req.query.refresh !== false) };

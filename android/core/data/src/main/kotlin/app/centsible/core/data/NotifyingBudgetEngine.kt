@@ -47,8 +47,10 @@ class NotifyingBudgetEngine @Inject constructor(
     ) = write { inner.moveMoney(budget, month, from, to, amount, idempotencyKey) }
     override suspend fun holdForNextMonth(budget: app.centsible.core.model.BudgetId, month: app.centsible.core.model.YearMonth, amount: app.centsible.core.model.Money?) =
         write { inner.holdForNextMonth(budget, month, amount) }
-    override suspend fun createAccount(budget: app.centsible.core.model.BudgetId, name: String, offBudget: Boolean, initialBalance: app.centsible.core.model.Money) =
-        write { inner.createAccount(budget, name, offBudget, initialBalance) }
+    override suspend fun createAccount(budget: app.centsible.core.model.BudgetId, name: String, offBudget: Boolean, initialBalance: app.centsible.core.model.Money, type: app.centsible.core.model.AccountType?) =
+        write { inner.createAccount(budget, name, offBudget, initialBalance, type) }
+    override suspend fun setAccountType(budget: app.centsible.core.model.BudgetId, id: app.centsible.core.model.AccountId, type: app.centsible.core.model.AccountType?) =
+        write { inner.setAccountType(budget, id, type) }
     override suspend fun renameAccount(budget: app.centsible.core.model.BudgetId, id: app.centsible.core.model.AccountId, name: String) =
         write { inner.renameAccount(budget, id, name) }
     override suspend fun closeAccount(budget: app.centsible.core.model.BudgetId, id: app.centsible.core.model.AccountId, moveBalanceTo: app.centsible.core.model.AccountId?, balanceCategory: app.centsible.core.model.CategoryId?) =

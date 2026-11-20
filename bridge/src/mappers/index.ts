@@ -20,7 +20,7 @@ export function budgetTypeFromPrefs(prefs: Raw): BudgetType {
   return 'unknown';
 }
 
-export function toAccount(raw: Raw, balance: number, sync?: { syncSource: string | null; lastSync: string | null; bankSyncStatus?: string | null }) {
+export function toAccount(raw: Raw, balance: number, sync?: { syncSource: string | null; lastSync: string | null; bankSyncStatus?: string | null }, kind: string | null = null) {
   return {
     id: String(raw.id),
     name: String(raw.name ?? ''),
@@ -31,6 +31,7 @@ export function toAccount(raw: Raw, balance: number, sync?: { syncSource: string
     syncSource: sync?.syncSource ?? null,
     bankSyncStatus: sync?.bankSyncStatus ?? null,
     lastSync: sync?.lastSync ?? null,
+    kind,
   };
 }
 

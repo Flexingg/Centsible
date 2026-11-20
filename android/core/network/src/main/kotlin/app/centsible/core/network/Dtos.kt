@@ -61,6 +61,8 @@ import kotlinx.serialization.Serializable
     val syncSource: String? = null,
     val lastSync: String? = null,
     val bankSyncStatus: String? = null,
+    /** cash, savings, credit, investment, mortgage, loan; null when not set. */
+    val kind: String? = null,
 )
 
 @Serializable data class CategoryDto(val id: String, val name: String, val groupId: String, val isIncome: Boolean, val hidden: Boolean)
@@ -154,8 +156,10 @@ import kotlinx.serialization.Serializable
     val hideFraction: Boolean = false,
 )
 
-@Serializable data class NewAccountDto(val name: String, val offBudget: Boolean = false, val initialBalance: Long = 0)
+@Serializable data class NewAccountDto(val name: String, val offBudget: Boolean = false, val initialBalance: Long = 0, val kind: String? = null)
 @Serializable data class AccountPatchDto(val name: String)
+/** Sets an account's type; JsonNull clears it (sent explicitly, unlike other nulls). */
+@Serializable data class AccountKindPatchDto(val kind: kotlinx.serialization.json.JsonElement)
 @Serializable data class CloseAccountDto(val transferAccountId: String? = null, val transferCategoryId: String? = null)
 @Serializable data class NewCategoryDto(val name: String, val groupId: String)
 @Serializable data class CategoryPatchDto(val name: String? = null, val hidden: Boolean? = null, val groupId: String? = null)

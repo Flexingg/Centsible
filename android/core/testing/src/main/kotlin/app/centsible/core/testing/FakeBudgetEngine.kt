@@ -133,10 +133,12 @@ class FakeBudgetEngine(
     override suspend fun preferences(budget: BudgetId) =
         Preferences(BudgetType.Envelope, "USD", "comma-dot", "MM/dd/yyyy", 0, false)
 
-    override suspend fun createAccount(budget: BudgetId, name: String, offBudget: Boolean, initialBalance: Money): Account {
+    override suspend fun createAccount(budget: BudgetId, name: String, offBudget: Boolean, initialBalance: Money, type: app.centsible.core.model.AccountType?): Account {
         check()
-        return Account(AccountId("acc-${accounts.size}"), name, offBudget, false, initialBalance).also { accounts += it }
+        return Account(AccountId("acc-${accounts.size}"), name, offBudget, false, initialBalance, type = type).also { accounts += it }
     }
+
+    override suspend fun setAccountType(budget: BudgetId, id: AccountId, type: app.centsible.core.model.AccountType?) = replaceAccount(id) { it.copy(type = type) }
 
     override suspend fun renameAccount(budget: BudgetId, id: AccountId, name: String) = replaceAccount(id) { it.copy(name = name) }
 

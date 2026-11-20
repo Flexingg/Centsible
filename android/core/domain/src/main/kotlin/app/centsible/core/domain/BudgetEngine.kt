@@ -47,8 +47,10 @@ interface BudgetEngine {
 
     suspend fun preferences(budget: BudgetId): Preferences
 
-    suspend fun createAccount(budget: BudgetId, name: String, offBudget: Boolean, initialBalance: Money): Account
+    suspend fun createAccount(budget: BudgetId, name: String, offBudget: Boolean, initialBalance: Money, type: app.centsible.core.model.AccountType? = null): Account
     suspend fun renameAccount(budget: BudgetId, id: AccountId, name: String): Account
+    /** Sets the account's type; null clears it, and the app guesses again. */
+    suspend fun setAccountType(budget: BudgetId, id: AccountId, type: app.centsible.core.model.AccountType?): Account
     /** Returns null when Actual deleted the account because it had no transactions. */
     suspend fun closeAccount(budget: BudgetId, id: AccountId, moveBalanceTo: AccountId?, balanceCategory: CategoryId?): Account?
     suspend fun reopenAccount(budget: BudgetId, id: AccountId): Account

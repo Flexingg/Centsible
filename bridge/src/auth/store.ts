@@ -150,6 +150,14 @@ const MIGRATIONS: string[] = [
      PRIMARY KEY (budget_id, account_id),
      UNIQUE (budget_id, plaid_account_id)
    );`,
+  // 7: Account types (cash, savings, credit, investment, mortgage, loan), which Actual
+  // doesn't have. One row per account that has been given one.
+  `CREATE TABLE account_kinds (
+     budget_id TEXT NOT NULL,
+     account_id TEXT NOT NULL,
+     kind TEXT NOT NULL,
+     PRIMARY KEY (budget_id, account_id)
+   );`,
 ];
 
 const sha256 = (s: string) => createHash('sha256').update(s).digest('hex');
@@ -323,6 +331,22 @@ export class HouseholdStore {
     return (this.db.prepare('SELECT COUNT(*) AS n FROM simplefin_requests WHERE at >= ?').get(this.now() - 24 * 3600 * 1000) as { n: number }).n;
   }
 
+  // ── Account types ────────────────────────────────────────────────────────
+
+  accountKinds(budgetId: string): Map<string, string> {
+    const rows = this.db.prepare('SELECT account_id, kind FROM account_kinds WHERE budget_id = ?').all(budgetId) as { account_id: string; kind: string }[];
+    return new Map(rows.map((r) => [r.account_id, r.kind]));
+  }
+
+  /** Sets an account's type; null clears it (the app guesses again). */
+  setAccountKind(budgetId: string, accountId: string, kind: string | null) {
+    if (kind === null) this.db.prepare('DELETE FROM account_kinds WHERE budget_id = ? AND account_id = ?').run(budgetId, accountId);
+    else
+      this.db
+        .prepare('INSERT INTO account_kinds (budget_id, account_id, kind) VALUES (?, ?, ?) ON CONFLICT(budget_id, account_id) DO UPDATE SET kind = excluded.kind')
+        .run(budgetId, accountId, kind);
+  }
+
   // ── Plaid ────────────────────────────────────────────────────────────────
 
   plaidItems(): PlaidItemRow[] {
@@ -378,6 +402,11 @@ export class HouseholdStore {
     this.db
       .prepare('UPDATE plaid_links SET last_sync_at = ?, last_error = ?, cursor = ? WHERE budget_id = ? AND account_id = ?')
       .run(patch.lastSyncAt ?? cur.lastSyncAt, patch.lastError === undefined ? cur.lastError : patch.lastError, patch.cursor === undefined ? cur.cursor : patch.cursor, budgetId, accountId);
+  }
+
+  /** Starts a link's sync over from [startDate] (a history import). */
+  resetPlaidLink(budgetId: string, accountId: string, startDate: string) {
+    this.db.prepare('UPDATE plaid_links SET start_date = ?, cursor = NULL WHERE budget_id = ? AND account_id = ?').run(startDate, budgetId, accountId);
   }
 
   deletePlaidLink(budgetId: string, accountId: string) {
