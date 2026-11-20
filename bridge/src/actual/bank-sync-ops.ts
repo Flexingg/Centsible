@@ -3,7 +3,7 @@ import type { HouseholdStore } from '../auth/store.js';
 import { ApiError } from '../errors.js';
 import type { ActualHost, Lib } from './host.js';
 import { claimSetupToken, SimpleFinError, type SimpleFinKeyFile } from './simplefin-client.js';
-import type { TellerOps } from './teller-ops.js';
+import type { PlaidOps } from './plaid-ops.js';
 
 type Raw = Record<string, unknown>;
 type Send = (name: string, args?: unknown) => Promise<unknown>;
@@ -63,8 +63,8 @@ export class BankSyncOps {
   /** Runs after each sync, in the same budget session (auto-linking transfers). */
   afterSync?: (budgetId: string, lib: Lib) => Promise<number>;
 
-  /** The second provider: accounts linked through Teller sync alongside SimpleFIN ones. */
-  teller?: TellerOps;
+  /** The second provider: accounts linked through Plaid sync alongside SimpleFIN ones. */
+  plaid?: PlaidOps;
 
   /** Whether the bridge holds its own copy of the SimpleFIN access URL (needed for history backfill). */
   get historyAccess() {
@@ -240,8 +240,8 @@ export class BankSyncOps {
       // The scheduler passes simplefin: false when SimpleFIN's daily quota is nearly used up.
       const simplefin = opts.simplefin === false ? [] : linked.filter((l) => l.source === 'simpleFin');
       const others = linked.filter((l) => l.source !== 'simpleFin');
-      const teller = this.teller?.hasLinks(budgetId) ?? false;
-      if (!linked.length && !teller) throw ApiError.validation('No accounts are linked to a bank yet. Link one in Settings → Bank sync.');
+      const plaid = this.plaid?.hasLinks(budgetId) ?? false;
+      if (!linked.length && !plaid) throw ApiError.validation('No accounts are linked to a bank yet. Link one in Settings → Bank sync.');
       const results: AccountSyncResult[] = [];
       if (simplefin.length) {
         this.store.recordSimpleFinRequest();
@@ -255,7 +255,7 @@ export class BankSyncOps {
       }
       await settle();
       const summary = await withStatuses(results, simplefin.length ? 1 : 0);
-      if (teller) addResults(summary, await this.teller!.syncIn(budgetId));
+      if (plaid) addResults(summary, await this.plaid!.syncIn(budgetId));
       return linked_(summary, await this.after(budgetId, lib));
     });
   }
@@ -271,9 +271,9 @@ export class BankSyncOps {
       const linked = await linkedAccounts();
       const acct = linked.find((l) => l.id === accountId);
       if (!acct) throw ApiError.notFound('Account not found');
-      if (this.teller?.links(budgetId).some((l) => l.accountId === accountId)) {
+      if (this.plaid?.links(budgetId).some((l) => l.accountId === accountId)) {
         const summary: SyncSummary = { accounts: 0, newTransactions: 0, results: [], simplefinRequests: 0 };
-        addResults(summary, await this.teller.syncIn(budgetId, [accountId]));
+        addResults(summary, await this.plaid.syncIn(budgetId, [accountId]));
         return linked_(summary, await this.after(budgetId, lib));
       }
       if (!acct.source) throw ApiError.validation("This account isn't linked to a bank. Link it in Settings → Bank sync.");

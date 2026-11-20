@@ -16,10 +16,10 @@ const dismissedKey = (budgetId: string) => `duplicates.dismissed.${budgetId}`;
 const pairKey = (a: string, b: string) => [a, b].sort().join('|');
 const days = (a: string, b: string) => Math.round(Math.abs(Date.parse(a) - Date.parse(b)) / DAY);
 
-/** Where a transaction came from: Teller, another import (SimpleFIN, a file), or typed in. */
-function source(t: Raw): 'teller' | 'bank' | 'manual' {
+/** Where a transaction came from: Plaid, Teller (before it closed), another import (SimpleFIN, a file), or typed in. */
+function source(t: Raw): 'plaid' | 'teller' | 'bank' | 'manual' {
   const id = typeof t.imported_id === 'string' ? t.imported_id : '';
-  return id.startsWith('teller:') ? 'teller' : id ? 'bank' : 'manual';
+  return id.startsWith('plaid:') ? 'plaid' : id.startsWith('teller:') ? 'teller' : id ? 'bank' : 'manual';
 }
 
 const norm = (s: unknown) => (typeof s === 'string' ? s.toLowerCase().replace(/[^a-z0-9]/g, '') : '');
@@ -67,8 +67,8 @@ export class DuplicateOps {
             const b = list[j]!;
             const d = days(String(a.date), String(b.date));
             if (d > WINDOW_DAYS || dismissed.has(pairKey(String(a.id), String(b.id)))) continue;
-            // Teller ids are stable, so two Teller transactions are two real ones.
-            if (source(a) === 'teller' && source(b) === 'teller') continue;
+            // Plaid's (and Teller's) ids are stable, so two from the same one are two real transactions.
+            if (source(a) === source(b) && (source(a) === 'plaid' || source(a) === 'teller')) continue;
             if (source(a) !== source(b) || samePayee(a, b)) candidates.push({ a, b, days: d });
           }
         }

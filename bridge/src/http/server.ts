@@ -21,7 +21,7 @@ import type { ReportOps } from '../actual/report-ops.js';
 import type { JobStore } from '../jobs.js';
 import type { SetupService } from '../setup.js';
 import type { BankSyncOps } from '../actual/bank-sync-ops.js';
-import type { TellerOps } from '../actual/teller-ops.js';
+import type { PlaidOps } from '../actual/plaid-ops.js';
 import type { DuplicateOps } from '../actual/duplicate-ops.js';
 import type { BankSyncBackfill } from '../bank-sync-backfill.js';
 import type { BankSyncScheduler } from '../bank-sync-scheduler.js';
@@ -45,7 +45,7 @@ import { setupRoutes } from './routes/setup.js';
 import { bankSyncRoutes } from './routes/bank-sync.js';
 
 export type Deps = {
-  teller: TellerOps;
+  plaid: PlaidOps;
   duplicates: DuplicateOps;
   config: BridgeConfig;
   store: HouseholdStore;
@@ -81,9 +81,7 @@ declare module 'fastify' {
   }
 }
 
-// The Teller Connect page holds nothing secret (the app id is public); the app gets the
-// result from it directly, never through the browser.
-const PUBLIC_ROUTES = new Set(['/v1/health', '/v1/auth/pair', '/v1/auth/refresh', '/v1/setup', '/v1/setup/claim', '/v1/bank-sync/teller/connect']);
+const PUBLIC_ROUTES = new Set(['/v1/health', '/v1/auth/pair', '/v1/auth/refresh', '/v1/setup', '/v1/setup/claim']);
 
 export async function buildServer(deps: Deps, opts: { logger?: boolean | object } = {}): Promise<FastifyInstance> {
   const app = Fastify({

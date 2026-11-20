@@ -1,3 +1,5 @@
+import { rmSync } from 'node:fs';
+import { join } from 'node:path';
 import { AccountOps } from './actual/account-ops.js';
 import { BankSyncOps } from './actual/bank-sync-ops.js';
 import { BudgetOps } from './actual/budget-ops.js';
@@ -23,8 +25,8 @@ import type { HouseholdStore } from './auth/store.js';
 import { BankSyncBackfill } from './bank-sync-backfill.js';
 import { BankSyncScheduler } from './bank-sync-scheduler.js';
 import { SimpleFinKeyFile } from './actual/simplefin-client.js';
-import { TellerVault } from './actual/teller-client.js';
-import { TellerOps } from './actual/teller-ops.js';
+import { PlaidVault } from './actual/plaid-client.js';
+import { PlaidOps } from './actual/plaid-ops.js';
 import type { BridgeConfig } from './config.js';
 import type { Deps } from './http/server.js';
 import { JobStore } from './jobs.js';
@@ -38,9 +40,11 @@ export function createDeps(config: BridgeConfig, store: HouseholdStore, host: Ac
   const budgetOps = new BudgetOps(host);
   const keys = new SimpleFinKeyFile(config.dataDir, config.actualDataDir);
   const bankSync = new BankSyncOps(host, store, keys);
-  const teller = new TellerOps(host, store, new TellerVault(config.dataDir), config.tellerApiUrl);
-  bankSync.teller = teller;
-  budgetOps.syncOverlay = (budgetId) => teller.overlay(budgetId);
+  // Teller closed its API in 2026: drop its leftover secrets (Plaid replaced it).
+  rmSync(join(config.dataDir, 'teller.json'), { force: true });
+  const plaid = new PlaidOps(host, store, new PlaidVault(config.dataDir), config.plaidApiUrl);
+  bankSync.plaid = plaid;
+  budgetOps.syncOverlay = (budgetId) => plaid.overlay(budgetId);
   const transfers = new TransferOps(host, store);
   const annual = new AnnualOps(host, store);
   const offBooks = new OffBooks(store);
@@ -58,7 +62,7 @@ export function createDeps(config: BridgeConfig, store: HouseholdStore, host: Ac
     setup,
     jobs,
     bankSync,
-    teller,
+    plaid,
     backfill,
     backups,
     server: new ServerOps(config, host, store, log),

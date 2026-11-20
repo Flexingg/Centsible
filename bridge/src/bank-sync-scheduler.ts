@@ -86,8 +86,8 @@ export class BankSyncScheduler {
       const used = this.store.simpleFinRequestsToday();
       const quotaLeft = used < SIMPLEFIN_DAILY_QUOTA - HEADROOM;
       const skippedNote = `Skipped SimpleFIN: ${used} SimpleFIN requests in the last day (SimpleFIN allows about ${SIMPLEFIN_DAILY_QUOTA}).`;
-      // Teller has no such quota: when SimpleFIN must wait, Teller accounts still sync.
-      if (!quotaLeft && !this.ops.teller?.hasLinks()) {
+      // Plaid has no such quota: when SimpleFIN must wait, Plaid accounts still sync.
+      if (!quotaLeft && !this.ops.plaid?.hasLinks()) {
         const result = { newTransactions: 0, accounts: 0, errors: [], skipped: skippedNote.replace('Skipped SimpleFIN', 'Skipped') };
         this.store.setSetting('bank_sync.last_result', result);
         this.log.warn(result, 'scheduled bank sync skipped');

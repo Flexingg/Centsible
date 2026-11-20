@@ -1,0 +1,43 @@
+{
+  "items": [
+    {
+      "id": "acc_chk",
+      "itemId": "item_wf",
+      "institution": "Wells Fargo",
+      "name": "Everyday Checking",
+      "type": "depository",
+      "subtype": "checking",
+      "mask": "6975",
+      "balance": 115918,
+      "currency": "USD",
+      "linkedAccountId": null,
+      "linkedAccountName": null
+    },
+    {
+      "id": "acc_sav",
+      "itemId": "item_wf",
+      "institution": "Wells Fargo",
+      "name": "Way2Save Savings",
+      "type": "depository",
+      "subtype": "savings",
+      "mask": "1111",
+      "balance": 50000,
+      "currency": "USD",
+      "linkedAccountId": null,
+      "linkedAccountName": null
+    },
+    {
+      "id": "acc_card",
+      "itemId": "item_disc",
+      "institution": "Discover",
+      "name": "Discover it Card",
+      "type": "credit",
+      "subtype": "credit card",
+      "mask": "4242",
+      "balance": -24504,
+      "currency": "USD",
+      "linkedAccountId": null,
+      "linkedAccountName": null
+    }
+  ]
+}
