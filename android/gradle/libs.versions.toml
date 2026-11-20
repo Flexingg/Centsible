@@ -1,4 +1,5 @@
 [versions]
+plaid-link = "6.4.0"
 agp = "9.4.1"
 kotlin = "2.4.20"
 ksp = "2.3.12"
@@ -22,6 +23,7 @@ robolectric = "4.17"
 roborazzi = "1.75.0"
 
 [libraries]
+plaid-link = { module = "com.plaid.link:sdk-core", version.ref = "plaid-link" }
 # Kotlin
 kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "coroutines" }
 kotlinx-coroutines-android = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-android", version.ref = "coroutines" }

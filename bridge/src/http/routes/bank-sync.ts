@@ -2,7 +2,7 @@ import type { FastifyPluginAsync } from 'fastify';
 import { SIMPLEFIN_DAILY_QUOTA, SIMPLEFIN_FIELDS, type BankSyncSettings } from '../../actual/bank-sync-ops.js';
 import { BACKFILL_MAX_YEARS, type BackfillState } from '../../bank-sync-backfill.js';
 import { SYNC_INTERVALS } from '../../bank-sync-scheduler.js';
-import { TELLER_ENVIRONMENTS, type TellerEnvironment } from '../../actual/teller-client.js';
+import { PLAID_ENVIRONMENTS, type PlaidEnvironment } from '../../actual/plaid-client.js';
 import { audit, requireBudget, requireRole, type Deps } from '../server.js';
 import { DATE } from './budgets.js';
 
@@ -31,10 +31,10 @@ const mapping = {
 export const bankSyncRoutes =
   (deps: Deps): FastifyPluginAsync =>
   async (app) => {
-    const { bankSync, scheduler, store, backfill, teller } = deps;
+    const { bankSync, scheduler, store, backfill, plaid } = deps;
     const overview = async () => ({
       simplefin: { ...(await bankSync.status()), requestsToday: bankSync.requestsToday(), dailyQuota: SIMPLEFIN_DAILY_QUOTA, historyAccess: bankSync.historyAccess },
-      teller: teller.status(),
+      plaid: plaid.status(),
       schedule: scheduler.state(),
       intervals: [...SYNC_INTERVALS],
       backfill: publicBackfill(backfill.state()),
@@ -82,123 +82,100 @@ export const bankSyncRoutes =
       return { backfill: publicBackfill(state) };
     });
 
-    // ── Teller (household-wide: the app's certificate and the bank logins) ──
-    app.put<{ Body: { applicationId: string; environment: TellerEnvironment; certificate?: string; privateKey?: string } }>(
-      '/v1/bank-sync/teller',
+    // ── Plaid (household-wide: the keys and the bank logins) ──
+    app.put<{ Body: { clientId: string; secret?: string; environment: PlaidEnvironment } }>(
+      '/v1/bank-sync/plaid',
       {
         schema: {
           body: {
             type: 'object',
-            required: ['applicationId', 'environment'],
+            required: ['clientId', 'environment'],
             additionalProperties: false,
             properties: {
-              applicationId: { type: 'string', minLength: 4, maxLength: 200 },
-              environment: { type: 'string', enum: [...TELLER_ENVIRONMENTS] },
-              certificate: { type: 'string', maxLength: 20000 },
-              privateKey: { type: 'string', maxLength: 20000 },
+              clientId: { type: 'string', minLength: 4, maxLength: 200 },
+              secret: { type: 'string', maxLength: 200 },
+              environment: { type: 'string', enum: [...PLAID_ENVIRONMENTS] },
             },
           },
         },
       },
       async (req) => {
         const { member, device } = requireRole(req, 'owner');
-        const res = teller.configure(req.body);
-        store.audit({ memberId: member.id, deviceId: device.id, action: 'bank_sync.teller_configured', detail: { environment: req.body.environment, certificate: Boolean(req.body.certificate) } });
+        const res = await plaid.configure(req.body);
+        store.audit({ memberId: member.id, deviceId: device.id, action: 'bank_sync.plaid_configured', detail: { environment: req.body.environment } });
         return res;
       },
     );
 
-    app.delete('/v1/bank-sync/teller', async (req, reply) => {
+    app.delete('/v1/bank-sync/plaid', async (req, reply) => {
       const { member, device } = requireRole(req, 'owner');
-      await teller.reset();
-      store.audit({ memberId: member.id, deviceId: device.id, action: 'bank_sync.teller_reset' });
+      await plaid.reset();
+      store.audit({ memberId: member.id, deviceId: device.id, action: 'bank_sync.plaid_reset' });
       return reply.status(204).send();
     });
 
-    app.get<{ Querystring: { enrollmentId?: string } }>('/v1/bank-sync/teller/connect', async (req, reply) => {
-      // Public (see server.ts): opened in the app's WebView, which passes the result to the app.
-      return reply
-        .header('cache-control', 'no-store')
-        .header('referrer-policy', 'no-referrer')
-        .type('text/html; charset=utf-8')
-        .send(teller.connectPage(req.query.enrollmentId));
-    });
+    app.post<{ Body: { itemId?: string | null } }>(
+      '/v1/bank-sync/plaid/link-token',
+      { schema: { body: { type: 'object', additionalProperties: false, properties: { itemId: { type: ['string', 'null'], maxLength: 200 } } } } },
+      async (req) => {
+        const { member } = requireRole(req, 'member'); // anyone who can link accounts can connect their bank
+        return plaid.linkToken({ memberId: member.id, itemId: req.body.itemId ?? null });
+      },
+    );
 
-    app.post<{ Body: { accessToken: string; enrollmentId: string; institution: string; userId?: string | null } }>(
-      '/v1/bank-sync/teller/enrollments',
+    app.post<{ Body: { publicToken?: string | null; itemId?: string | null; institution?: string | null } }>(
+      '/v1/bank-sync/plaid/items',
       {
         schema: {
           body: {
             type: 'object',
-            required: ['accessToken', 'enrollmentId', 'institution'],
             additionalProperties: false,
             properties: {
-              accessToken: { type: 'string', minLength: 4, maxLength: 1000 },
-              enrollmentId: { type: 'string', minLength: 1, maxLength: 200 },
-              institution: { type: 'string', maxLength: 200 },
-              userId: { type: ['string', 'null'], maxLength: 200 },
+              publicToken: { type: ['string', 'null'], maxLength: 1000 },
+              itemId: { type: ['string', 'null'], maxLength: 200 },
+              institution: { type: ['string', 'null'], maxLength: 200 },
             },
           },
         },
       },
       async (req, reply) => {
-        const { member, device } = requireRole(req, 'member'); // anyone who can link accounts can connect their bank
-        const res = await teller.addEnrollment(req.body);
-        store.audit({ memberId: member.id, deviceId: device.id, action: 'bank_sync.teller_enrollment_added', target: res.id, detail: { institution: res.institution } });
+        const { member, device } = requireRole(req, 'member');
+        const res = await plaid.addItem(req.body);
+        store.audit({ memberId: member.id, deviceId: device.id, action: req.body.itemId ? 'bank_sync.plaid_item_reconnected' : 'bank_sync.plaid_item_added', target: res.id, detail: { institution: res.institution } });
         return reply.status(201).send(res);
       },
     );
 
-    app.delete<{ Params: { id: string } }>('/v1/bank-sync/teller/enrollments/:id', async (req, reply) => {
+    app.delete<{ Params: { id: string } }>('/v1/bank-sync/plaid/items/:id', async (req, reply) => {
       const { member, device } = requireRole(req, 'owner');
-      await teller.removeEnrollment(req.params.id);
-      store.audit({ memberId: member.id, deviceId: device.id, action: 'bank_sync.teller_enrollment_removed', target: req.params.id });
+      await plaid.removeItem(req.params.id);
+      store.audit({ memberId: member.id, deviceId: device.id, action: 'bank_sync.plaid_item_removed', target: req.params.id });
       return reply.status(204).send();
     });
 
     // ── Per budget ──
-    app.get<{ Params: BudgetParams; Querystring: { refresh?: boolean } }>('/v1/budgets/:budgetId/bank-sync/teller/accounts', async (req) => {
+    app.get<{ Params: BudgetParams; Querystring: { refresh?: boolean } }>('/v1/budgets/:budgetId/bank-sync/plaid/accounts', async (req) => {
       requireBudget(deps, req, req.params.budgetId, 'member');
-      return { items: await teller.listAccounts(req.params.budgetId, req.query.refresh !== false) };
+      return { items: await plaid.listAccounts(req.params.budgetId, req.query.refresh !== false) };
     });
 
-    app.post<{ Params: BudgetParams; Body: { tellerAccountId: string; flip?: boolean } }>(
-      '/v1/budgets/:budgetId/bank-sync/teller/preview',
-      { schema: { body: { type: 'object', required: ['tellerAccountId'], additionalProperties: false, properties: { tellerAccountId: { type: 'string', minLength: 1 }, flip: { type: 'boolean' } } } } },
-      async (req) => {
-        requireBudget(deps, req, req.params.budgetId, 'member');
-        return teller.preview(req.body.tellerAccountId, req.body.flip ?? false);
-      },
-    );
-
-    app.post<{ Params: BudgetParams; Body: { tellerAccountId: string; accountId: string; flip?: boolean; startDate?: string } }>(
-      '/v1/budgets/:budgetId/bank-sync/teller/link',
+    app.post<{ Params: BudgetParams; Body: { plaidAccountId: string; accountId: string; startDate?: string } }>(
+      '/v1/budgets/:budgetId/bank-sync/plaid/link',
       {
         schema: {
           body: {
             type: 'object',
-            required: ['tellerAccountId', 'accountId'],
+            required: ['plaidAccountId', 'accountId'],
             additionalProperties: false,
-            properties: { tellerAccountId: { type: 'string', minLength: 1 }, accountId: { type: 'string', minLength: 1 }, flip: { type: 'boolean' }, startDate: DATE },
+            properties: { plaidAccountId: { type: 'string', minLength: 1 }, accountId: { type: 'string', minLength: 1 }, startDate: DATE },
           },
         },
       },
       async (req, reply) => {
         requireBudget(deps, req, req.params.budgetId, 'member');
-        const res = await teller.link(req.params.budgetId, { ...req.body, flip: req.body.flip ?? false });
-        audit(deps, req, req.params.budgetId, 'bank_sync.teller_linked', res.accountId, { tellerAccountId: req.body.tellerAccountId, flip: req.body.flip ?? false });
+        const res = await plaid.link(req.params.budgetId, req.body);
+        audit(deps, req, req.params.budgetId, 'bank_sync.plaid_linked', res.accountId, { plaidAccountId: req.body.plaidAccountId });
         return reply.status(201).send(res);
-      },
-    );
-
-    app.patch<{ Params: AccountParams; Body: { flip: boolean } }>(
-      '/v1/budgets/:budgetId/accounts/:id/teller',
-      { schema: { body: { type: 'object', required: ['flip'], additionalProperties: false, properties: { flip: { type: 'boolean' } } } } },
-      async (req) => {
-        requireBudget(deps, req, req.params.budgetId, 'member');
-        teller.setFlip(req.params.budgetId, req.params.id, req.body.flip);
-        audit(deps, req, req.params.budgetId, 'bank_sync.teller_flip_set', req.params.id, req.body);
-        return { flip: req.body.flip };
       },
     );
 
@@ -254,7 +231,7 @@ export const bankSyncRoutes =
 
     app.post<{ Params: AccountParams }>('/v1/budgets/:budgetId/accounts/:id/unlink', async (req, reply) => {
       requireBudget(deps, req, req.params.budgetId, 'member');
-      if (!teller.unlink(req.params.budgetId, req.params.id)) await bankSync.unlink(req.params.budgetId, req.params.id);
+      if (!plaid.unlink(req.params.budgetId, req.params.id)) await bankSync.unlink(req.params.budgetId, req.params.id);
       audit(deps, req, req.params.budgetId, 'bank_sync.unlinked', req.params.id);
       return reply.status(204).send();
     });

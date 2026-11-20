@@ -46,17 +46,17 @@ Actual's server and the bridge run together as one Home Assistant app, updated f
 
 The setup code works once, until the first owner exists; knowing the bridge's address isn't enough to claim it. Prefer the command line? `docker compose exec bridge node dist/admin/cli.js add-member --name "Jo" --role owner --pair` still prints an owner invite QR code.
 
-## Bank sync: SimpleFIN and Teller
+## Bank sync: SimpleFIN and Plaid
 
 Accounts can sync through either provider, and you can mix them account by account. Both run on the bridge's schedule and on **Sync now**.
 
 - **SimpleFIN** (about $15 a year): set up in Actual's way, with a setup token from bridge.simplefin.org. **More → Settings → Bank sync**.
-- **Teller** (free for personal use, up to 100 bank logins): useful when a bank keeps breaking in SimpleFIN. Actual has no Teller support, so the bridge does the syncing itself and hands transactions to Actual's importer (which runs your rules).
-  In the app, open **Bank sync → Teller**. A four-step guide walks through it:
-  1. **Make a free Teller account** at [teller.io](https://teller.io).
-  2. **Copy your Application ID** from the dashboard (it starts with `app_`).
-  3. **Add your certificate.** Under **Certificates → Create certificate**, Teller downloads your certificate and private key. Choose the downloaded files in the app (the `.zip`, or both `.pem` files); pasting the text also works. They stay on the bridge in `teller.json`, readable only by the bridge, and never go into backups. The environment defaults to **Development** (free, real banks).
-  4. **Connect a bank.** Teller opens its own sign-in page, so Centsible never sees your bank password. Then tap each account to link it to an account in your budget. Check the preview: purchases should be negative. Some banks send card purchases positive, so switch on **Reverse signs** if they look backwards. An account that syncs through SimpleFIN now moves over to Teller, and what's already there is matched rather than duplicated.
+- **Plaid** (free on Plaid's Trial plan, up to 10 bank logins, for developers in the US and Canada): useful when a bank keeps breaking in SimpleFIN (Wells Fargo, Chase, Discover…). Actual has no Plaid support, so the bridge does the syncing itself and hands posted transactions to Actual's importer (which runs your rules). It replaced Teller, which closed its API in 2026.
+  In the app, open **Bank sync → Plaid**. A four-step guide walks through it:
+  1. **Make a free Plaid account** at [dashboard.plaid.com](https://dashboard.plaid.com/signup) and check it's on the Trial plan.
+  2. **Copy your keys** from **Developers → Keys**: the `client_id` and the Production secret. The bridge checks them with Plaid, then keeps the secret in `plaid.json`, readable only by the bridge.
+  3. **Allow the Centsible app.** Under **Developers → API → Allowed Android package names**, add `app.centsible.budget`. Banks that sign in through their own app or website hand you back to Centsible only when it's allowed.
+  4. **Connect a bank.** Plaid's own sign-in screens open, so Centsible never sees your bank password. Then tap each account to link it to an account in your budget. Purchases come in negative and payments positive, for cards too; pending transactions wait until they post, and corrections or reversals from the bank are followed. An account that syncs through SimpleFIN (or synced through Teller) now moves over to Plaid, and what's already there is matched rather than duplicated.
 
   When a bank asks you to sign in again, the account shows **needs reconnecting**. Tap **Reconnect**: the bank login is repaired in place, and the same links keep working.
 
@@ -71,7 +71,7 @@ Other apps (Home Assistant dashboards and notifications, launcher shortcuts) can
 | Link | Opens |
 |---|---|
 | `centsible://open/review` | your review inbox |
-| `centsible://open/transactions`, `/accounts`, `/budget`, `/net-worth`, `/recurring`, `/trends`, `/bank-sync`, `/teller`, `/duplicates`, `/mortgage` | that screen |
+| `centsible://open/transactions`, `/accounts`, `/budget`, `/net-worth`, `/recurring`, `/trends`, `/bank-sync`, `/plaid`, `/duplicates`, `/mortgage` | that screen |
 | `centsible://open/account/<account id>` | one account |
 | `centsible://open/category/<category id>?name=Groceries[&month=2026-11]` | a category's transactions |
 

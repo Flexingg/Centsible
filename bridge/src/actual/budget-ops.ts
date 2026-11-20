@@ -18,7 +18,7 @@ import type { ActualHost } from './host.js';
 export class BudgetOps {
   constructor(private readonly host: ActualHost) {}
 
-  /** Bank links Actual doesn't know about (Teller), shown as each account's sync source. */
+  /** Bank links Actual doesn't know about (Plaid), shown as each account's sync source. */
   syncOverlay?: (budgetId: string) => Map<string, { syncSource: string | null; lastSync: string | null; bankSyncStatus: string | null }>;
 
   accounts(budgetId: string) {

@@ -123,6 +123,33 @@ const MIGRATIONS: string[] = [
      PRIMARY KEY (budget_id, account_id),
      UNIQUE (budget_id, teller_account_id)
    );`,
+  // 6: Teller closed its API in 2026; Plaid replaces it. Bank logins ("items") and which
+  // Plaid account feeds which account in a budget, with each link's own sync cursor. Access
+  // tokens and the secret live in plaid.json beside this file, because this database goes
+  // into backups.
+  `DROP TABLE teller_links;
+   DROP TABLE teller_enrollments;
+   CREATE TABLE plaid_items (
+     id TEXT PRIMARY KEY,
+     institution TEXT NOT NULL,
+     status TEXT NOT NULL,
+     status_code TEXT,
+     created_at TEXT NOT NULL,
+     updated_at TEXT NOT NULL
+   );
+   CREATE TABLE plaid_links (
+     budget_id TEXT NOT NULL,
+     account_id TEXT NOT NULL,
+     plaid_account_id TEXT NOT NULL,
+     item_id TEXT NOT NULL,
+     plaid_account_name TEXT NOT NULL,
+     start_date TEXT NOT NULL,
+     cursor TEXT,
+     last_sync_at TEXT,
+     last_error TEXT,
+     PRIMARY KEY (budget_id, account_id),
+     UNIQUE (budget_id, plaid_account_id)
+   );`,
 ];
 
 const sha256 = (s: string) => createHash('sha256').update(s).digest('hex');
@@ -140,36 +167,36 @@ const normalizeCode = (c: string) => c.toUpperCase().replace(/[^A-Z0-9]/g, '');
 
 type Row = Record<string, unknown>;
 
-export type TellerEnrollmentRow = { id: string; institution: string; userId: string | null; status: 'ok' | 'disconnected' | 'revoked'; statusCode: string | null; createdAt: string; updatedAt: string };
-export type TellerLinkRow = {
+export type PlaidItemStatus = 'ok' | 'reauth' | 'gone';
+export type PlaidItemRow = { id: string; institution: string; status: PlaidItemStatus; statusCode: string | null; createdAt: string; updatedAt: string };
+export type PlaidLinkRow = {
   budgetId: string;
   accountId: string;
-  tellerAccountId: string;
-  enrollmentId: string;
-  tellerAccountName: string;
-  /** Teller's sign is the bank's; flip makes purchases negative when a bank reports them positive. */
-  flip: boolean;
+  plaidAccountId: string;
+  itemId: string;
+  plaidAccountName: string;
   startDate: string;
+  /** Plaid's /transactions/sync position for this link; null until the first sync finishes. */
+  cursor: string | null;
   lastSyncAt: string | null;
   lastError: string | null;
 };
-const toEnrollment = (r: Row): TellerEnrollmentRow => ({
+const toItem = (r: Row): PlaidItemRow => ({
   id: String(r.id),
   institution: String(r.institution),
-  userId: (r.user_id as string | null) ?? null,
-  status: String(r.status) as TellerEnrollmentRow['status'],
+  status: String(r.status) as PlaidItemStatus,
   statusCode: (r.status_code as string | null) ?? null,
   createdAt: String(r.created_at),
   updatedAt: String(r.updated_at),
 });
-const toLink = (r: Row): TellerLinkRow => ({
+const toLink = (r: Row): PlaidLinkRow => ({
   budgetId: String(r.budget_id),
   accountId: String(r.account_id),
-  tellerAccountId: String(r.teller_account_id),
-  enrollmentId: String(r.enrollment_id),
-  tellerAccountName: String(r.teller_account_name),
-  flip: Number(r.flip) === 1,
+  plaidAccountId: String(r.plaid_account_id),
+  itemId: String(r.item_id),
+  plaidAccountName: String(r.plaid_account_name),
   startDate: String(r.start_date),
+  cursor: (r.cursor as string | null) ?? null,
   lastSyncAt: (r.last_sync_at as string | null) ?? null,
   lastError: (r.last_error as string | null) ?? null,
 });
@@ -296,71 +323,71 @@ export class HouseholdStore {
     return (this.db.prepare('SELECT COUNT(*) AS n FROM simplefin_requests WHERE at >= ?').get(this.now() - 24 * 3600 * 1000) as { n: number }).n;
   }
 
-  // ── Teller ───────────────────────────────────────────────────────────────
+  // ── Plaid ────────────────────────────────────────────────────────────────
 
-  tellerEnrollments(): TellerEnrollmentRow[] {
-    return (this.db.prepare('SELECT * FROM teller_enrollments ORDER BY created_at').all() as Row[]).map(toEnrollment);
+  plaidItems(): PlaidItemRow[] {
+    return (this.db.prepare('SELECT * FROM plaid_items ORDER BY created_at').all() as Row[]).map(toItem);
   }
 
-  tellerEnrollment(id: string): TellerEnrollmentRow | null {
-    const r = this.db.prepare('SELECT * FROM teller_enrollments WHERE id = ?').get(id) as Row | undefined;
-    return r ? toEnrollment(r) : null;
+  plaidItem(id: string): PlaidItemRow | null {
+    const r = this.db.prepare('SELECT * FROM plaid_items WHERE id = ?').get(id) as Row | undefined;
+    return r ? toItem(r) : null;
   }
 
-  /** Adds a bank login, or marks a reconnected one healthy again (Teller keeps its id). */
-  saveTellerEnrollment(e: { id: string; institution: string; userId: string | null }) {
+  /** Adds a bank login, or marks a reconnected one healthy again. */
+  savePlaidItem(e: { id: string; institution: string }) {
     const at = nowIso();
     this.db
       .prepare(
-        `INSERT INTO teller_enrollments (id, institution, user_id, status, status_code, created_at, updated_at) VALUES (?, ?, ?, 'ok', NULL, ?, ?)
-         ON CONFLICT(id) DO UPDATE SET institution = excluded.institution, user_id = excluded.user_id, status = 'ok', status_code = NULL, updated_at = excluded.updated_at`,
+        `INSERT INTO plaid_items (id, institution, status, status_code, created_at, updated_at) VALUES (?, ?, 'ok', NULL, ?, ?)
+         ON CONFLICT(id) DO UPDATE SET institution = excluded.institution, status = 'ok', status_code = NULL, updated_at = excluded.updated_at`,
       )
-      .run(e.id, e.institution, e.userId, at, at);
+      .run(e.id, e.institution, at, at);
   }
 
-  setTellerEnrollmentStatus(id: string, status: 'ok' | 'disconnected' | 'revoked', code: string | null) {
-    this.db.prepare('UPDATE teller_enrollments SET status = ?, status_code = ?, updated_at = ? WHERE id = ?').run(status, code, nowIso(), id);
+  setPlaidItemStatus(id: string, status: PlaidItemStatus, code: string | null) {
+    this.db.prepare('UPDATE plaid_items SET status = ?, status_code = ?, updated_at = ? WHERE id = ?').run(status, code, nowIso(), id);
   }
 
-  deleteTellerEnrollment(id: string) {
+  deletePlaidItem(id: string) {
     this.db.transaction(() => {
-      this.db.prepare('DELETE FROM teller_links WHERE enrollment_id = ?').run(id);
-      this.db.prepare('DELETE FROM teller_enrollments WHERE id = ?').run(id);
+      this.db.prepare('DELETE FROM plaid_links WHERE item_id = ?').run(id);
+      this.db.prepare('DELETE FROM plaid_items WHERE id = ?').run(id);
     })();
   }
 
-  tellerLinks(budgetId?: string): TellerLinkRow[] {
-    const rows = (budgetId ? this.db.prepare('SELECT * FROM teller_links WHERE budget_id = ?').all(budgetId) : this.db.prepare('SELECT * FROM teller_links').all()) as Row[];
+  plaidLinks(budgetId?: string): PlaidLinkRow[] {
+    const rows = (budgetId ? this.db.prepare('SELECT * FROM plaid_links WHERE budget_id = ?').all(budgetId) : this.db.prepare('SELECT * FROM plaid_links').all()) as Row[];
     return rows.map(toLink);
   }
 
-  tellerLink(budgetId: string, accountId: string): TellerLinkRow | null {
-    const r = this.db.prepare('SELECT * FROM teller_links WHERE budget_id = ? AND account_id = ?').get(budgetId, accountId) as Row | undefined;
+  plaidLink(budgetId: string, accountId: string): PlaidLinkRow | null {
+    const r = this.db.prepare('SELECT * FROM plaid_links WHERE budget_id = ? AND account_id = ?').get(budgetId, accountId) as Row | undefined;
     return r ? toLink(r) : null;
   }
 
-  addTellerLink(l: Omit<TellerLinkRow, 'lastSyncAt' | 'lastError'>) {
+  addPlaidLink(l: Omit<PlaidLinkRow, 'cursor' | 'lastSyncAt' | 'lastError'>) {
     this.db
-      .prepare('INSERT INTO teller_links (budget_id, account_id, teller_account_id, enrollment_id, teller_account_name, flip, start_date) VALUES (?, ?, ?, ?, ?, ?, ?)')
-      .run(l.budgetId, l.accountId, l.tellerAccountId, l.enrollmentId, l.tellerAccountName, l.flip ? 1 : 0, l.startDate);
+      .prepare('INSERT INTO plaid_links (budget_id, account_id, plaid_account_id, item_id, plaid_account_name, start_date) VALUES (?, ?, ?, ?, ?, ?)')
+      .run(l.budgetId, l.accountId, l.plaidAccountId, l.itemId, l.plaidAccountName, l.startDate);
   }
 
-  updateTellerLink(budgetId: string, accountId: string, patch: { lastSyncAt?: string; lastError?: string | null; flip?: boolean }) {
-    const cur = this.tellerLink(budgetId, accountId);
+  updatePlaidLink(budgetId: string, accountId: string, patch: { lastSyncAt?: string; lastError?: string | null; cursor?: string | null }) {
+    const cur = this.plaidLink(budgetId, accountId);
     if (!cur) return;
     this.db
-      .prepare('UPDATE teller_links SET last_sync_at = ?, last_error = ?, flip = ? WHERE budget_id = ? AND account_id = ?')
-      .run(patch.lastSyncAt ?? cur.lastSyncAt, patch.lastError === undefined ? cur.lastError : patch.lastError, (patch.flip ?? cur.flip) ? 1 : 0, budgetId, accountId);
+      .prepare('UPDATE plaid_links SET last_sync_at = ?, last_error = ?, cursor = ? WHERE budget_id = ? AND account_id = ?')
+      .run(patch.lastSyncAt ?? cur.lastSyncAt, patch.lastError === undefined ? cur.lastError : patch.lastError, patch.cursor === undefined ? cur.cursor : patch.cursor, budgetId, accountId);
   }
 
-  deleteTellerLink(budgetId: string, accountId: string) {
-    this.db.prepare('DELETE FROM teller_links WHERE budget_id = ? AND account_id = ?').run(budgetId, accountId);
+  deletePlaidLink(budgetId: string, accountId: string) {
+    this.db.prepare('DELETE FROM plaid_links WHERE budget_id = ? AND account_id = ?').run(budgetId, accountId);
   }
 
-  clearTeller() {
+  clearPlaid() {
     this.db.transaction(() => {
-      this.db.prepare('DELETE FROM teller_links').run();
-      this.db.prepare('DELETE FROM teller_enrollments').run();
+      this.db.prepare('DELETE FROM plaid_links').run();
+      this.db.prepare('DELETE FROM plaid_items').run();
     })();
   }
 
