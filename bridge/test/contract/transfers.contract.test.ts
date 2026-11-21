@@ -150,4 +150,41 @@ describe('transfer matching', () => {
     expect(t.json().transferId).toBe(out.id);
     expect(pairOf(after.pairs, outA.id)?.confident).toBe(false);
   });
+
+  it('catches wider-gap card payments, all-time history, and 2-account fuzzy near-amount matches', async () => {
+    // 8 days apart card payment (previously missed by 5-day window).
+    const slowOut = await add(actual.accounts.checking, -54321, 18, 'CHASE CREDIT CRD EPAY');
+    const slowIn = await add(actual.accounts.card, 54321, 10, 'PAYMENT THANK YOU');
+    const def = await matches();
+    const slowPair = pairOf(def.pairs, slowOut.id);
+    expect(slowPair).toBeDefined();
+    expect(slowPair!.to.id).toBe(slowIn.id);
+    expect(slowPair!.days).toBe(8);
+    expect(slowPair!.confident).toBe(true);
+
+    // 200-day-old payment: hidden by default 120d lookback, found with allTime=true.
+    const oldOut = await add(actual.accounts.checking, -31415, 210, 'AUTOPAY CARD');
+    const oldIn = await add(actual.accounts.card, 31415, 207, 'ONLINE PAYMENT');
+    expect(pairOf((await matches()).pairs, oldOut.id)).toBeUndefined();
+    const allTime = (await call('GET', '/transfers/matches?allTime=true', '/transfers/matches', viewer)).body as { pairs: any[] };
+    expect(pairOf(allTime.pairs, oldOut.id)?.to.id).toBe(oldIn.id);
+
+    // 2-account fuzzy search: catches 15-day gap + $0.50 fee difference.
+    const fuzzyOut = await add(actual.accounts.checking, -40050, 260, 'CARD WIRE PMT');
+    const fuzzyIn = await add(actual.accounts.card, 40000, 245, 'PAYMENT RECEIVED');
+    const scoped = (
+      await call(
+        'GET',
+        `/transfers/matches?allTime=true&fromAccountId=${actual.accounts.checking}&toAccountId=${actual.accounts.card}&windowDays=21&fuzzy=true`,
+        '/transfers/matches',
+        viewer,
+      )
+    ).body as { pairs: any[] };
+    const fp = pairOf(scoped.pairs, fuzzyOut.id);
+    expect(fp).toBeDefined();
+    expect(fp.to.id).toBe(fuzzyIn.id);
+    expect(fp.days).toBe(15);
+    expect(fp.amountDiff).toBe(50);
+    expect(fp.confident).toBe(false);
+  });
 });

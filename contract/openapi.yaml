@@ -1048,9 +1048,14 @@ paths:
     get:
       tags: [budgets]
       operationId: transferMatches
-      summary: "Pairs that look like one payment seen from both accounts (a credit card payment leaving checking and arriving on the card): same amount, opposite signs, different accounts, within five days, neither already a transfer. Last 120 days, newest first. `confident` means neither side had another candidate."
+      summary: "Pairs that look like one payment seen from both accounts (a credit card payment leaving checking and arriving on the card): same amount (or near-amount when fuzzy=true), opposite signs, different accounts, within windowDays (default 10, or 21 in fuzzy/2-account mode), neither already a transfer. Default last 120 days unless allTime=true."
       parameters:
         - $ref: '#/components/parameters/BudgetId'
+        - { name: allTime, in: query, schema: { type: boolean } }
+        - { name: fromAccountId, in: query, schema: { type: string } }
+        - { name: toAccountId, in: query, schema: { type: string } }
+        - { name: windowDays, in: query, schema: { type: integer, minimum: 1, maximum: 60 } }
+        - { name: fuzzy, in: query, schema: { type: boolean } }
       responses:
         '200':
           description: Pairs
@@ -3484,6 +3489,8 @@ components:
               to: { $ref: '#/components/schemas/Transaction' }
               days: { type: integer, description: Days between the two dates }
               confident: { type: boolean }
+              amountDiff: { type: integer, description: Absolute difference in minor units (0 for exact matches) }
+              reason: { type: [string, 'null'], description: Match signal such as "Card payment" or "Account name match" }
     SyncSummary:
       type: object
       required: [accounts, newTransactions, results, simplefinRequests]

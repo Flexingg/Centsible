@@ -45,9 +45,19 @@ class BridgeTransactionTools(private val api: TransactionToolsApi, private val o
         return BatchResult(r.updated, r.deleted, r.skipped.map { BatchResult.Skipped(TransactionId(it.id), it.reason) })
     }
 
-    override suspend fun transferMatches(budget: BudgetId): TransferMatches {
-        val d = api.transferMatches(budget.raw)
-        return TransferMatches(d.pairs.map { TransferPair(it.from.toModel(), it.to.toModel(), it.days, it.confident) }, d.auto)
+    override suspend fun transferMatches(budget: BudgetId, options: app.centsible.core.model.TransferSearchOptions): TransferMatches {
+        val d = api.transferMatches(
+            budgetId = budget.raw,
+            allTime = options.allTime,
+            fromAccountId = options.fromAccountId?.raw,
+            toAccountId = options.toAccountId?.raw,
+            windowDays = options.windowDays,
+            fuzzy = options.fuzzy,
+        )
+        return TransferMatches(
+            d.pairs.map { TransferPair(it.from.toModel(), it.to.toModel(), it.days, it.confident, it.amountDiff, it.reason) },
+            d.auto,
+        )
     }
 
     override suspend fun linkTransfer(budget: BudgetId, from: TransactionId, to: TransactionId) {

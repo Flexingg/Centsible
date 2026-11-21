@@ -270,10 +270,36 @@ export const transactionRoutes =
       },
     );
 
-    app.get<{ Params: BudgetParams }>('/v1/budgets/:budgetId/transfers/matches', async (req) => {
-      requireBudget(deps, req, req.params.budgetId);
-      return transfers.matches(req.params.budgetId);
-    });
+    app.get<{
+      Params: BudgetParams;
+      Querystring: { allTime?: boolean; fromAccountId?: string; toAccountId?: string; windowDays?: number; fuzzy?: boolean };
+    }>(
+      '/v1/budgets/:budgetId/transfers/matches',
+      {
+        schema: {
+          querystring: {
+            type: 'object',
+            properties: {
+              allTime: { type: 'boolean' },
+              fromAccountId: { type: 'string' },
+              toAccountId: { type: 'string' },
+              windowDays: { type: 'integer', minimum: 1, maximum: 60 },
+              fuzzy: { type: 'boolean' },
+            },
+          },
+        },
+      },
+      async (req) => {
+        requireBudget(deps, req, req.params.budgetId);
+        return transfers.matches(req.params.budgetId, {
+          allTime: req.query.allTime,
+          fromAccountId: req.query.fromAccountId || undefined,
+          toAccountId: req.query.toAccountId || undefined,
+          windowDays: req.query.windowDays,
+          fuzzy: req.query.fuzzy,
+        });
+      },
+    );
 
     app.get<{ Params: BudgetParams; Querystring: { transactionId: string; q?: string; limit?: number } }>(
       '/v1/budgets/:budgetId/transfers/candidates',

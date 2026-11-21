@@ -349,7 +349,12 @@ private fun MainScaffold(
                 app.centsible.feature.transactions.ReviewRoute(onBack = { nav.popBackStack() }, onOpen = { nav.navigate(Routes.transaction(it)) }, onMakeRule = { p, c -> nav.navigate(Routes.rule(null, p.raw, c?.raw)) }, onMatchTransfers = { nav.navigate(Routes.TRANSFERS) }, onFindDuplicates = { nav.navigate(Routes.DUPLICATES) })
             }
             composable(Routes.MORTGAGE) { app.centsible.feature.planning.MortgageRoute(onBack = { nav.popBackStack() }) }
-            composable(Routes.TRANSFERS) { app.centsible.feature.transactions.TransfersRoute(onBack = { nav.popBackStack() }) }
+            composable(Routes.TRANSFERS) {
+                app.centsible.feature.transactions.TransfersRoute(
+                    onBack = { nav.popBackStack() },
+                    onOpenTransaction = { nav.navigate(Routes.transaction(it)) },
+                )
+            }
             composable(Routes.DUPLICATES) { app.centsible.feature.transactions.DuplicatesRoute(onBack = { nav.popBackStack() }) }
             composable(
                 Routes.TRANSACTIONS_FOR,

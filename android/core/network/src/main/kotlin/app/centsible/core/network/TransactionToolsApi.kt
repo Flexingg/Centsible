@@ -14,7 +14,14 @@ import kotlinx.serialization.json.JsonObject
 @Serializable data class BatchSkippedDto(val id: String, val reason: String)
 @Serializable data class BatchResultDto(val updated: Int = 0, val deleted: Int = 0, val skipped: List<BatchSkippedDto> = emptyList())
 
-@Serializable data class TransferPairDto(val from: TransactionDto, val to: TransactionDto, val days: Int = 0, val confident: Boolean = false)
+@Serializable data class TransferPairDto(
+    val from: TransactionDto,
+    val to: TransactionDto,
+    val days: Int = 0,
+    val confident: Boolean = false,
+    val amountDiff: Long = 0L,
+    val reason: String? = null,
+)
 @Serializable data class TransferMatchesDto(val pairs: List<TransferPairDto> = emptyList(), val auto: Boolean = false)
 @Serializable data class TransferPairRequestDto(val fromId: String, val toId: String)
 @Serializable data class TransferSettingsDto(val auto: Boolean)
@@ -30,7 +37,20 @@ class TransactionToolsApi(private val client: BridgeClient) {
     suspend fun mark(budgetId: String, body: ReviewMarkDto): ReviewRemainingDto = client.send(HttpMethod.Post, "/v1/budgets/$budgetId/review", body)
     /** Built by hand so "clear the category" (null) survives. */
     suspend fun batch(budgetId: String, body: JsonObject): BatchResultDto = client.send(HttpMethod.Post, "/v1/budgets/$budgetId/transactions/batch", body)
-    suspend fun transferMatches(budgetId: String): TransferMatchesDto = client.get("/v1/budgets/$budgetId/transfers/matches")
+    suspend fun transferMatches(
+        budgetId: String,
+        allTime: Boolean = false,
+        fromAccountId: String? = null,
+        toAccountId: String? = null,
+        windowDays: Int? = null,
+        fuzzy: Boolean = false,
+    ): TransferMatchesDto = client.get("/v1/budgets/$budgetId/transfers/matches") {
+        if (allTime) parameter("allTime", true)
+        fromAccountId?.let { parameter("fromAccountId", it) }
+        toAccountId?.let { parameter("toAccountId", it) }
+        windowDays?.let { parameter("windowDays", it) }
+        if (fuzzy) parameter("fuzzy", true)
+    }
     suspend fun transferCandidates(budgetId: String, transactionId: String, q: String?): TransferCandidatesDto =
         client.get("/v1/budgets/$budgetId/transfers/candidates") {
             parameter("transactionId", transactionId)
