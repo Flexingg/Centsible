@@ -120,9 +120,58 @@ class MerchantRuleHelperTest {
     }
 
     @Test
-    fun `matchesKeyword is case-insensitive and ignores blank keywords`() {
+    fun `matchesKeyword is case-insensitive, ignores blank keywords, and respects exclusions`() {
         assertTrue(MerchantRuleHelper.matchesKeyword("TST* TRADER JOE'S #089", "trader joe"))
         assertFalse(MerchantRuleHelper.matchesKeyword("Whole Foods", "trader joe"))
         assertFalse(MerchantRuleHelper.matchesKeyword("Whole Foods", "   "))
+        assertTrue(MerchantRuleHelper.matchesKeyword("SHELL OIL 57442", "SHELL", listOf("SHELLFISH")))
+        assertFalse(MerchantRuleHelper.matchesKeyword("SHELLFISH MARKET", "SHELL", listOf("SHELLFISH")))
+    }
+
+    @Test
+    fun `extractExclusionTerm picks the clearest distinguishing word`() {
+        assertEquals("SHELLFISH", MerchantRuleHelper.extractExclusionTerm("SHELL", "SHELLFISH MARKET #42"))
+        assertEquals("STORE", MerchantRuleHelper.extractExclusionTerm("APPLE", "APPLE STORE #R123"))
+        assertEquals("PRIME", MerchantRuleHelper.extractExclusionTerm("AMAZON", "AMAZON PRIME VIDEO"))
+    }
+
+    @Test
+    fun `buildDraft switches to AND when exclusions or notes filter are present`() {
+        val draft = MerchantRuleHelper.buildDraft(
+            mode = MatchMode.Keyword,
+            payeeId = PayeeId("p1"),
+            keyword = "APPLE",
+            categoryId = CategoryId("c-subs"),
+            excludeKeywords = listOf("STORE", "store"),
+            notesContains = "iCloud",
+        )
+        assertEquals("and", draft.conditionsOp)
+        assertEquals(
+            listOf(
+                RuleClause("payee", "contains", RuleValue.Text("APPLE"), "string"),
+                RuleClause("payee", "doesNotContain", RuleValue.Text("STORE"), "string"),
+                RuleClause("notes", "contains", RuleValue.Text("iCloud"), "string"),
+            ),
+            draft.conditions,
+        )
+    }
+
+    @Test
+    fun `buildDraft supports exact merchant split by notes`() {
+        val draft = MerchantRuleHelper.buildDraft(
+            mode = MatchMode.Exact,
+            payeeId = PayeeId("p-paypal"),
+            keyword = "PayPal",
+            categoryId = CategoryId("c-gym"),
+            notesContains = "Gym",
+        )
+        assertEquals("and", draft.conditionsOp)
+        assertEquals(
+            listOf(
+                RuleClause("payee", "is", RuleValue.Text("p-paypal"), "id"),
+                RuleClause("notes", "contains", RuleValue.Text("Gym"), "string"),
+            ),
+            draft.conditions,
+        )
     }
 }

@@ -94,17 +94,41 @@ object MerchantRuleHelper {
         }
     }
 
-    /** True when a merchant name would be swept up by a keyword rule. */
-    fun matchesKeyword(payeeName: String, keyword: String): Boolean {
+    /** True when a merchant name would be swept up by a keyword rule (and not excluded). */
+    fun matchesKeyword(payeeName: String, keyword: String, excludeKeywords: List<String> = emptyList()): Boolean {
         val kw = keyword.trim()
-        return kw.isNotEmpty() && payeeName.contains(kw, ignoreCase = true)
+        if (kw.isEmpty() || !payeeName.contains(kw, ignoreCase = true)) return false
+        return excludeKeywords.none { ex ->
+            val t = ex.trim()
+            t.isNotEmpty() && payeeName.contains(t, ignoreCase = true)
+        }
+    }
+
+    /**
+     * Picks the clearest distinguishing word from [candidateName] to exclude it from a rule
+     * matching [keyword] (e.g. keyword `"SHELL"` + `"SHELLFISH MARKET #42"` -> `"SHELLFISH"`,
+     * keyword `"APPLE"` + `"APPLE STORE #123"` -> `"STORE"`).
+     */
+    fun extractExclusionTerm(keyword: String, candidateName: String): String {
+        val kw = keyword.trim()
+        val cleaned = suggest(candidateName).keyword.trim().ifEmpty { candidateName.trim() }
+        if (cleaned.isEmpty()) return ""
+        val kwWords = kw.lowercase().split(Regex("""[\s./*_-]+""")).filter { it.isNotEmpty() }.toSet()
+        val words = cleaned.split(Regex("""\s+""")).map { it.trim(',', '.', '-', '_', '*', '#') }.filter { it.length >= 2 }
+        // Prefer a longer word that accidentally contains the keyword (e.g. SHELLFISH vs SHELL).
+        words.firstOrNull { w -> kw.isNotEmpty() && w.contains(kw, ignoreCase = true) && !w.equals(kw, ignoreCase = true) }?.let { return it }
+        // Otherwise pick the first meaningful word not already in the keyword (e.g. STORE in APPLE STORE).
+        words.firstOrNull { w -> w.lowercase() !in kwWords }?.let { return it }
+        return cleaned
     }
 
     /**
      * Builds the [RuleDraft] for previewing or saving.
      *
-     * In [MatchMode.Keyword], matches `imported_payee contains kw OR payee contains kw` so it
-     * catches both bank-synced descriptions and manually entered transactions.
+     * In [MatchMode.Keyword] without extra filters, matches `imported_payee contains kw OR
+     * payee contains kw` so it catches both bank-synced descriptions and manually entered
+     * transactions. When exclusions or a notes filter are present, switches to `AND` so every
+     * narrowing condition must hold.
      */
     fun buildDraft(
         mode: MatchMode,
@@ -112,16 +136,36 @@ object MerchantRuleHelper {
         keyword: String,
         categoryId: CategoryId?,
         targetPayeeId: PayeeId? = null,
+        excludeKeywords: List<String> = emptyList(),
+        notesContains: String = "",
     ): RuleDraft {
         val kw = keyword.trim()
+        val excludes = excludeKeywords.map { it.trim() }.filter { it.isNotEmpty() }.distinctBy { it.lowercase() }
+        val notes = notesContains.trim()
+
         val (conditionsOp, conditions) = when (mode) {
-            MatchMode.Exact -> "and" to listOf(
-                RuleClause("payee", "is", RuleValue.Text(payeeId.raw), "id"),
-            )
-            MatchMode.Keyword -> "or" to listOf(
-                RuleClause("imported_payee", "contains", RuleValue.Text(kw), "string"),
-                RuleClause("payee", "contains", RuleValue.Text(kw), "string"),
-            )
+            MatchMode.Exact -> "and" to buildList {
+                add(RuleClause("payee", "is", RuleValue.Text(payeeId.raw), "id"))
+                if (notes.isNotEmpty()) {
+                    add(RuleClause("notes", "contains", RuleValue.Text(notes), "string"))
+                }
+            }
+            MatchMode.Keyword -> if (excludes.isEmpty() && notes.isEmpty()) {
+                "or" to listOf(
+                    RuleClause("imported_payee", "contains", RuleValue.Text(kw), "string"),
+                    RuleClause("payee", "contains", RuleValue.Text(kw), "string"),
+                )
+            } else {
+                "and" to buildList {
+                    add(RuleClause("payee", "contains", RuleValue.Text(kw), "string"))
+                    excludes.forEach { ex ->
+                        add(RuleClause("payee", "doesNotContain", RuleValue.Text(ex), "string"))
+                    }
+                    if (notes.isNotEmpty()) {
+                        add(RuleClause("notes", "contains", RuleValue.Text(notes), "string"))
+                    }
+                }
+            }
         }
         val actions = buildList {
             if (targetPayeeId != null) {

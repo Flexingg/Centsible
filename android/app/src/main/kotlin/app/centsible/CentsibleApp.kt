@@ -325,6 +325,7 @@ private fun MainScaffold(
                 app.centsible.feature.planning.MerchantRulesRoute(
                     onBack = { nav.popBackStack() },
                     onCustomizeRule = { p, c -> nav.navigate(Routes.rule(null, p.raw, c?.raw)) },
+                    onOpenTransaction = { id -> nav.navigate(Routes.transaction(id)) },
                 )
             }
             composable(Routes.RULES) { RulesRoute(onBack = { nav.popBackStack() }, onOpenRule = { nav.navigate(Routes.rule(it)) }) }
