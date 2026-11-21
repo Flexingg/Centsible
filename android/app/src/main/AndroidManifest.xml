@@ -42,5 +42,51 @@
                 <data android:scheme="centsible" android:host="open" />
             </intent-filter>
         </activity>
+
+        <!-- Home screen widgets -->
+        <receiver android:name=".glance.BudgetWidgetReceiver" android:exported="true" android:label="@string/widget_budget_name">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_budget" />
+        </receiver>
+        <receiver android:name=".glance.BillsWidgetReceiver" android:exported="true" android:label="@string/widget_bills_name">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_bills" />
+        </receiver>
+
+        <!-- Quick Settings tiles -->
+        <service
+            android:name=".glance.AddTransactionTileService"
+            android:exported="true"
+            android:icon="@drawable/ic_tile_add"
+            android:label="@string/tile_add"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+        <service
+            android:name=".glance.ReviewTileService"
+            android:exported="true"
+            android:icon="@drawable/ic_tile_review"
+            android:label="@string/tile_review"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+        <service
+            android:name=".glance.SyncTileService"
+            android:exported="true"
+            android:icon="@drawable/ic_tile_sync"
+            android:label="@string/tile_sync"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
     </application>
 </manifest>

@@ -52,5 +52,33 @@ dependencies {
     implementation(libs.androidx.navigation.compose)
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.hilt.navigation.compose)
-    implementation(libs.androidx.work) // daily bill reminders
+    implementation(libs.androidx.work) // daily bill reminders, widget refresh
+    // Home screen widgets
+    implementation(libs.androidx.glance.appwidget)
+    implementation(libs.androidx.glance.material3)
+
+    // Widget tests: Glance's own test runner on Robolectric.
+    testImplementation(libs.androidx.glance.appwidget.testing)
+    testImplementation(libs.robolectric)
+    testImplementation(libs.junit)
+    testImplementation(project(":core:testing"))
+}
+
+// Robolectric's Android runtime through Gradle, offline (as in the feature modules).
+val robolectricRuntime = configurations.create("robolectricRuntime") { isTransitive = false }
+dependencies {
+    robolectricRuntime("org.robolectric:android-all-instrumented:15-robolectric-13954326-i7")
+}
+val robolectricDir = layout.buildDirectory.dir("robolectric-runtime")
+val syncRobolectricRuntime = tasks.register<Sync>("syncRobolectricRuntime") {
+    from(robolectricRuntime)
+    into(robolectricDir)
+}
+android {
+    testOptions.unitTests.isIncludeAndroidResources = true
+}
+tasks.withType<Test>().configureEach {
+    dependsOn(syncRobolectricRuntime)
+    systemProperty("robolectric.offline", "true")
+    systemProperty("robolectric.dependency.dir", robolectricDir.get().asFile.absolutePath)
 }
