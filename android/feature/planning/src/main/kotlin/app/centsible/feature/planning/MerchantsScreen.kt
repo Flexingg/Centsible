@@ -50,24 +50,36 @@ import app.centsible.core.designsystem.component.PickerItem
 import app.centsible.core.designsystem.component.PickerSheet
 import app.centsible.core.designsystem.theme.CentsibleTheme
 import app.centsible.core.domain.BudgetChanges
+import app.centsible.core.domain.BudgetEngine
 import app.centsible.core.domain.PlanningGateway
 import app.centsible.core.domain.SelectedBudget
 import app.centsible.core.domain.SessionStore
 import app.centsible.core.domain.userMessage
+import app.centsible.core.model.Feature
+import app.centsible.core.model.PayeeId
 import app.centsible.core.model.PayeeStat
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-data class MerchantsUiState(val payees: Loadable<List<PayeeStat>> = Loadable.Loading, val canEdit: Boolean = false, val message: String? = null)
+data class MerchantsUiState(
+    val payees: Loadable<List<PayeeStat>> = Loadable.Loading,
+    val canEdit: Boolean = false,
+    val canEditRules: Boolean = false,
+    val unruledCount: Int = 0,
+    val message: String? = null,
+)
 
 @HiltViewModel
 class MerchantsViewModel @Inject constructor(
     private val planning: PlanningGateway,
+    private val engine: BudgetEngine,
     private val selectedBudget: SelectedBudget,
     private val sessions: SessionStore,
     changes: BudgetChanges,
@@ -82,8 +94,21 @@ class MerchantsViewModel @Inject constructor(
 
     fun refresh() = viewModelScope.launch {
         val canEdit = sessions.current()?.member?.role?.canWrite == true
-        runCatching { planning.payeeStats(selectedBudget()).filter { it.transferAccountId == null } }
-            .onSuccess { p -> state.update { it.copy(payees = Loadable.Ready(p), canEdit = canEdit) } }
+        runCatching {
+            coroutineScope {
+                val b = selectedBudget()
+                val payees = async { planning.payeeStats(b).filter { it.transferAccountId == null } }
+                val rules = async { planning.rules(b) }
+                val caps = async { engine.capabilities() }
+                val p = payees.await()
+                val r = rules.await()
+                val unruled = p.count { it.transactionCount > 0 && !MerchantRuleHelper.isCoveredByRules(it, r) }
+                Triple(p, canEdit && caps.await().has(Feature.RulesWrite), unruled)
+            }
+        }
+            .onSuccess { (p, canEditRules, unruled) ->
+                state.update { it.copy(payees = Loadable.Ready(p), canEdit = canEdit, canEditRules = canEditRules, unruledCount = unruled) }
+            }
             .onFailure { e -> state.update { it.copy(payees = Loadable.Failed(e.userMessage())) } }
     }
 
@@ -100,7 +125,13 @@ class MerchantsViewModel @Inject constructor(
 }
 
 @Composable
-fun MerchantsRoute(onBack: () -> Unit, onOpenTransactions: (app.centsible.core.extensions.Destination.TransactionsFor) -> Unit = {}, viewModel: MerchantsViewModel = hiltViewModel()) {
+fun MerchantsRoute(
+    onBack: () -> Unit,
+    onOpenTransactions: (app.centsible.core.extensions.Destination.TransactionsFor) -> Unit = {},
+    onQuickRules: () -> Unit = {},
+    onMakeRule: (PayeeId) -> Unit = {},
+    viewModel: MerchantsViewModel = hiltViewModel(),
+) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     MerchantsScreen(
         state, onBack,
@@ -110,6 +141,8 @@ fun MerchantsRoute(onBack: () -> Unit, onOpenTransactions: (app.centsible.core.e
         onRetry = { viewModel.refresh() },
         onMessageShown = viewModel::messageShown,
         onOpenTransactions = onOpenTransactions,
+        onQuickRules = onQuickRules,
+        onMakeRule = onMakeRule,
     )
 }
 
@@ -123,6 +156,8 @@ fun MerchantsScreen(
     onRetry: () -> Unit = {},
     onMessageShown: () -> Unit = {},
     onOpenTransactions: (app.centsible.core.extensions.Destination.TransactionsFor) -> Unit = {},
+    onQuickRules: () -> Unit = {},
+    onMakeRule: (PayeeId) -> Unit = {},
 ) {
     val colors = CentsibleTheme.colors
     val snackbar = remember { SnackbarHostState() }
@@ -136,7 +171,10 @@ fun MerchantsScreen(
         topBar = {
             Row(Modifier.fillMaxWidth().padding(4.dp), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Back") }
-                Text("Merchants", style = MaterialTheme.typography.titleLarge)
+                Text("Merchants", style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
+                if (state.canEditRules && state.unruledCount > 0) {
+                    TextButton(onClick = onQuickRules) { Text("Quick rules") }
+                }
             }
         },
     ) { padding ->
@@ -154,7 +192,31 @@ fun MerchantsScreen(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
                 )
                 val shown = d.value.filter { query.isBlank() || it.name.contains(query.trim(), ignoreCase = true) }
-                LazyColumn(contentPadding = PaddingValues(16.dp, 12.dp, 16.dp, 96.dp)) {
+                LazyColumn(
+                    contentPadding = PaddingValues(16.dp, 12.dp, 16.dp, 96.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    if (state.canEditRules && state.unruledCount > 0 && query.isBlank()) {
+                        item {
+                            CentsibleCard(onClick = onQuickRules, contentPadding = PaddingValues(16.dp)) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                        Text(
+                                            if (state.unruledCount == 1) "1 merchant without a rule" else "${state.unruledCount} merchants without a rule",
+                                            style = MaterialTheme.typography.titleMedium,
+                                        )
+                                        Text(
+                                            "Clean up merchants and auto-categorize transactions in a queue",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = colors.textSecondary,
+                                        )
+                                    }
+                                    Spacer(Modifier.width(12.dp))
+                                    Text("Start", style = MaterialTheme.typography.labelLarge, color = colors.accent)
+                                }
+                            }
+                        }
+                    }
                     item {
                         CentsibleCard(contentPadding = PaddingValues(0.dp)) {
                             shown.forEachIndexed { i, p ->
@@ -197,6 +259,9 @@ fun MerchantsScreen(
                         TextButton(onClick = { selected = null; onOpenTransactions(app.centsible.core.extensions.Destination.TransactionsFor(p.name, payeeId = p.id)) }) {
                             Text(if (p.transactionCount == 1) "See its transaction" else "See its ${p.transactionCount} transactions")
                         }
+                    }
+                    if (state.canEditRules) {
+                        TextButton(onClick = { selected = null; onMakeRule(p.id) }) { Text("Make category rule") }
                     }
                     TextButton(onClick = { merging = p; selected = null }) { Text("Merge another merchant into this one…") }
                     if (p.transactionCount == 0) TextButton(onClick = { onDelete(p); selected = null }) { Text("Delete (unused)", color = colors.negative) }
