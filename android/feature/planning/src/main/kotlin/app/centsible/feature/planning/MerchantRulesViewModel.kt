@@ -495,6 +495,6 @@ class MerchantRulesViewModel @Inject constructor(
     }
 
     private companion object {
-        const val PREVIEW_LIMIT = 30
+        const val PREVIEW_LIMIT = 100
     }
 }

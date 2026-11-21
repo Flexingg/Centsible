@@ -1,12 +1,15 @@
 package app.centsible.feature.planning
 
 import app.centsible.core.model.CategoryId
+import app.centsible.core.model.Money
 import app.centsible.core.model.PayeeId
 import app.centsible.core.model.PayeeStat
 import app.centsible.core.model.Rule
 import app.centsible.core.model.RuleClause
 import app.centsible.core.model.RuleDraft
 import app.centsible.core.model.RuleValue
+import app.centsible.core.model.Transaction
+import kotlin.math.roundToLong
 
 /** How a quick rule matches transactions for a merchant. */
 enum class MatchMode { Exact, Keyword }
@@ -17,6 +20,26 @@ data class MerchantSuggestion(
     val keyword: String,
     val renameTo: String,
 )
+
+/** Summary statistics across the currently matched transactions for a rule draft. */
+data class MatchedStats(
+    val count: Int,
+    val totalMatchCount: Int,
+    val sum: Money,
+    val average: Money,
+    val median: Money,
+    /** Mathematical mode amount, or null when no amount repeats at least twice. */
+    val mode: Money?,
+    val modeCount: Int,
+    val expenseCount: Int,
+    val incomeCount: Int,
+    val minAmount: Money,
+    val maxAmount: Money,
+    val firstDate: String?,
+    val lastDate: String?,
+) {
+    val isSampled: Boolean get() = totalMatchCount > count
+}
 
 /**
  * Pure logic for the merchant quick-rules queue: suggesting clean keywords from noisy bank
@@ -180,6 +203,47 @@ object MerchantRuleHelper {
             conditionsOp = conditionsOp,
             conditions = conditions,
             actions = actions,
+        )
+    }
+
+    /** Computes summary stats (sum, average, median, mode, income/expense counts, range, dates) for matched transactions. */
+    fun computeStats(transactions: List<Transaction>, totalMatchCount: Int = transactions.size): MatchedStats? {
+        if (transactions.isEmpty()) return null
+        val amounts = transactions.map { it.amount.minor }
+        val sorted = amounts.sorted()
+        val sum = amounts.sum()
+        val avg = (sum.toDouble() / amounts.size).roundToLong()
+        val mid = sorted.size / 2
+        val median = if (sorted.size % 2 == 1) {
+            sorted[mid]
+        } else {
+            ((sorted[mid - 1] + sorted[mid]) / 2.0).roundToLong()
+        }
+
+        val freq = amounts.groupingBy { it }.eachCount()
+        // Most frequent amount (ties broken by larger magnitude so repeated charges win over $0).
+        val topMode = freq.entries
+            .filter { it.value >= 2 }
+            .maxWithOrNull(compareBy<Map.Entry<Long, Int>> { it.value }.thenBy { kotlin.math.abs(it.key) })
+
+        val expenseCount = amounts.count { it < 0L }
+        val incomeCount = amounts.count { it > 0L }
+        val dates = transactions.map { it.date }.filter { it.isNotBlank() }.sorted()
+
+        return MatchedStats(
+            count = transactions.size,
+            totalMatchCount = totalMatchCount.coerceAtLeast(transactions.size),
+            sum = Money(sum),
+            average = Money(avg),
+            median = Money(median),
+            mode = topMode?.let { Money(it.key) },
+            modeCount = topMode?.value ?: 0,
+            expenseCount = expenseCount,
+            incomeCount = incomeCount,
+            minAmount = Money(sorted.first()),
+            maxAmount = Money(sorted.last()),
+            firstDate = dates.firstOrNull(),
+            lastDate = dates.lastOrNull(),
         )
     }
 

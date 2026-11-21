@@ -496,6 +496,14 @@ private fun MerchantCard(
         )
     }
 
+    // ── Matched transaction stats ────────────────────────────────────────
+    val stats = remember(card.preview) {
+        card.preview?.let { p -> MerchantRuleHelper.computeStats(p.items.map { it.transaction }, p.matchCount) }
+    }
+    if (stats != null) {
+        MatchedStatsCard(stats)
+    }
+
     // ── Category & Optional Rename ───────────────────────────────────────
     CentsibleCard(Modifier.animateContentSize()) {
         StatLabel("Always categorize as")
@@ -645,7 +653,7 @@ private fun PreviewSection(
     }
 
     if (p != null && p.items.isNotEmpty()) {
-        val shown = if (card.previewExpanded) p.items else p.items.take(3)
+        val shown = if (card.previewExpanded) p.items.take(30) else p.items.take(3)
         Spacer(Modifier.height(6.dp))
         Column(
             Modifier
@@ -676,9 +684,9 @@ private fun PreviewSection(
                         .clickable { actions.togglePreviewExpanded() }
                         .padding(vertical = 4.dp),
                 )
-            } else if (card.previewExpanded && p.matchCount > p.items.size) {
+            } else if (card.previewExpanded && p.matchCount > shown.size) {
                 Text(
-                    "Showing ${p.items.size} most recent of ${p.matchCount} matches",
+                    "Showing ${shown.size} most recent of ${p.matchCount} matches",
                     style = MaterialTheme.typography.labelSmall,
                     color = colors.textTertiary,
                 )
@@ -836,3 +844,93 @@ private fun AllDoneState(
         }
     }
 }
+
+@Composable
+private fun MatchedStatsCard(stats: MatchedStats) {
+    val colors = CentsibleTheme.colors
+    CentsibleCard(Modifier.animateContentSize()) {
+        Row(
+            Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            StatLabel("Matched stats", Modifier.weight(1f))
+            val rangeLabel = formatDateRange(stats.firstDate, stats.lastDate)
+            if (rangeLabel != null) {
+                Text(rangeLabel, style = MaterialTheme.typography.labelSmall, color = colors.textTertiary)
+            }
+        }
+        Spacer(Modifier.height(10.dp))
+
+        val sumText = MoneyFormat.format(stats.sum, signed = stats.sum.minor > 0)
+        val avgText = MoneyFormat.format(stats.average, signed = stats.average.minor > 0)
+        val medianText = MoneyFormat.format(stats.median, signed = stats.median.minor > 0)
+        val modeText = stats.mode?.let { m ->
+            "${MoneyFormat.format(m, signed = m.minor > 0)} (${stats.modeCount}×)"
+        } ?: "No repeat"
+        val flowText = when {
+            stats.incomeCount == 0 && stats.expenseCount > 0 ->
+                if (stats.expenseCount == 1) "1 expense" else "${stats.expenseCount} expenses"
+            stats.expenseCount == 0 && stats.incomeCount > 0 ->
+                if (stats.incomeCount == 1) "1 income" else "${stats.incomeCount} income"
+            else -> "${stats.expenseCount} out · ${stats.incomeCount} in"
+        }
+        val rangeText = if (stats.minAmount == stats.maxAmount) {
+            MoneyFormat.format(stats.minAmount, signed = stats.minAmount.minor > 0)
+        } else {
+            "${MoneyFormat.format(stats.minAmount, signed = stats.minAmount.minor > 0)} to ${MoneyFormat.format(stats.maxAmount, signed = stats.maxAmount.minor > 0)}"
+        }
+
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                StatCell("Total", sumText, Modifier.weight(1f))
+                StatCell("Average", avgText, Modifier.weight(1f))
+            }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                StatCell("Mode", modeText, Modifier.weight(1f))
+                StatCell("Median", medianText, Modifier.weight(1f))
+            }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                StatCell("Income / Expense", flowText, Modifier.weight(1f))
+                StatCell("Range", rangeText, Modifier.weight(1f))
+            }
+        }
+
+        if (stats.isSampled) {
+            Spacer(Modifier.height(8.dp))
+            Text(
+                "Based on ${stats.count} most recent of ${stats.totalMatchCount} matches",
+                style = MaterialTheme.typography.labelSmall,
+                color = colors.textTertiary,
+            )
+        }
+    }
+}
+
+@Composable
+private fun StatCell(label: String, value: String, modifier: Modifier = Modifier) {
+    val colors = CentsibleTheme.colors
+    Column(
+        modifier
+            .background(colors.cardMuted, RoundedCornerShape(10.dp))
+            .padding(horizontal = 10.dp, vertical = 8.dp),
+    ) {
+        Text(label, style = MaterialTheme.typography.labelSmall, color = colors.textTertiary, maxLines = 1)
+        Spacer(Modifier.height(2.dp))
+        Text(
+            value,
+            style = MaterialTheme.typography.bodyMedium.copy(fontFeatureSettings = "tnum"),
+            color = colors.textPrimary,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+private fun formatDateRange(first: String?, last: String?): String? {
+    if (first == null || last == null) return null
+    val fmt = java.time.format.DateTimeFormatter.ofPattern("MMM yyyy")
+    val a = runCatching { java.time.LocalDate.parse(first).format(fmt) }.getOrNull() ?: first
+    val b = runCatching { java.time.LocalDate.parse(last).format(fmt) }.getOrNull() ?: last
+    return if (a == b) a else "$a – $b"
+}
+
