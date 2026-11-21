@@ -95,6 +95,7 @@ private object Routes {
     const val PLAID = "bank-sync/plaid"
     const val REPORTS = "reports"
     const val MERCHANTS = "merchants"
+    const val MERCHANT_RULES = "merchants/rules"
     const val RULES = "rules"
     const val TAGS = "tags"
     const val GOALS = "goals"
@@ -312,7 +313,20 @@ private fun MainScaffold(
                 app.centsible.feature.planning.ForecastRoute(onBack = { nav.popBackStack() }, onOpenCalendar = { nav.navigate(Routes.CALENDAR) { launchSingleTop = true } })
             }
             composable(Routes.REPORTS) { ReportsRoute(onBack = { nav.popBackStack() }, onOpenTransactions = { nav.go(it) }) }
-            composable(Routes.MERCHANTS) { MerchantsRoute(onBack = { nav.popBackStack() }, onOpenTransactions = { nav.go(it) }) }
+            composable(Routes.MERCHANTS) {
+                MerchantsRoute(
+                    onBack = { nav.popBackStack() },
+                    onOpenTransactions = { nav.go(it) },
+                    onQuickRules = { nav.navigate(Routes.MERCHANT_RULES) },
+                    onMakeRule = { p -> nav.navigate(Routes.rule(null, p.raw)) },
+                )
+            }
+            composable(Routes.MERCHANT_RULES) {
+                app.centsible.feature.planning.MerchantRulesRoute(
+                    onBack = { nav.popBackStack() },
+                    onCustomizeRule = { p, c -> nav.navigate(Routes.rule(null, p.raw, c?.raw)) },
+                )
+            }
             composable(Routes.RULES) { RulesRoute(onBack = { nav.popBackStack() }, onOpenRule = { nav.navigate(Routes.rule(it)) }) }
             composable(Routes.TAGS) { TagsRoute(onBack = { nav.popBackStack() }, onSearch = { nav.navigate(Routes.search(it)) }) }
             composable(
