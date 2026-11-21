@@ -1,13 +1,18 @@
 package app.centsible.feature.planning
 
+import app.centsible.core.model.AccountId
 import app.centsible.core.model.CategoryId
+import app.centsible.core.model.Money
 import app.centsible.core.model.PayeeId
 import app.centsible.core.model.PayeeStat
 import app.centsible.core.model.Rule
 import app.centsible.core.model.RuleClause
 import app.centsible.core.model.RuleValue
+import app.centsible.core.model.Transaction
+import app.centsible.core.model.TransactionId
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -173,5 +178,61 @@ class MerchantRuleHelperTest {
             ),
             draft.conditions,
         )
+    }
+
+    private fun tx(id: String, amountMinor: Long, date: String) = Transaction(
+        id = TransactionId(id),
+        accountId = AccountId("a1"),
+        date = date,
+        amount = Money(amountMinor),
+        payeeId = PayeeId("p1"),
+        payeeName = "Netflix",
+        categoryId = null,
+        notes = null,
+        cleared = true,
+        reconciled = false,
+        transferId = null,
+        isParent = false,
+        subtransactions = emptyList(),
+    )
+
+    @Test
+    fun `computeStats returns sum, average, median, mode, flow counts, range, and dates`() {
+        val txs = listOf(
+            tx("1", -1599, "2026-01-15"),
+            tx("2", -1599, "2026-02-15"),
+            tx("3", -1599, "2026-03-15"),
+            tx("4", -2500, "2026-04-15"),
+            tx("5", 1000, "2026-05-15"),
+        )
+        val stats = MerchantRuleHelper.computeStats(txs, totalMatchCount = 12)!!
+        assertEquals(5, stats.count)
+        assertEquals(12, stats.totalMatchCount)
+        assertTrue(stats.isSampled)
+        assertEquals(Money(-6297), stats.sum)
+        assertEquals(Money(-1259), stats.average)
+        assertEquals(Money(-1599), stats.median)
+        assertEquals(Money(-1599), stats.mode)
+        assertEquals(3, stats.modeCount)
+        assertEquals(4, stats.expenseCount)
+        assertEquals(1, stats.incomeCount)
+        assertEquals(Money(-2500), stats.minAmount)
+        assertEquals(Money(1000), stats.maxAmount)
+        assertEquals("2026-01-15", stats.firstDate)
+        assertEquals("2026-05-15", stats.lastDate)
+    }
+
+    @Test
+    fun `computeStats omits mode when no amount repeats`() {
+        val txs = listOf(
+            tx("1", -1000, "2026-01-01"),
+            tx("2", -2000, "2026-02-01"),
+        )
+        val stats = MerchantRuleHelper.computeStats(txs)!!
+        assertNull(stats.mode)
+        assertEquals(0, stats.modeCount)
+        assertEquals(Money(-1500), stats.median)
+        assertFalse(stats.isSampled)
+        assertNull(MerchantRuleHelper.computeStats(emptyList()))
     }
 }
