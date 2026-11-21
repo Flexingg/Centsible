@@ -57,6 +57,17 @@ class PrefsGlanceableStore @Inject constructor(@ApplicationContext context: Cont
             .put("updatedAt", g.updatedAt)
             .put("locked", g.locked)
             .put("bills", JSONArray(g.bills.map { JSONObject().put("title", it.title).put("amount", it.amount.minor).put("date", it.date).put("when", it.whenText) }))
+            .put("categories", JSONArray(g.categories.map { JSONObject().put("name", it.name).put("spent", it.spent.minor).put("budgeted", it.budgeted.minor) }))
+            .put("trend", g.trend?.let { t ->
+                JSONObject()
+                    .put("monthToDate", JSONArray(t.monthToDate))
+                    .put("lastMonth", JSONArray(t.lastMonth))
+                    .put("daysInMonth", t.daysInMonth)
+                    .put("week", JSONArray(t.week))
+                    .put("weekdayToday", t.weekdayToday)
+                    .put("lastWeekTotal", t.lastWeekTotal)
+                    .put("weekAllowance", t.weekAllowance ?: JSONObject.NULL)
+            } ?: JSONObject.NULL)
 
         fun decode(o: JSONObject): Glanceable {
             val bills = o.optJSONArray("bills") ?: JSONArray()
@@ -74,6 +85,21 @@ class PrefsGlanceableStore @Inject constructor(@ApplicationContext context: Cont
                 },
                 updatedAt = o.getLong("updatedAt"),
                 locked = o.optBoolean("locked", false),
+                trend = o.optJSONObject("trend")?.let { t ->
+                    fun longs(name: String) = t.getJSONArray(name).let { a -> (0 until a.length()).map { a.getLong(it) } }
+                    Glanceable.Trend(
+                        monthToDate = longs("monthToDate"),
+                        lastMonth = longs("lastMonth"),
+                        daysInMonth = t.getInt("daysInMonth"),
+                        week = longs("week"),
+                        weekdayToday = t.getInt("weekdayToday"),
+                        lastWeekTotal = t.getLong("lastWeekTotal"),
+                        weekAllowance = if (t.isNull("weekAllowance")) null else t.getLong("weekAllowance"),
+                    )
+                },
+                categories = (o.optJSONArray("categories") ?: JSONArray()).let { a ->
+                    (0 until a.length()).map { i -> a.getJSONObject(i).let { c -> Glanceable.CategorySlice(c.getString("name"), Money(c.getLong("spent")), Money(c.getLong("budgeted"))) } }
+                },
             )
         }
     }

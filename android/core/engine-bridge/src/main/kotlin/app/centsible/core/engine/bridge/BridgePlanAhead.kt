@@ -132,6 +132,10 @@ class BridgePlanAhead(private val api: PlanningApi, private val onWrite: () -> U
         onWrite()
     }
 
+    override suspend fun linkMortgageLoan(budget: BudgetId, id: String, account: AccountId?, retireOld: Boolean): String? =
+        api.linkMortgageLoan(budget.raw, id, app.centsible.core.network.MortgageLoanLinkDto(kotlinx.serialization.json.JsonPrimitive(account?.raw), retireOld)).retiredAccount
+            .also { onWrite() }
+
     override suspend fun deleteMortgage(budget: BudgetId, id: String) {
         api.deleteMortgage(budget.raw, id)
         onWrite()
@@ -154,6 +158,7 @@ private fun app.centsible.core.network.MortgageDto.toModel() = app.centsible.cor
     interestPaid = Money(interestPaid), interestLeft = Money(interestLeft), interestSaved = Money(interestSaved),
     homeValue = homeValue?.let(::Money), equity = equity?.let(::Money), paymentsFound = paymentsFound, unrecorded = unrecorded,
     schedule = schedule.map { app.centsible.core.model.Mortgage.Row(it.n, it.date, Money(it.payment), Money(it.interest), Money(it.principal), Money(it.extra), Money(it.balance), it.paidOn) },
+    loanPositive = loanPositive,
 )
 
 private fun kindName(k: app.centsible.core.model.Target.Kind) = when (k) {

@@ -82,6 +82,8 @@ class BridgeReports(private val api: PlanningApi) : ReportsGateway {
     override suspend fun cashFlow(budget: BudgetId, start: YearMonth, end: YearMonth) = api.cashFlow(budget.raw, start.raw, end.raw).months.map { it.toModel() }
     override suspend fun spending(budget: BudgetId, start: YearMonth, end: YearMonth) = api.spending(budget.raw, start.raw, end.raw).toModel()
     override suspend fun netWorth(budget: BudgetId, months: Int) = api.netWorth(budget.raw, months).points.map { it.toModel() }
+    override suspend fun dailySpending(budget: BudgetId, from: String, to: String) =
+        api.dailySpending(budget.raw, from, to).days.map { app.centsible.core.model.DaySpending(it.date, Money(it.amount)) }
 }
 
 class BridgeBankSync(private val api: PlanningApi, private val onWrite: () -> Unit) : app.centsible.core.domain.BankSyncGateway {

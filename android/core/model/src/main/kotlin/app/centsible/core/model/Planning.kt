@@ -137,6 +137,9 @@ data class SpendingCategory(val categoryId: CategoryId?, val name: String, val g
 
 data class SpendingReport(val total: Money, val categories: List<SpendingCategory>)
 
+/** Spending on one day (positive, refunds netted). */
+data class DaySpending(val date: String, val amount: Money)
+
 data class NetWorthPoint(val month: YearMonth, val assets: Money, val liabilities: Money, val netWorth: Money)
 
 /** What a rule would do to one existing transaction (nothing written). */

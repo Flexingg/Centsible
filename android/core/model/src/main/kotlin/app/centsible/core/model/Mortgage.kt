@@ -40,6 +40,8 @@ data class Mortgage(
     /** Payments whose principal isn't on the loan account yet. */
     val unrecorded: Int,
     val schedule: List<Row> = emptyList(),
+    /** The bank reports what's owed as a positive balance, so net worth counts the loan as an asset. */
+    val loanPositive: Boolean = false,
 ) {
     /** How much of what was borrowed is paid off. */
     val paidOff: Float get() = if (principal.minor > 0) (1f - balance.minor.toFloat() / principal.minor).coerceIn(0f, 1f) else 1f

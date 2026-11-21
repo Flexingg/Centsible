@@ -34,6 +34,11 @@ interface PlanAheadGateway {
     /** [id] null creates one. */
     suspend fun saveMortgage(budget: BudgetId, id: String?, input: app.centsible.core.model.MortgageInput)
     suspend fun deleteMortgage(budget: BudgetId, id: String)
+    /**
+     * Uses [account] (one the bank syncs) as the mortgage's loan account; null unlinks.
+     * [retireOld] closes the previous unsynced loan account at zero. Returns its name if closed.
+     */
+    suspend fun linkMortgageLoan(budget: BudgetId, id: String, account: app.centsible.core.model.AccountId?, retireOld: Boolean): String?
     suspend fun setHomeValue(budget: BudgetId, id: String, value: app.centsible.core.model.Money)
     /** Takes unrecorded payments' principal off the loan account; returns how many. */
     suspend fun recordPrincipal(budget: BudgetId, id: String): Int
