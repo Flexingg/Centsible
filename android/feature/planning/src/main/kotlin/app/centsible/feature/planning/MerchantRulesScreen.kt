@@ -213,7 +213,7 @@ fun MerchantRulesScreen(state: MerchantRulesUiState, actions: MerchantRulesActio
             Loadable.Loading -> LoadingState(Modifier.padding(padding))
             is Loadable.Failed -> MessageState(
                 title = "Couldn't load merchants",
-                body = d.message,
+                message = d.message,
                 actionLabel = "Try again",
                 onAction = actions.retry,
                 modifier = Modifier.padding(padding),
