@@ -4,8 +4,10 @@ import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -19,13 +21,16 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.InputChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -42,6 +47,9 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
@@ -64,6 +72,8 @@ import app.centsible.core.designsystem.component.categoryEmoji
 import app.centsible.core.designsystem.theme.CentsibleTheme
 import app.centsible.core.model.CategoryId
 import app.centsible.core.model.PayeeId
+import app.centsible.core.model.Transaction
+import app.centsible.core.model.TransactionId
 import app.centsible.core.ui.CategoryPickerSheet
 
 data class MerchantRulesActions(
@@ -71,6 +81,14 @@ data class MerchantRulesActions(
     val setMode: (MatchMode) -> Unit = {},
     val setKeyword: (String) -> Unit = {},
     val setRenameTo: (String) -> Unit = {},
+    val togglePreviewExpanded: () -> Unit = {},
+    val excludeMerchant: (String) -> Unit = {},
+    val addExcludeKeyword: (String) -> Unit = {},
+    val removeExcludeKeyword: (String) -> Unit = {},
+    val narrowKeywordTo: (String) -> Unit = {},
+    val setShowNotesFilter: (Boolean) -> Unit = {},
+    val setNotesContains: (String) -> Unit = {},
+    val openTransaction: (TransactionId) -> Unit = {},
     val openCategoryPicker: (Boolean) -> Unit = {},
     val setCategory: (CategoryId?) -> Unit = {},
     val setApplyToExisting: (Boolean) -> Unit = {},
@@ -85,6 +103,7 @@ data class MerchantRulesActions(
 fun MerchantRulesRoute(
     onBack: () -> Unit,
     onCustomizeRule: (PayeeId, CategoryId?) -> Unit = { _, _ -> },
+    onOpenTransaction: (TransactionId) -> Unit = {},
     viewModel: MerchantRulesViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -99,6 +118,17 @@ fun MerchantRulesRoute(
             setMode = viewModel::setMode,
             setKeyword = viewModel::setKeyword,
             setRenameTo = viewModel::setRenameTo,
+            togglePreviewExpanded = viewModel::togglePreviewExpanded,
+            excludeMerchant = viewModel::excludeMerchant,
+            addExcludeKeyword = viewModel::addExcludeKeyword,
+            removeExcludeKeyword = viewModel::removeExcludeKeyword,
+            narrowKeywordTo = viewModel::narrowKeywordTo,
+            setShowNotesFilter = viewModel::setShowNotesFilter,
+            setNotesContains = viewModel::setNotesContains,
+            openTransaction = { id ->
+                viewModel.leavingForEditor()
+                onOpenTransaction(id)
+            },
             openCategoryPicker = viewModel::openCategoryPicker,
             setCategory = viewModel::setCategory,
             setApplyToExisting = viewModel::setApplyToExisting,
@@ -118,7 +148,9 @@ fun MerchantRulesRoute(
 @Composable
 fun MerchantRulesScreen(state: MerchantRulesUiState, actions: MerchantRulesActions) {
     val colors = CentsibleTheme.colors
-    val snackbar = androidx.compose.runtime.remember { SnackbarHostState() }
+    val snackbar = remember { SnackbarHostState() }
+    var addingExclude by remember { mutableStateOf(false) }
+
     LaunchedEffect(state.message) {
         state.message?.let {
             snackbar.showSnackbar(it)
@@ -165,8 +197,11 @@ fun MerchantRulesScreen(state: MerchantRulesUiState, actions: MerchantRulesActio
             val card = state.card
             if (state.data is Loadable.Ready && card != null && state.canEdit) {
                 val matchCount = card.preview?.matchCount
+                val isSplit = card.notesContains.trim().isNotEmpty()
                 val primaryLabel = when {
                     state.saving -> "Saving…"
+                    isSplit && card.applyToExisting && matchCount != null && matchCount > 0 -> "Save split ($matchCount)"
+                    isSplit -> "Save split rule"
                     card.applyToExisting && matchCount != null && matchCount > 0 -> "Save & apply ($matchCount)"
                     card.applyToExisting -> "Save & apply"
                     else -> "Save rule"
@@ -241,7 +276,9 @@ fun MerchantRulesScreen(state: MerchantRulesUiState, actions: MerchantRulesActio
                         MerchantCard(
                             card = card,
                             categoryNames = data.categoryNames,
+                            accountNames = data.accountNames,
                             enabled = state.canEdit && !state.saving,
+                            onAskAddExclude = { addingExclude = true },
                             actions = actions,
                         )
                         Spacer(Modifier.height(8.dp))
@@ -261,14 +298,55 @@ fun MerchantRulesScreen(state: MerchantRulesUiState, actions: MerchantRulesActio
             onDismiss = { actions.openCategoryPicker(false) },
         )
     }
+
+    if (addingExclude && card != null) {
+        var term by remember { mutableStateOf("") }
+        AlertDialog(
+            onDismissRequest = { addingExclude = false },
+            title = { Text("Exclude a keyword") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        "Transactions whose merchant contains this word won't match this rule and will stay in your queue.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = colors.textSecondary,
+                    )
+                    OutlinedTextField(
+                        value = term,
+                        onValueChange = { term = it },
+                        label = { Text("Doesn't contain") },
+                        placeholder = { Text("e.g. STORE or MARKET") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        actions.addExcludeKeyword(term)
+                        addingExclude = false
+                    },
+                    enabled = term.isNotBlank(),
+                ) {
+                    Text("Exclude")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { addingExclude = false }) { Text("Cancel") }
+            },
+        )
+    }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 private fun MerchantCard(
     card: MerchantRuleCardState,
     categoryNames: Map<String, String>,
+    accountNames: Map<String, String>,
     enabled: Boolean,
+    onAskAddExclude: () -> Unit,
     actions: MerchantRulesActions,
 ) {
     val colors = CentsibleTheme.colors
@@ -339,16 +417,83 @@ private fun MerchantCard(
                 modifier = Modifier.fillMaxWidth(),
             )
             Text(
-                "Matches any transaction whose merchant or bank description contains this text.",
+                if (card.excludeKeywords.isEmpty() && card.notesContains.isBlank()) {
+                    "Matches any transaction whose merchant or bank description contains this text."
+                } else {
+                    "Matches merchants containing this keyword while applying the filters below."
+                },
                 style = MaterialTheme.typography.bodySmall,
                 color = colors.textTertiary,
                 modifier = Modifier.padding(top = 4.dp),
             )
         }
 
-        // ── Live sample transactions ─────────────────────────────────────
+        // ── Narrow / Split chips (exclusions & notes filter) ─────────────
+        Spacer(Modifier.height(8.dp))
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            card.excludeKeywords.forEach { ex ->
+                InputChip(
+                    selected = true,
+                    onClick = { if (enabled) actions.removeExcludeKeyword(ex) },
+                    enabled = enabled,
+                    label = { Text("Not \"$ex\"") },
+                    trailingIcon = { Icon(Icons.Rounded.Close, contentDescription = "Remove exclusion $ex") },
+                )
+            }
+            if (enabled) {
+                AssistChip(
+                    onClick = onAskAddExclude,
+                    label = { Text("Exclude word") },
+                    leadingIcon = { Icon(Icons.Rounded.Add, contentDescription = null) },
+                )
+                if (!card.showNotesFilter) {
+                    AssistChip(
+                        onClick = { actions.setShowNotesFilter(true) },
+                        label = { Text("Split by notes") },
+                        leadingIcon = { Icon(Icons.Rounded.Add, contentDescription = null) },
+                    )
+                }
+            }
+        }
+
+        if (card.showNotesFilter) {
+            Spacer(Modifier.height(8.dp))
+            OutlinedTextField(
+                value = card.notesContains,
+                onValueChange = actions.setNotesContains,
+                label = { Text("Notes contain") },
+                placeholder = { Text("e.g. Gym or Subscription") },
+                singleLine = true,
+                enabled = enabled,
+                trailingIcon = {
+                    if (enabled) {
+                        IconButton(onClick = { actions.setShowNotesFilter(false) }) {
+                            Icon(Icons.Rounded.Close, contentDescription = "Remove notes filter")
+                        }
+                    }
+                },
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Text(
+                "Split mode: saving creates a rule for just these matches and keeps this merchant open for another rule.",
+                style = MaterialTheme.typography.bodySmall,
+                color = colors.textTertiary,
+                modifier = Modifier.padding(top = 4.dp),
+            )
+        }
+
+        // ── Live matched transactions (expandable with details + split) ──
         Spacer(Modifier.height(12.dp))
-        PreviewSection(card = card, categoryNames = categoryNames)
+        PreviewSection(
+            card = card,
+            categoryNames = categoryNames,
+            accountNames = accountNames,
+            enabled = enabled,
+            actions = actions,
+        )
     }
 
     // ── Category & Optional Rename ───────────────────────────────────────
@@ -459,78 +604,189 @@ private fun MerchantCard(
 }
 
 @Composable
-private fun PreviewSection(card: MerchantRuleCardState, categoryNames: Map<String, String>) {
+private fun PreviewSection(
+    card: MerchantRuleCardState,
+    categoryNames: Map<String, String>,
+    accountNames: Map<String, String>,
+    enabled: Boolean,
+    actions: MerchantRulesActions,
+) {
     val colors = CentsibleTheme.colors
+    val p = card.preview
+
     Row(verticalAlignment = Alignment.CenterVertically) {
         val label = when {
             card.previewError != null -> "Preview unavailable"
-            card.preview == null && card.previewing -> "Checking matching transactions…"
-            card.preview == null -> "Enter a keyword to preview matches"
-            card.preview.matchCount == 0 -> "Matches no existing transactions"
-            card.preview.matchCount == 1 -> "Matches 1 transaction"
-            else -> "Matches ${card.preview.matchCount} transactions"
+            p == null && card.previewing -> "Checking matching transactions…"
+            p == null -> "Enter a keyword to preview matches"
+            p.matchCount == 0 -> "Matches no existing transactions"
+            p.matchCount == 1 -> "Matches 1 transaction"
+            else -> "Matches ${p.matchCount} transactions"
         }
         Text(
             label,
             style = MaterialTheme.typography.labelLarge,
-            color = if (card.preview != null && card.preview.matchCount > 0) colors.accent else colors.textSecondary,
+            color = if (p != null && p.matchCount > 0) colors.accent else colors.textSecondary,
             modifier = Modifier.weight(1f),
         )
-        if (card.previewing) DialSpinner(size = 16.dp)
+        if (card.previewing) {
+            DialSpinner(size = 16.dp)
+        } else if (p != null && p.items.isNotEmpty()) {
+            TextButton(
+                onClick = actions.togglePreviewExpanded,
+                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+            ) {
+                Text(
+                    if (card.previewExpanded) "Collapse" else "Inspect (${p.matchCount})",
+                    style = MaterialTheme.typography.labelMedium,
+                )
+            }
+        }
     }
 
-    val p = card.preview
     if (p != null && p.items.isNotEmpty()) {
+        val shown = if (card.previewExpanded) p.items else p.items.take(3)
         Spacer(Modifier.height(6.dp))
         Column(
             Modifier
                 .fillMaxWidth()
                 .background(colors.cardMuted, RoundedCornerShape(10.dp))
                 .padding(horizontal = 12.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            p.items.take(3).forEachIndexed { idx, item ->
+            shown.forEachIndexed { idx, item ->
                 if (idx > 0) HorizontalDivider(color = colors.border)
-                val t = item.transaction
-                val existingCat = t.categoryId?.let { categoryNames[it.raw] }
-                Row(
-                    Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Column(Modifier.weight(1f)) {
-                        Text(
-                            t.payeeName ?: card.merchant.name,
-                            style = MaterialTheme.typography.bodyMedium,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                        val meta = buildString {
-                            append(Describe.shortDate(t.date))
-                            if (existingCat != null) append(" · $existingCat")
-                            else append(" · Uncategorized")
-                        }
-                        Text(
-                            meta,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = colors.textTertiary,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                    Spacer(Modifier.width(8.dp))
-                    Text(
-                        MoneyFormat.format(t.amount),
-                        style = MaterialTheme.typography.bodyMedium.copy(fontFeatureSettings = "tnum"),
-                        color = colors.textPrimary,
-                    )
-                }
+                MatchedTransactionRow(
+                    tx = item.transaction,
+                    card = card,
+                    categoryNames = categoryNames,
+                    accountNames = accountNames,
+                    expanded = card.previewExpanded,
+                    enabled = enabled,
+                    actions = actions,
+                )
             }
-            if (p.matchCount > 3) {
+            if (!card.previewExpanded && p.matchCount > 3) {
                 Text(
-                    "…and ${p.matchCount - 3} more",
+                    "Show all ${p.matchCount} matched transactions & split options",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = colors.accent,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { actions.togglePreviewExpanded() }
+                        .padding(vertical = 4.dp),
+                )
+            } else if (card.previewExpanded && p.matchCount > p.items.size) {
+                Text(
+                    "Showing ${p.items.size} most recent of ${p.matchCount} matches",
                     style = MaterialTheme.typography.labelSmall,
                     color = colors.textTertiary,
                 )
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun MatchedTransactionRow(
+    tx: Transaction,
+    card: MerchantRuleCardState,
+    categoryNames: Map<String, String>,
+    accountNames: Map<String, String>,
+    expanded: Boolean,
+    enabled: Boolean,
+    actions: MerchantRulesActions,
+) {
+    val colors = CentsibleTheme.colors
+    val rowPayee = tx.payeeName ?: card.merchant.name
+    val existingCat = tx.categoryId?.let { categoryNames[it.raw] }
+    val account = accountNames[tx.accountId.raw]
+
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .then(if (!expanded) Modifier.clickable { actions.togglePreviewExpanded() } else Modifier),
+    ) {
+        Row(
+            Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.Top,
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text(
+                    rowPayee,
+                    style = MaterialTheme.typography.bodyMedium,
+                    maxLines = if (expanded) 2 else 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                val meta = buildList {
+                    add(Describe.shortDate(tx.date))
+                    if (expanded && account != null) add(account)
+                    add(existingCat?.let { "${categoryEmoji(it)} $it" } ?: "Uncategorized")
+                }.joinToString(" · ")
+                Text(
+                    meta,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = colors.textTertiary,
+                    maxLines = if (expanded) 2 else 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            Spacer(Modifier.width(8.dp))
+            Text(
+                MoneyFormat.format(tx.amount),
+                style = MaterialTheme.typography.bodyMedium.copy(fontFeatureSettings = "tnum"),
+                color = colors.textPrimary,
+            )
+        }
+
+        if (expanded) {
+            val notes = tx.notes?.trim().orEmpty()
+            if (notes.isNotEmpty()) {
+                Text(
+                    notes,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = colors.textSecondary,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(top = 4.dp),
+                )
+            }
+
+            if (enabled) {
+                val distinctFromCurrent = !rowPayee.equals(card.merchant.name, ignoreCase = true)
+                val suggestedRowKeyword = MerchantRuleHelper.suggest(rowPayee).keyword
+                val canNarrow = card.mode == MatchMode.Keyword &&
+                    suggestedRowKeyword.isNotBlank() &&
+                    !suggestedRowKeyword.equals(card.keyword.trim(), ignoreCase = true)
+
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    modifier = Modifier.padding(top = 4.dp),
+                ) {
+                    if (card.mode == MatchMode.Keyword || distinctFromCurrent) {
+                        TextButton(
+                            onClick = { actions.excludeMerchant(rowPayee) },
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                        ) {
+                            Text("Exclude", style = MaterialTheme.typography.labelSmall, color = colors.warning)
+                        }
+                    }
+                    if (canNarrow) {
+                        TextButton(
+                            onClick = { actions.narrowKeywordTo(rowPayee) },
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                        ) {
+                            Text("Only this", style = MaterialTheme.typography.labelSmall)
+                        }
+                    }
+                    TextButton(
+                        onClick = { actions.openTransaction(tx.id) },
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                    ) {
+                        Text("Open", style = MaterialTheme.typography.labelSmall, color = colors.textSecondary)
+                    }
+                }
             }
         }
     }
