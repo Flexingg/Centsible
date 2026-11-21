@@ -46,6 +46,8 @@ export function createDeps(config: BridgeConfig, store: HouseholdStore, host: Ac
   bankSync.plaid = plaid;
   budgetOps.syncOverlay = (budgetId) => plaid.overlay(budgetId);
   budgetOps.kinds = (budgetId) => store.accountKinds(budgetId);
+  const mortgages = new MortgageOps(host, store);
+  mortgages.plaidLinked = (budgetId) => new Set(store.plaidLinks(budgetId).map((l) => l.accountId));
   const transfers = new TransferOps(host, store);
   const annual = new AnnualOps(host, store);
   const offBooks = new OffBooks(store);
@@ -77,7 +79,7 @@ export function createDeps(config: BridgeConfig, store: HouseholdStore, host: Ac
     transfers,
     duplicates: new DuplicateOps(host, store),
     targets: new TargetOps(host, store),
-    mortgages: new MortgageOps(host, store),
+    mortgages,
     annual,
     automations: new AutomationOps(host),
     ruleTools: new RuleTools(host),

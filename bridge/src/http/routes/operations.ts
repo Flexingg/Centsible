@@ -2,7 +2,7 @@ import type { FastifyPluginAsync } from 'fastify';
 import type { ImportFile } from '../../actual/account-ops.js';
 import { ApiError } from '../../errors.js';
 import { audit, requireBudget, type Deps } from '../server.js';
-import { MONEY, MONTH, type BudgetParams } from './budgets.js';
+import { DATE, MONEY, MONTH, type BudgetParams } from './budgets.js';
 
 type IdParams = BudgetParams & { id: string };
 
@@ -124,6 +124,14 @@ export const operationRoutes =
         requireBudget(deps, req, req.params.budgetId);
         if (req.query.start > req.query.end) throw ApiError.validation('start must not be after end');
         return reports.spending(req.params.budgetId, req.query.start, req.query.end);
+      },
+    );
+    app.get<{ Params: BudgetParams; Querystring: { from: string; to: string } }>(
+      '/v1/budgets/:budgetId/reports/daily-spending',
+      { schema: { querystring: { type: 'object', required: ['from', 'to'], properties: { from: DATE, to: DATE } } } },
+      async (req) => {
+        requireBudget(deps, req, req.params.budgetId);
+        return reports.dailySpending(req.params.budgetId, req.query.from, req.query.to);
       },
     );
     app.get<{ Params: BudgetParams; Querystring: { months?: number } }>(
