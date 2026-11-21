@@ -1,0 +1,44 @@
+# CI replaces "0.0.0-dev" with the release (0.2.<build>) on the home-assistant branch, so
+# Home Assistant offers each release as an update. The image tag is that same version.
+name: Centsible
+version: "0.2.104"
+slug: centsible
+description: Your Actual Budget server and the Centsible app's bridge, kept on matching versions and updated from Home Assistant.
+url: https://github.com/Flexingg/Centsible
+arch:
+  - amd64
+  - aarch64
+image: ghcr.io/flexingg/centsible-ha
+init: false
+startup: services
+boot: auto
+# SQLite files are copied safely while stopped; the app restarts within a minute.
+backup: cold
+backup_exclude:
+  - "bridge/backups/**"
+watchdog: "http://[HOST]:[PORT:8787]/v1/health"
+map:
+  - addon_config:rw
+ports:
+  8787/tcp: 8787
+  5006/tcp: null
+ports_description:
+  8787/tcp: The Centsible app (point your Cloudflare tunnel here)
+  5006/tcp: Actual's web app (optional; off by default)
+options:
+  public_url: ""
+  cloudflare_access_client_id: ""
+  cloudflare_access_client_secret: ""
+  setup_code: ""
+  budget_passwords: []
+  log_level: info
+schema:
+  public_url: str
+  cloudflare_access_client_id: str?
+  cloudflare_access_client_secret: password?
+  setup_code: str?
+  actual_password: password?
+  budget_passwords:
+    - budget_id: str
+      password: password
+  log_level: list(debug|info|warn|error)
