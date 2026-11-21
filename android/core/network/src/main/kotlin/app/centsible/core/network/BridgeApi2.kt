@@ -114,6 +114,10 @@ class PlanningApi(private val client: BridgeClient) {
     // Reports
     suspend fun cashFlow(budgetId: String, start: String, end: String): CashFlowDto =
         client.get("${b(budgetId)}/reports/cash-flow") { parameter("start", start); parameter("end", end) }
+    suspend fun dailySpending(budgetId: String, from: String, to: String): DailySpendingDto =
+        client.get("${b(budgetId)}/reports/daily-spending") { parameter("from", from); parameter("to", to) }
+    suspend fun linkMortgageLoan(budgetId: String, id: String, body: MortgageLoanLinkDto): MortgageDto =
+        client.send(HttpMethod.Put, "${b(budgetId)}/mortgages/$id/loan-account", body)
     suspend fun spending(budgetId: String, start: String, end: String): SpendingDto =
         client.get("${b(budgetId)}/reports/spending") { parameter("start", start); parameter("end", end) }
     suspend fun netWorth(budgetId: String, months: Int): NetWorthDto = client.get("${b(budgetId)}/reports/net-worth") { parameter("months", months) }

@@ -119,6 +119,28 @@ describe('mortgages', () => {
     expect(valued.body.homeValue).toBe(45_000_000);
     expect((await accounts()).find((a) => a.id === m.homeAccountId).balance).toBe(45_000_000);
 
+    // The bank's own mortgage account (here a Plaid link; SimpleFIN works the same way), which
+    // reports what's owed as a positive number.
+    const bankLoan = (await call('POST', '/accounts', '/accounts', owner, { name: 'Lakeside 7781', offBudget: true, initialBalance: 29_500_000 })).body;
+    store.addPlaidLink({ budgetId: b, accountId: bankLoan.id, plaidAccountId: 'pl_mortgage', itemId: 'item_x', plaidAccountName: 'Mortgage', startDate: monthStart(1) });
+    const url = `/mortgages/${m.id}/loan-account`;
+    const path = '/mortgages/{id}/loan-account';
+    expect((await call('PUT', url, path, viewer, { accountId: bankLoan.id })).status).toBe(403);
+    expect((await call('PUT', url, path, owner, { accountId: m.homeAccountId })).status).toBe(400);
+    expect((await call('PUT', url, path, owner, { accountId: 'nope' })).status).toBe(404);
+    const linked = await call('PUT', url, path, owner, { accountId: bankLoan.id, retireOld: true });
+    expect(linked.status).toBe(200);
+    expect(linked.body).toMatchObject({ loanAccountId: bankLoan.id, loanSynced: true, loanPositive: true, balance: 29_500_000, unrecorded: 0, retiredAccount: 'House mortgage' });
+    expect(linked.body.equity).toBe(45_000_000 - 29_500_000);
+    // The old loan account is closed at zero (its history stays), so the loan isn't counted twice.
+    const after2 = await accounts();
+    expect(after2.find((a) => a.id === m.loanAccountId)).toMatchObject({ closed: true, balance: 0 });
+    expect(after2.find((a) => a.id === bankLoan.id).kind).toBe('mortgage');
+    // Nothing to record by hand for a loan the bank updates.
+    expect((await call('POST', `/mortgages/${m.id}/record-principal`, '/mortgages/{id}/record-principal', owner)).status).toBe(400);
+    const unlinked = await call('PUT', url, path, owner, { accountId: null });
+    expect(unlinked.body).toMatchObject({ loanAccountId: null, loanSynced: false, retiredAccount: null });
+
     expect((await call('DELETE', `/mortgages/${m.id}`, '/mortgages/{id}', owner)).status).toBe(204);
     // The accounts stay.
     expect((await accounts()).some((a) => a.id === m.loanAccountId)).toBe(true);

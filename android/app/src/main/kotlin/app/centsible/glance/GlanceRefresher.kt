@@ -45,6 +45,7 @@ class GlanceRefresher @Inject constructor(
     private val engine: BudgetEngine,
     private val tools: TransactionTools,
     private val planning: PlanningGateway,
+    private val reports: app.centsible.core.domain.ReportsGateway,
     private val appLock: AppLockSettings,
     private val store: GlanceableStore,
 ) {
@@ -65,8 +66,14 @@ class GlanceRefresher @Inject constructor(
             val payees = runCatching { engine.payees(budget) }.getOrDefault(emptyList()).associate { it.id to it.name }
             val bills = runCatching { Glanceable.bills(planning.schedules(budget, upcoming = 3), today, { s -> s.payeeId?.let(payees::get) }) }.getOrDefault(emptyList())
             val name = runCatching { engine.budgets().firstOrNull { it.id == budget }?.name }.getOrNull()
+            // Daily spending from the start of last month, for the pace and week charts (older bridges: none).
+            val trend = runCatching {
+                val days = reports.dailySpending(budget, today.withDayOfMonth(1).minusMonths(1).toString(), today.toString())
+                    .associate { LocalDate.parse(it.date) to it.amount.minor }
+                Glanceable.Trend.from(days, today, month.totalBudgeted.minor)
+            }.getOrNull()
             Glanceable.from(month, name, review, bills, System.currentTimeMillis(), today.month.getDisplayName(TextStyle.FULL, Locale.getDefault()))
-                .copy(locked = locked)
+                .copy(locked = locked, trend = trend, categories = Glanceable.topCategories(month))
         }
         result.onSuccess { store.write(it) }
         // Locking or unlocking still applies to the copy already there.
@@ -78,6 +85,9 @@ class GlanceRefresher @Inject constructor(
     suspend fun redraw() {
         runCatching { BudgetWidget().updateAll(context) }
         runCatching { BillsWidget().updateAll(context) }
+        runCatching { PaceWidget().updateAll(context) }
+        runCatching { WeekWidget().updateAll(context) }
+        runCatching { CategoriesWidget().updateAll(context) }
         for (tile in listOf(ReviewTileService::class.java, SyncTileService::class.java)) {
             runCatching { TileService.requestListeningState(context, ComponentName(context, tile)) }
         }

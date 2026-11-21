@@ -47,3 +47,44 @@ class GlanceableTest {
         if (month.totalBudgeted.minor > 0) assertTrue(share != null && share in 0f..1f) else assertNull(share)
     }
 }
+
+class GlanceableTrendTest {
+    // Friday 20 November 2026; this week runs Monday 16th to Sunday 22nd.
+    private val today = LocalDate.parse("2026-11-20")
+
+    @Test fun `running totals, this week and last week`() {
+        val days = mapOf(
+            LocalDate.parse("2026-10-01") to 1_000L,
+            LocalDate.parse("2026-10-31") to 500L,
+            LocalDate.parse("2026-11-01") to 2_000L,
+            LocalDate.parse("2026-11-10") to 300L, // last week (Mon 9th .. Sun 15th)
+            LocalDate.parse("2026-11-16") to 200L, // this week: Monday
+            LocalDate.parse("2026-11-17") to 400L,
+            LocalDate.parse("2026-11-20") to 100L, // today, Friday
+            LocalDate.parse("2026-11-21") to 999L, // tomorrow: not counted
+        )
+        val t = Glanceable.Trend.from(days, today, monthBudget = 300_000)
+        assertEquals(20, t.monthToDate.size)
+        assertEquals(2_000L + 300 + 200 + 400 + 100, t.spentThisMonth)
+        assertEquals(31, t.lastMonth.size)
+        assertEquals(1_500L, t.lastMonth.last())
+        assertEquals(1_000L, t.lastMonthByNow) // by the 20th of October
+        assertEquals(listOf(200L, 400, 0, 0, 100, 0, 0), t.week)
+        assertEquals(4, t.weekdayToday)
+        assertEquals(300L, t.lastWeekTotal)
+        assertEquals(300_000L * 7 / 30, t.weekAllowance)
+        assertEquals(30, t.daysInMonth)
+    }
+
+    @Test fun `no budget, no allowance`() {
+        assertNull(Glanceable.Trend.from(emptyMap(), today, monthBudget = 0).weekAllowance)
+        assertNull(Glanceable.Trend.from(emptyMap(), today, monthBudget = null).weekAllowance)
+    }
+
+    @Test fun `top categories are the biggest spends, as positive amounts`() {
+        val top = Glanceable.topCategories(SampleHousehold.budgetMonth, max = 3)
+        assertEquals(3, top.size)
+        assertTrue(top.zipWithNext().all { (a, b) -> a.spent.minor >= b.spent.minor })
+        assertTrue(top.all { it.spent.minor > 0 })
+    }
+}

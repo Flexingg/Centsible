@@ -56,6 +56,24 @@
             </intent-filter>
             <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_bills" />
         </receiver>
+        <receiver android:name=".glance.PaceWidgetReceiver" android:exported="true" android:label="@string/widget_pace_name">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_pace" />
+        </receiver>
+        <receiver android:name=".glance.WeekWidgetReceiver" android:exported="true" android:label="@string/widget_week_name">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_week" />
+        </receiver>
+        <receiver android:name=".glance.CategoriesWidgetReceiver" android:exported="true" android:label="@string/widget_categories_name">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_categories" />
+        </receiver>
 
         <!-- Quick Settings tiles -->
         <service

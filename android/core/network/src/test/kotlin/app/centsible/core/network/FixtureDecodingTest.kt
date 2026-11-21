@@ -57,6 +57,7 @@ class FixtureDecodingTest {
         "bank-sync-settings" to BankSyncSettingsDto.serializer(),
         "simplefin-accounts" to ItemsDto.serializer(ExternalAccountDto.serializer()),
         "plaid-status" to PlaidStatusDto.serializer(),
+        "report-daily-spending" to DailySpendingDto.serializer(),
         "plaid-item" to PlaidItemDto.serializer(),
         "plaid-link-token" to PlaidLinkTokenDto.serializer(),
         "plaid-accounts" to ItemsDto.serializer(PlaidAccountDto.serializer()),

@@ -62,6 +62,10 @@ Accounts can sync through either provider, and you can mix them account by accou
 
   When a bank asks you to sign in again, the account shows **needs reconnecting**. Tap **Reconnect**: the bank login is repaired in place, and the same links keep working.
 
+## Mortgage linked to the bank
+
+Set up the mortgage in **More → Mortgage** for its terms (rate, schedule, payoff, interest). If your bank's mortgage account syncs (SimpleFIN or Plaid), open the mortgage and tap **Link bank account**: pick that account and its balance becomes what you owe, with nothing to record by hand. If Centsible kept a loan account up by hand before, it can be closed at zero (its history stays) so net worth doesn't count the loan twice.
+
 ## Account types
 
 Actual has no account types, so Centsible keeps them on the bridge: **Cash, Savings, Credit card, Investment, Mortgage, Loan**. They decide how the Accounts page groups accounts. On **Accounts → Edit types**, tap an account's type to change it, or choose **Automatic** to go back to guessing from the name and balance. Linking an account through Plaid sets its type from what the bank reports, and **Add account** asks for one.
@@ -75,6 +79,10 @@ Actual has no account types, so Centsible keeps them on the bridge: **Cash, Savi
   - **Add transaction** opens a new transaction.
   - **Review** shows how many transactions wait and opens the review inbox.
   - **Sync banks** starts a bank sync on the bridge without opening the app, and shows when it finished and what came in.
+
+  - **Spending pace**: this month's running spending as a line over last month's (dashed), with the month's budget, and how far ahead or behind last month you are by today.
+  - **This week**: Monday to Sunday as bars against a daily allowance (the month's budget over its days), with what's left of the week's allowance and last week's total.
+  - **Top spending**: this month's biggest categories, spent against budgeted.
 
 They refresh about every hour, a few seconds after you change something in the app, and when you tap ↻. With the **app lock** on, they show no amounts or counts.
 

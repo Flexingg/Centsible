@@ -210,4 +210,10 @@ class FakeReports : ReportsGateway {
     override suspend fun cashFlow(budget: BudgetId, start: YearMonth, end: YearMonth) = SamplePlanning.cashFlow.filter { it.month in start..end }
     override suspend fun spending(budget: BudgetId, start: YearMonth, end: YearMonth) = SamplePlanning.spending
     override suspend fun netWorth(budget: BudgetId, months: Int) = SamplePlanning.netWorth.takeLast(months)
+    override suspend fun dailySpending(budget: BudgetId, from: String, to: String): List<app.centsible.core.model.DaySpending> {
+        val start = java.time.LocalDate.parse(from)
+        val end = java.time.LocalDate.parse(to)
+        return generateSequence(start) { it.plusDays(1) }.takeWhile { !it.isAfter(end) }
+            .map { app.centsible.core.model.DaySpending(it.toString(), app.centsible.core.model.Money(((it.dayOfMonth * 3_700L) % 9_000) + 1_200)) }.toList()
+    }
 }

@@ -958,6 +958,19 @@ describe('phase 2: bank sync, import, reconcile, reports', () => {
     expect(sp.total).toBe(sp.categories.reduce((s, c) => s + c.amount, 0));
     recordFixture('report-spending', spending.body);
 
+    // The same money day by day: every day listed, spending positive, adding up to the month's.
+    const from = `${q.match(/start=(\d{4}-\d{2})/)![1]}-01`;
+    const to = `${q.match(/end=(\d{4}-\d{2})/)![1]}-28`;
+    const daily = await call({ method: 'GET', url: `${base()}/reports/daily-spending?from=${from}&to=${to}`, path: '/v1/budgets/{budgetId}/reports/daily-spending', token: owner.accessToken });
+    const dd = daily.body as { total: number; days: { date: string; amount: number }[] };
+    expect(dd.days[0]!.date).toBe(from);
+    expect(dd.days.at(-1)!.date).toBe(to);
+    expect(dd.total).toBe(dd.days.reduce((s, d) => s + d.amount, 0));
+    expect(dd.total).toBeGreaterThan(0);
+    recordFixture('report-daily-spending', daily.body);
+    const tooLong = await call({ method: 'GET', url: `${base()}/reports/daily-spending?from=2020-01-01&to=2026-01-01`, path: '/v1/budgets/{budgetId}/reports/daily-spending', token: owner.accessToken });
+    expect(tooLong.status).toBe(400);
+
     const nw = await call({ method: 'GET', url: `${base()}/reports/net-worth?months=3`, path: '/v1/budgets/{budgetId}/reports/net-worth', token: owner.accessToken });
     const points = (nw.body as { points: { netWorth: number }[] }).points;
     expect(points).toHaveLength(3);

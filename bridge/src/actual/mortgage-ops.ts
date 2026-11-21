@@ -87,10 +87,18 @@ export function amortize(balance: number, rate: number, payment: number, extra: 
 }
 
 export class MortgageOps {
+  /** Accounts in a budget that sync through Plaid (Actual itself only knows SimpleFIN's links). */
+  plaidLinked?: (budgetId: string) => Set<string>;
+
   constructor(
     private readonly host: ActualHost,
     private readonly store: HouseholdStore,
   ) {}
+
+  /** The bank updates this account (SimpleFIN in Actual, or Plaid through the bridge). */
+  private async synced(budgetId: string, accountId: string) {
+    return (this.plaidLinked?.(budgetId).has(accountId) ?? false) || (await linkedAccounts()).some((a) => a.id === accountId && a.source);
+  }
 
   private defs(budgetId: string) {
     return this.store.getSetting<MortgageDef[]>(key(budgetId)) ?? [];
@@ -101,11 +109,52 @@ export class MortgageOps {
   }
 
   list(budgetId: string) {
-    return this.host.withBudget(budgetId, 'read', async () => ({ items: await Promise.all(this.defs(budgetId).map((d) => this.describe(d, false))) }));
+    return this.host.withBudget(budgetId, 'read', async () => ({ items: await Promise.all(this.defs(budgetId).map((d) => this.describe(d, false, budgetId))) }));
   }
 
   get(budgetId: string, id: string) {
-    return this.host.withBudget(budgetId, 'read', async () => this.describe(this.find(budgetId, id), true));
+    return this.host.withBudget(budgetId, 'read', async () => this.describe(this.find(budgetId, id), true, budgetId));
+  }
+
+  /**
+   * Uses [accountId] (typically one SimpleFIN or Plaid syncs) as the mortgage's loan
+   * account: what it owes becomes the balance, and nothing needs recording by hand. With
+   * [retireOld], the previous loan account (one the bank didn't update, like the one this
+   * tool makes) is brought to zero with a note and closed, so net worth doesn't count the
+   * loan twice; its history stays. Null unlinks the loan account.
+   */
+  linkLoanAccount(budgetId: string, id: string, input: { accountId: string | null; retireOld?: boolean }) {
+    return this.host.withBudget(budgetId, 'write', async () => {
+      const defs = this.defs(budgetId);
+      const def = defs.find((d) => d.id === id);
+      if (!def) throw ApiError.notFound('Mortgage not found');
+      const accounts = (await api.getAccounts()) as Raw[];
+      const target = input.accountId ? accounts.find((a) => a.id === input.accountId) : null;
+      if (input.accountId) {
+        if (!target) throw ApiError.notFound('Account not found');
+        if (target.closed) throw ApiError.validation('Reopen that account first.');
+        if (input.accountId === def.homeAccountId) throw ApiError.validation("That's the home's account. Pick the account that owes the loan.");
+      }
+      const old = def.loanAccountId && def.loanAccountId !== input.accountId ? accounts.find((a) => a.id === def.loanAccountId && !a.closed) : undefined;
+      let retired: string | null = null;
+      if (input.retireOld && old && !(await this.synced(budgetId, String(old.id)))) {
+        const balance = await api.getAccountBalance(String(old.id));
+        if (balance !== 0) {
+          await api.addTransactions(String(old.id), [
+            { date: today(), amount: -balance, payee_name: def.name, notes: target ? `Balance now tracked in ${String(target.name)}` : 'Loan account retired' },
+          ]);
+          await settle();
+        }
+        await api.closeAccount(String(old.id));
+        retired = String(old.name);
+      }
+      def.loanAccountId = input.accountId;
+      def.recorded = [];
+      if (input.accountId && !this.store.accountKinds(budgetId).has(input.accountId)) this.store.setAccountKind(budgetId, input.accountId, 'mortgage');
+      this.save(budgetId, defs);
+      await settle();
+      return { ...(await this.describe(def, false, budgetId)), retiredAccount: retired };
+    });
   }
 
   create(budgetId: string, input: MortgageInput) {
@@ -124,7 +173,7 @@ export class MortgageOps {
       }
       await settle();
       this.save(budgetId, [...this.defs(budgetId), def]);
-      return this.describe(def, false);
+      return this.describe(def, false, budgetId);
     });
   }
 
@@ -136,7 +185,7 @@ export class MortgageOps {
       if (i < 0) throw ApiError.notFound('Mortgage not found');
       defs[i] = { ...pick(input), loanAccountId: input.loanAccountId ?? defs[i]!.loanAccountId, homeAccountId: input.homeAccountId ?? defs[i]!.homeAccountId, id, recorded: defs[i]!.recorded };
       this.save(budgetId, defs);
-      return this.describe(defs[i]!, false);
+      return this.describe(defs[i]!, false, budgetId);
     });
   }
 
@@ -159,7 +208,7 @@ export class MortgageOps {
         if (now !== value) await api.addTransactions(def.homeAccountId, [{ date: today(), amount: value - now, payee_name: 'Home value update', notes: 'Home value update' }]);
       }
       await settle();
-      return this.describe(def, false);
+      return this.describe(def, false, budgetId);
     });
   }
 
@@ -173,7 +222,7 @@ export class MortgageOps {
       const def = defs.find((d) => d.id === id);
       if (!def) throw ApiError.notFound('Mortgage not found');
       if (!def.loanAccountId) throw ApiError.validation('Link or create the loan account first.');
-      if (await isSynced(def.loanAccountId)) throw ApiError.validation('Your bank updates this loan’s balance, so there’s nothing to record.');
+      if (await this.synced(budgetId, def.loanAccountId)) throw ApiError.validation('Your bank updates this loan’s balance, so there’s nothing to record.');
       const pending = (await this.payments(def)).filter((p) => !def.recorded.includes(p.id));
       const rows = fullSchedule(def);
       const adds = [];
@@ -211,7 +260,7 @@ export class MortgageOps {
     return data.map((r) => ({ id: String(r.id), date: String(r.date), amount: Number(r.amount) }));
   }
 
-  private async describe(def: MortgageDef, withSchedule: boolean) {
+  private async describe(def: MortgageDef, withSchedule: boolean, budgetId: string) {
     const pAndI = monthlyPayment(def.principal, def.rate, def.termMonths);
     const original = amortize(def.principal, def.rate, pAndI, 0, def.firstPayment);
     const planned = fullSchedule(def);
@@ -220,14 +269,16 @@ export class MortgageOps {
     const loanExists = !!def.loanAccountId && accounts.some((a) => a.id === def.loanAccountId);
     const homeExists = !!def.homeAccountId && accounts.some((a) => a.id === def.homeAccountId);
     const scheduled = scheduledBalance(def, now);
-    const balance = loanExists ? Math.max(0, -(await api.getAccountBalance(def.loanAccountId!))) : scheduled;
+    const synced = loanExists ? await this.synced(budgetId, def.loanAccountId!) : false;
+    const loanRaw = loanExists ? await api.getAccountBalance(def.loanAccountId!) : null;
+    // A bank may report what's owed as a positive number: owed is owed either way.
+    const balance = loanRaw === null ? scheduled : synced ? Math.abs(loanRaw) : Math.max(0, -loanRaw);
     const homeValue = homeExists ? await api.getAccountBalance(def.homeAccountId!) : null;
     // From what's owed now, paying the same each month: when it's done and what interest is left.
     const nextDate = planned.find((r) => r.date > now)?.date ?? addMonthsDay(def.firstPayment, planned.length);
     const ahead = balance > 0 ? amortize(balance, def.rate, pAndI, def.extra ?? 0, nextDate) : [];
     const paidCount = planned.filter((r) => r.date <= now).length;
     const payments = await this.payments(def);
-    const synced = loanExists ? await isSynced(def.loanAccountId!) : false;
     const interestPaid = planned.filter((r) => r.date <= now).reduce((s, r) => s + r.interest, 0);
     return {
       id: def.id,
@@ -243,6 +294,8 @@ export class MortgageOps {
       loanAccountId: loanExists ? def.loanAccountId! : null,
       homeAccountId: homeExists ? def.homeAccountId! : null,
       loanSynced: synced,
+      /** The loan account's balance is positive, so net worth counts the loan as an asset (the bank reports it that way). */
+      loanPositive: loanRaw !== null && loanRaw > 0,
       monthlyPayment: pAndI,
       monthlyTotal: pAndI + (def.escrow ?? 0) + (def.extra ?? 0),
       balance,
@@ -291,10 +344,6 @@ function rowFor(rows: AmortizationRow[], date: string) {
     const d = Math.abs(Date.parse(r.date) - t);
     return d <= 20 * 86_400_000 && (!best || d < Math.abs(Date.parse(best.date) - t)) ? r : best;
   }, null);
-}
-
-async function isSynced(accountId: string) {
-  return (await linkedAccounts()).some((a) => a.id === accountId && a.source);
 }
 
 function pick(i: MortgageInput): Omit<MortgageDef, 'id' | 'recorded'> {

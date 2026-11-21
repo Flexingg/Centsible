@@ -66,4 +66,6 @@ interface ReportsGateway {
     suspend fun cashFlow(budget: BudgetId, start: YearMonth, end: YearMonth): List<CashFlowMonth>
     suspend fun spending(budget: BudgetId, start: YearMonth, end: YearMonth): SpendingReport
     suspend fun netWorth(budget: BudgetId, months: Int): List<NetWorthPoint>
+    /** Spending per day from [from] to [to] (yyyy-MM-dd, up to 400 days), every day listed. */
+    suspend fun dailySpending(budget: BudgetId, from: String, to: String): List<app.centsible.core.model.DaySpending>
 }

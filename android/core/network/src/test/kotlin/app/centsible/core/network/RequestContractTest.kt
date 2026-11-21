@@ -138,6 +138,9 @@ class RequestContractTest {
         call { planning.updateTarget(b, "t1", TargetInputDto("account", accountId = "a1", amount = 1000000, targetMonth = "2027-06")) }
         call { planning.deleteTarget(b, "t1") }
         call { planning.createMortgage(b, MortgageInputDto("House", 30_000_000, 6.0, 360, "2026-01-01", escrow = 30_000, createLoanAccount = true, homeValue = 42_000_000)) }
+        call { planning.linkMortgageLoan(b, "m1", MortgageLoanLinkDto(kotlinx.serialization.json.JsonPrimitive("acc"), retireOld = true)) }
+        call { planning.linkMortgageLoan(b, "m1", MortgageLoanLinkDto(kotlinx.serialization.json.JsonNull)) } // unlinking still sends "accountId": null
+        call { planning.dailySpending(b, "2026-10-01", "2026-11-20") }
         call { planning.updateMortgage(b, "m1", MortgageInputDto("House", 30_000_000, 6.0, 360, "2026-01-01", extra = 20_000)) }
         call { planning.setHomeValue(b, "m1", HomeValueDto(45_000_000)) }
         call { planning.deleteMortgage(b, "m1") }

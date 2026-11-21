@@ -1950,6 +1950,42 @@ paths:
         '400': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
 
+  /v1/budgets/{budgetId}/mortgages/{id}/loan-account:
+    put:
+      tags: [plan]
+      operationId: linkMortgageLoanAccount
+      summary: Members. Uses an account (typically one SimpleFIN or Plaid syncs) as the mortgage's loan account; its balance becomes what's owed. retireOld brings the previous, unsynced loan account to zero with a note and closes it, so net worth doesn't count the loan twice. accountId null unlinks.
+      parameters:
+        - $ref: '#/components/parameters/BudgetId'
+        - $ref: '#/components/parameters/Id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [accountId]
+              additionalProperties: false
+              properties:
+                accountId: { type: [string, 'null'], minLength: 1 }
+                retireOld: { type: boolean }
+      responses:
+        '200':
+          description: The mortgage, and the account that was closed (if any)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Mortgage'
+                  - type: object
+                    required: [retiredAccount]
+                    properties:
+                      retiredAccount: { type: [string, 'null'], description: Name of the old loan account that was closed }
+        '400': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '423': { $ref: '#/components/responses/Problem' }
+
   /v1/budgets/{budgetId}/mortgages/{id}:
     get:
       tags: [plan]
@@ -2682,6 +2718,38 @@ paths:
         '400': { $ref: '#/components/responses/Problem' }
         '423': { $ref: '#/components/responses/Problem' }
 
+  /v1/budgets/{budgetId}/reports/daily-spending:
+    get:
+      tags: [budgets]
+      operationId: dailySpendingReport
+      description: Spending day by day (same money as the spending report, as positive amounts with refunds netted). Every day in the range is listed. At most 400 days.
+      parameters:
+        - $ref: '#/components/parameters/BudgetId'
+        - { name: from, in: query, required: true, schema: { $ref: '#/components/schemas/Date' } }
+        - { name: to, in: query, required: true, schema: { $ref: '#/components/schemas/Date' } }
+      responses:
+        '200':
+          description: Daily spending
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [from, to, total, days]
+                properties:
+                  from: { $ref: '#/components/schemas/Date' }
+                  to: { $ref: '#/components/schemas/Date' }
+                  total: { $ref: '#/components/schemas/Money' }
+                  days:
+                    type: array
+                    items:
+                      type: object
+                      required: [date, amount]
+                      properties:
+                        date: { $ref: '#/components/schemas/Date' }
+                        amount: { $ref: '#/components/schemas/Money' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '423': { $ref: '#/components/responses/Problem' }
+
   /v1/budgets/{budgetId}/reports/net-worth:
     get:
       tags: [budgets]
@@ -3292,7 +3360,8 @@ components:
         paymentAccountId: { type: [string, 'null'] }
         loanAccountId: { type: [string, 'null'] }
         homeAccountId: { type: [string, 'null'] }
-        loanSynced: { type: boolean, description: The bank updates the loan account }
+        loanSynced: { type: boolean, description: The bank updates the loan account (SimpleFIN or Plaid) }
+        loanPositive: { type: boolean, description: "The loan account's balance is positive (the bank reports what's owed that way), so net worth counts it as an asset" }
         monthlyPayment: { type: integer, description: Principal and interest }
         monthlyTotal: { type: integer, description: With escrow and extra }
         balance: { type: integer, description: Owed now (the loan account's balance, or the schedule's without one) }

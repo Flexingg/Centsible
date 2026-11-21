@@ -95,6 +95,33 @@ export class ReportOps {
   }
 
   /**
+   * Spending day by day from [from] to [to] (YYYY-MM-DD, at most 400 days): the same money
+   * as the spending report (on budget, no transfers, not income), as positive amounts, with
+   * refunds netted. Every day in the range is listed, zero when nothing was spent.
+   */
+  dailySpending(budgetId: string, from: string, to: string) {
+    const days = Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000) + 1;
+    if (!(days >= 1)) throw ApiError.validation('from must not be after to');
+    if (days > 400) throw ApiError.validation('Ranges are limited to 400 days');
+    return this.host.withBudget(budgetId, 'read', async () => {
+      const { data } = (await api.aqlQuery(
+        api
+          .q('transactions')
+          .filter({ ...BUDGET_FLOW, ...this.scoped(budgetId, dateRange(from, to)), $or: [{ category: null }, { 'category.is_income': false }] })
+          .groupBy(['date'])
+          .select(['date', { amount: { $sum: '$amount' } }]),
+      )) as { data: Row[] };
+      const byDate = new Map(data.map((r) => [String(r.date), -Number(r.amount)]));
+      const out: { date: string; amount: number }[] = [];
+      for (let i = 0; i < days; i++) {
+        const date = new Date(Date.parse(`${from}T00:00:00Z`) + i * 86_400_000).toISOString().slice(0, 10);
+        out.push({ date, amount: byDate.get(date) ?? 0 });
+      }
+      return { from, to, total: out.reduce((s, d) => s + d.amount, 0), days: out };
+    });
+  }
+
+  /**
    * End-of-month balances across every account, including off-budget ones, in total
    * and per account (accounts that were closed and empty the whole time are left out).
    */

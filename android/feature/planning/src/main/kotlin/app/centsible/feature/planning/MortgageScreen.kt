@@ -23,6 +23,8 @@ import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.Checkbox
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
@@ -110,6 +112,10 @@ data class MortgageUiState(
     val editing: Mortgage? = null,
     val creating: Boolean = false,
     val valuing: Mortgage? = null,
+    /** The mortgage whose loan account is being linked to a bank account. */
+    val linking: Mortgage? = null,
+    /** Open accounts with how they sync and their balance, for picking the bank's loan account. */
+    val accountDetails: List<app.centsible.core.model.Account> = emptyList(),
     val busy: Boolean = false,
     val message: String? = null,
 )
@@ -140,14 +146,15 @@ class MortgageViewModel @Inject constructor(
             coroutineScope {
                 val b = selectedBudget()
                 val items = async { plan.mortgages(b) }
-                val accounts = async { engine.accounts(b).filter { !it.closed }.map { it.id to it.name } }
+                val all = async { engine.accounts(b).filter { !it.closed } }
+                val accounts = async { all.await().map { it.id to it.name } }
                 val payees = async { engine.payees(b).filter { it.transferAccountId == null }.map { it.id to it.name }.sortedBy { it.second.lowercase() } }
                 val open = state.value.detail?.id
-                Triple(items.await(), accounts.await() to payees.await(), open?.let { plan.mortgage(b, it) })
+                Triple(items.await(), Triple(accounts.await(), payees.await(), all.await()), open?.let { plan.mortgage(b, it) })
             }
         }
             .onSuccess { (items, lists, detail) ->
-                state.update { it.copy(items = Loadable.Ready(items), accounts = lists.first, payees = lists.second, detail = detail) }
+                state.update { it.copy(items = Loadable.Ready(items), accounts = lists.first, payees = lists.second, accountDetails = lists.third, detail = detail) }
             }
             .onFailure { e -> state.update { it.copy(items = if (it.items is Loadable.Ready) it.items else Loadable.Failed(e.userMessage()), message = e.userMessage()) } }
     }
@@ -168,6 +175,23 @@ class MortgageViewModel @Inject constructor(
     fun create(open: Boolean) = state.update { it.copy(creating = open, editing = null) }
     fun edit(m: Mortgage?) = state.update { it.copy(editing = m, creating = false) }
     fun value(m: Mortgage?) = state.update { it.copy(valuing = m) }
+    fun startLink(m: Mortgage?) = state.update { it.copy(linking = m) }
+
+    /** Uses [account] (the bank's own loan account) for the mortgage; null unlinks. */
+    fun linkLoan(id: String, account: AccountId?, retireOld: Boolean) = act(null) {
+        val retired = plan.linkMortgageLoan(selectedBudget(), id, account, retireOld)
+        val name = state.value.accountDetails.firstOrNull { it.id == account }?.name
+        state.update {
+            it.copy(
+                linking = null,
+                message = when {
+                    account == null -> "Loan account unlinked"
+                    retired != null -> "Linked to $name. \"$retired\" is closed at zero, so the loan isn't counted twice."
+                    else -> "Linked to $name"
+                },
+            )
+        }
+    }
 
     fun save(id: String?, input: MortgageInput) = act("Saved") { plan.saveMortgage(selectedBudget(), id, input) }
     fun delete(id: String) = act("Mortgage removed. Its accounts stay in Actual.") {
@@ -186,7 +210,7 @@ class MortgageViewModel @Inject constructor(
         state.update { it.copy(busy = true) }
         runCatching { block() }
             .onSuccess {
-                state.update { it.copy(busy = false, creating = false, editing = null, valuing = null, message = success ?: it.message) }
+                state.update { it.copy(busy = false, creating = false, editing = null, valuing = null, linking = null, message = success ?: it.message) }
                 load()
             }
             .onFailure { e -> state.update { it.copy(busy = false, message = e.userMessage()) } }
@@ -204,6 +228,8 @@ data class MortgageActions(
     val delete: (String) -> Unit = {},
     val setHomeValue: (String, Money) -> Unit = { _, _ -> },
     val recordPrincipal: (String) -> Unit = {},
+    val startLink: (Mortgage?) -> Unit = {},
+    val linkLoan: (String, AccountId?, Boolean) -> Unit = { _, _, _ -> },
     val messageShown: () -> Unit = {},
 )
 
@@ -223,6 +249,8 @@ fun MortgageRoute(onBack: () -> Unit, viewModel: MortgageViewModel = hiltViewMod
             delete = { viewModel.delete(it) },
             setHomeValue = { id, v -> viewModel.setHomeValue(id, v) },
             recordPrincipal = { viewModel.recordPrincipal(it) },
+            startLink = viewModel::startLink,
+            linkLoan = { id, a, r -> viewModel.linkLoan(id, a, r) },
             messageShown = viewModel::messageShown,
         ),
     )
@@ -273,6 +301,114 @@ fun MortgageScreen(state: MortgageUiState, actions: MortgageActions, today: Loca
     }
     if (state.creating || state.editing != null) MortgageSheet(state.editing, state, today, onSave = actions.save, onDelete = actions.delete, onDismiss = { actions.create(false); actions.edit(null) })
     state.valuing?.let { m -> HomeValueDialog(m, onSave = { actions.setHomeValue(m.id, it) }, onDismiss = { actions.value(null) }) }
+    state.linking?.let { m -> LoanLinkSheet(m, state, actions) }
+}
+
+/** The loan account in words: the bank's (synced), one kept by hand, or none. */
+@Composable
+private fun LoanAccountRow(m: Mortgage, state: MortgageUiState, actions: MortgageActions) {
+    val colors = CentsibleTheme.colors
+    val account = state.accountDetails.firstOrNull { it.id == m.loanAccountId }
+    Row(Modifier.fillMaxWidth().padding(top = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f)) {
+            StatLabel("Loan account")
+            Text(
+                when {
+                    m.loanAccountId == null -> "None linked"
+                    m.loanSynced -> "${account?.name ?: "Linked"} · updated by your bank"
+                    else -> "${account?.name ?: "Linked"} · kept up by Centsible"
+                },
+                style = MaterialTheme.typography.bodyMedium,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+            if (m.loanPositive) {
+                Text(
+                    "Your bank reports this loan as a positive balance, so net worth counts it as money you have. Set the account's type to Mortgage and check your net worth.",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = colors.warning,
+                )
+            }
+        }
+        if (state.canEdit) TextButton(onClick = { actions.startLink(m) }) { Text(if (m.loanSynced) "Change" else "Link bank account") }
+    }
+}
+
+/**
+ * Picks the bank's own mortgage account (synced through SimpleFIN or Plaid) as the loan
+ * account. Synced accounts come first; the old hand-kept account can be closed at zero.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun LoanLinkSheet(m: Mortgage, state: MortgageUiState, actions: MortgageActions) {
+    val colors = CentsibleTheme.colors
+    val current = state.accountDetails.firstOrNull { it.id == m.loanAccountId }
+    val candidates = state.accountDetails
+        .filter { it.id != m.homeAccountId }
+        .sortedWith(compareBy({ it.syncSource == null }, { it.type != app.centsible.core.model.AccountType.Mortgage }, { it.name.lowercase() }))
+    var picked by remember { mutableStateOf(m.loanAccountId) }
+    // Closing the old account only makes sense for one Centsible keeps up by hand.
+    val canRetire = current != null && !m.loanSynced && picked != null && picked != current.id
+    var retire by remember { mutableStateOf(true) }
+    ModalBottomSheet(onDismissRequest = { actions.startLink(null) }, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true), containerColor = colors.card) {
+        Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp).navigationBarsPadding().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("Link the bank's loan account", style = MaterialTheme.typography.titleLarge)
+            Text(
+                "Pick the mortgage account your bank syncs (through SimpleFIN or Plaid). Its balance becomes what you owe, so there's nothing to record by hand.",
+                style = MaterialTheme.typography.bodySmall,
+                color = colors.textSecondary,
+            )
+            if (candidates.none { it.syncSource != null }) {
+                Text(
+                    "None of your accounts sync with a bank yet. Link the mortgage in Settings → Bank sync first, then come back.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = colors.warning,
+                )
+            }
+            candidates.forEach { a ->
+                Row(
+                    Modifier.fillMaxWidth().selectable(picked == a.id, role = androidx.compose.ui.semantics.Role.RadioButton) { picked = a.id }.padding(vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    RadioButton(selected = picked == a.id, onClick = null)
+                    Spacer(Modifier.width(12.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(a.name, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(
+                            listOfNotNull(
+                                when (a.syncSource) { null -> "Not synced"; "simpleFin" -> "SimpleFIN"; "plaid" -> "Plaid"; else -> a.syncSource },
+                                if (a.id == m.loanAccountId) "linked now" else null,
+                            ).joinToString(" · "),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = if (a.syncSource != null) colors.positive else colors.textTertiary,
+                        )
+                    }
+                    MoneyText(a.balance, style = MaterialTheme.typography.bodyMedium)
+                }
+            }
+            if (canRetire) {
+                Row(Modifier.fillMaxWidth().toggleable(retire, role = androidx.compose.ui.semantics.Role.Checkbox) { retire = it }.padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Checkbox(checked = retire, onCheckedChange = null)
+                    Spacer(Modifier.width(8.dp))
+                    Column {
+                        Text("Close \"${current!!.name}\"", style = MaterialTheme.typography.bodyLarge)
+                        Text("It goes to zero with a note (its history stays), so net worth doesn't count the loan twice.", style = MaterialTheme.typography.bodySmall, color = colors.textSecondary)
+                    }
+                }
+            }
+            Button(
+                onClick = { actions.linkLoan(m.id, picked, canRetire && retire) },
+                enabled = picked != null && picked != m.loanAccountId && !state.busy,
+                modifier = Modifier.fillMaxWidth(),
+            ) { Text(if (state.busy) "Linking…" else "Link") }
+            if (m.loanAccountId != null) {
+                TextButton(onClick = { actions.linkLoan(m.id, null, false) }, enabled = !state.busy, modifier = Modifier.fillMaxWidth()) {
+                    Text("Unlink the loan account", color = colors.negative)
+                }
+            }
+            Spacer(Modifier.height(16.dp))
+        }
+    }
 }
 
 @Composable
@@ -296,6 +432,7 @@ private fun MortgageCard(m: Mortgage, state: MortgageUiState, actions: MortgageA
         }
         val (text, good) = standing(m)
         Text(text, style = MaterialTheme.typography.bodySmall, color = if (good) colors.positive else colors.textSecondary, modifier = Modifier.padding(top = 12.dp))
+        LoanAccountRow(m, state, actions)
         if (state.canEdit) {
             Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedButton(onClick = { actions.value(m) }, modifier = Modifier.weight(1f)) { Text(if (m.homeValue == null) "Add home value" else "Update value") }

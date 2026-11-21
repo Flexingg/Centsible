@@ -33,7 +33,11 @@ import androidx.glance.layout.fillMaxWidth
 import androidx.glance.layout.height
 import androidx.glance.layout.padding
 import androidx.glance.layout.width
+import androidx.glance.Image
+import androidx.glance.ImageProvider
+import androidx.compose.ui.graphics.toArgb
 import androidx.glance.text.FontWeight
+import androidx.glance.text.TextAlign
 import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
 import app.centsible.MainActivity
@@ -203,5 +207,186 @@ internal fun BillsContent(context: Context, data: Glanceable?) {
         }
         Spacer(GlanceModifier.defaultWeight())
         Small("Updated " + DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(data.updatedAt)))
+    }
+}
+
+// ── Chart widgets ──
+
+/** The widget's size in pixels, for drawing a chart that fills [fraction] of its height. */
+@Composable
+private fun chartPx(context: Context, heightFraction: Float, reserved: Int = 0): Pair<Int, Int> {
+    val density = context.resources.displayMetrics.density
+    val size = LocalSize.current
+    val w = ((size.width.value - 28) * density).toInt().coerceAtLeast(40)
+    val h = (((size.height.value - 28 - reserved) * heightFraction) * density).toInt().coerceAtLeast(30)
+    return w to h
+}
+
+@Composable
+private fun chartColors(context: Context) = Charts.Colors(
+    line = GlanceTheme.colors.primary.getColor(context).toArgb(),
+    muted = GlanceTheme.colors.onSurfaceVariant.getColor(context).copy(alpha = 0.55f).toArgb(),
+    grid = GlanceTheme.colors.outline.getColor(context).copy(alpha = 0.35f).toArgb(),
+    over = GlanceTheme.colors.error.getColor(context).toArgb(),
+)
+
+private fun money(cents: Long) = MoneyFormat.format(app.centsible.core.model.Money(cents), showCents = false)
+
+/** Spending pace: this month's running total against last month's, day by day. */
+class PaceWidget : GlanceAppWidget() {
+    override val sizeMode = SizeMode.Exact
+
+    override suspend fun provideGlance(context: Context, id: GlanceId) {
+        val data = context.glanceDeps().store().read()
+        provideContent { GlanceTheme { PaceContent(context, data) } }
+    }
+}
+
+class PaceWidgetReceiver : ChartReceiver(PaceWidget())
+
+/** This week: Monday to Sunday against the weekly allowance. */
+class WeekWidget : GlanceAppWidget() {
+    override val sizeMode = SizeMode.Exact
+
+    override suspend fun provideGlance(context: Context, id: GlanceId) {
+        val data = context.glanceDeps().store().read()
+        provideContent { GlanceTheme { WeekContent(context, data) } }
+    }
+}
+
+class WeekWidgetReceiver : ChartReceiver(WeekWidget())
+
+/** Where the money goes this month: the biggest categories, spent against budgeted. */
+class CategoriesWidget : GlanceAppWidget() {
+    override val sizeMode = SizeMode.Exact
+
+    override suspend fun provideGlance(context: Context, id: GlanceId) {
+        val data = context.glanceDeps().store().read()
+        provideContent { GlanceTheme { CategoriesContent(context, data) } }
+    }
+}
+
+class CategoriesWidgetReceiver : ChartReceiver(CategoriesWidget())
+
+open class ChartReceiver(private val widget: GlanceAppWidget) : GlanceAppWidgetReceiver() {
+    override val glanceAppWidget: GlanceAppWidget get() = widget
+
+    override fun onEnabled(context: Context) {
+        super.onEnabled(context)
+        GlanceRefresher.schedule(context)
+        GlanceRefresher.refreshSoon(context)
+    }
+}
+
+@Composable
+private fun NeedsBridgeUpdate(context: Context) {
+    Frame(context, "budget") {
+        Label("Centsible")
+        Spacer(GlanceModifier.height(6.dp))
+        Small("Update Centsible on your server (Home Assistant) to show this chart.")
+    }
+}
+
+@Composable
+internal fun PaceContent(context: Context, data: Glanceable?) {
+    if (data == null || data.locked) return Placeholder(context, data)
+    val t = data.trend ?: return NeedsBridgeUpdate(context)
+    val diff = t.spentThisMonth - t.lastMonthByNow
+    Frame(context, "trends") {
+        Row(GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Label("Spending · ${data.month}")
+            Spacer(GlanceModifier.defaultWeight())
+            Text("↻", style = TextStyle(color = GlanceTheme.colors.onSurfaceVariant, fontSize = 14.sp), modifier = GlanceModifier.clickable(actionRunCallback<RefreshAction>()))
+        }
+        Big(money(t.spentThisMonth))
+        Text(
+            when {
+                t.lastMonthByNow == 0L -> "spent so far"
+                diff > 0 -> "${money(diff)} more than last month by now"
+                diff < 0 -> "${money(-diff)} less than last month by now"
+                else -> "the same as last month by now"
+            },
+            style = TextStyle(color = if (diff > 0) GlanceTheme.colors.error else GlanceTheme.colors.onSurfaceVariant, fontSize = 12.sp),
+            maxLines = 1,
+        )
+        Spacer(GlanceModifier.height(6.dp))
+        val (w, h) = chartPx(context, 1f, reserved = 74)
+        Image(
+            provider = ImageProvider(Charts.pace(t, data.budgeted.minor.takeIf { it > 0 }, w, h, chartColors(context))),
+            contentDescription = "This month's spending, ${money(t.spentThisMonth)}, against last month's",
+            modifier = GlanceModifier.fillMaxWidth().defaultWeight(),
+        )
+    }
+}
+
+@Composable
+internal fun WeekContent(context: Context, data: Glanceable?) {
+    if (data == null || data.locked) return Placeholder(context, data)
+    val t = data.trend ?: return NeedsBridgeUpdate(context)
+    val allowance = t.weekAllowance
+    Frame(context, "transactions") {
+        Row(GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Label("This week")
+            Spacer(GlanceModifier.defaultWeight())
+            Text("↻", style = TextStyle(color = GlanceTheme.colors.onSurfaceVariant, fontSize = 14.sp), modifier = GlanceModifier.clickable(actionRunCallback<RefreshAction>()))
+        }
+        Big(money(t.weekTotal))
+        Text(
+            when {
+                allowance == null -> "last week: ${money(t.lastWeekTotal)}"
+                t.weekTotal > allowance -> "${money(t.weekTotal - allowance)} over this week's ${money(allowance)}"
+                else -> "${money(allowance - t.weekTotal)} left of ${money(allowance)} · last week ${money(t.lastWeekTotal)}"
+            },
+            style = TextStyle(color = if (allowance != null && t.weekTotal > allowance) GlanceTheme.colors.error else GlanceTheme.colors.onSurfaceVariant, fontSize = 12.sp),
+            maxLines = 1,
+        )
+        Spacer(GlanceModifier.height(6.dp))
+        val (w, h) = chartPx(context, 1f, reserved = 92)
+        Image(
+            provider = ImageProvider(Charts.week(t, w, h, chartColors(context))),
+            contentDescription = "Spending each day this week",
+            modifier = GlanceModifier.fillMaxWidth().defaultWeight(),
+        )
+        Row(GlanceModifier.fillMaxWidth()) {
+            listOf("M", "T", "W", "T", "F", "S", "S").forEachIndexed { i, d ->
+                Text(
+                    d,
+                    style = TextStyle(
+                        color = if (i == t.weekdayToday) GlanceTheme.colors.primary else GlanceTheme.colors.onSurfaceVariant,
+                        fontSize = 11.sp, fontWeight = if (i == t.weekdayToday) FontWeight.Bold else FontWeight.Normal, textAlign = TextAlign.Center,
+                    ),
+                    modifier = GlanceModifier.defaultWeight(),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+internal fun CategoriesContent(context: Context, data: Glanceable?) {
+    if (data == null || data.locked) return Placeholder(context, data)
+    Frame(context, "budget") {
+        Label("Top spending · ${data.month}")
+        Spacer(GlanceModifier.height(6.dp))
+        if (data.categories.isEmpty()) Small("Nothing spent yet this month.")
+        val rows = ((LocalSize.current.height.value - 40) / 34).toInt().coerceIn(1, 5)
+        data.categories.take(rows).forEach { c ->
+            Row(GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text(c.name, style = TextStyle(color = GlanceTheme.colors.onSurface, fontSize = 13.sp, fontWeight = FontWeight.Medium), maxLines = 1, modifier = GlanceModifier.defaultWeight())
+                Text(
+                    if (c.budgeted.minor > 0) "${MoneyFormat.format(c.spent, showCents = false)} / ${MoneyFormat.format(c.budgeted, showCents = false)}" else MoneyFormat.format(c.spent, showCents = false),
+                    style = TextStyle(color = GlanceTheme.colors.onSurfaceVariant, fontSize = 12.sp),
+                    maxLines = 1,
+                )
+            }
+            val share = if (c.budgeted.minor > 0) (c.spent.minor.toFloat() / c.budgeted.minor).coerceIn(0f, 1f) else 1f
+            LinearProgressIndicator(
+                progress = share,
+                modifier = GlanceModifier.fillMaxWidth().height(5.dp),
+                color = if (c.budgeted.minor > 0 && c.spent.minor > c.budgeted.minor) GlanceTheme.colors.error else GlanceTheme.colors.primary,
+                backgroundColor = GlanceTheme.colors.secondaryContainer,
+            )
+            Spacer(GlanceModifier.height(7.dp))
+        }
     }
 }

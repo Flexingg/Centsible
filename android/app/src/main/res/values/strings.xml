@@ -4,6 +4,12 @@
     <string name="widget_budget_description">This month: left to budget, spending, and transactions to review</string>
     <string name="widget_bills_name">Upcoming bills</string>
     <string name="widget_bills_description">The next bills from your recurring schedules</string>
+    <string name="widget_pace_name">Spending pace</string>
+    <string name="widget_pace_description">This month\'s spending against last month\'s, day by day</string>
+    <string name="widget_week_name">This week</string>
+    <string name="widget_week_description">Spending each day this week against your weekly allowance</string>
+    <string name="widget_categories_name">Top spending</string>
+    <string name="widget_categories_description">This month\'s biggest categories, spent against budgeted</string>
     <string name="tile_add">Add transaction</string>
     <string name="tile_review">Review</string>
     <string name="tile_sync">Sync banks</string>

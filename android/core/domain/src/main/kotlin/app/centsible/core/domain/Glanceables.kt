@@ -25,8 +25,62 @@ data class Glanceable(
     /** When this was read from the bridge (epoch millis). */
     val updatedAt: Long,
     val locked: Boolean = false,
+    /** Day-by-day spending for the charts; null on a bridge without the daily report. */
+    val trend: Trend? = null,
+    /** This month's biggest spending categories (most spent first). */
+    val categories: List<CategorySlice> = emptyList(),
 ) {
     data class Bill(val title: String, val amount: Money, val date: String, val whenText: String)
+
+    data class CategorySlice(val name: String, val spent: Money, val budgeted: Money)
+
+    /**
+     * Running totals for the month so far and all of last month (cents, by day), and this
+     * week Monday to Sunday (days still ahead are 0), to draw the pace and week charts.
+     */
+    data class Trend(
+        val monthToDate: List<Long>,
+        val lastMonth: List<Long>,
+        val daysInMonth: Int,
+        val week: List<Long>,
+        /** Which day of [week] is today (0 = Monday). */
+        val weekdayToday: Int,
+        val lastWeekTotal: Long,
+        /** What can be spent in a week to stay on budget (the month's budget over its days); null without a budget. */
+        val weekAllowance: Long?,
+    ) {
+        val spentThisMonth: Long get() = monthToDate.lastOrNull() ?: 0
+        /** Last month's spending by the same day of the month. */
+        val lastMonthByNow: Long get() = lastMonth.getOrNull(monthToDate.size - 1) ?: lastMonth.lastOrNull() ?: 0
+        val weekTotal: Long get() = week.sum()
+
+        companion object {
+            /**
+             * From [days] (date to amount spent) covering at least the start of last month
+             * through [today].
+             */
+            fun from(days: Map<LocalDate, Long>, today: LocalDate, monthBudget: Long?): Trend {
+                val first = today.withDayOfMonth(1)
+                val lastFirst = first.minusMonths(1)
+                fun cumulative(start: LocalDate, count: Int): List<Long> {
+                    var run = 0L
+                    return (0 until count).map { run += days[start.plusDays(it.toLong())] ?: 0; run }
+                }
+                val monday = today.minusDays((today.dayOfWeek.value - 1).toLong())
+                val week = (0 until 7).map { i -> monday.plusDays(i.toLong()).let { d -> if (d.isAfter(today)) 0L else days[d] ?: 0L } }
+                val lastWeek = (1..7).sumOf { days[monday.minusDays(it.toLong())] ?: 0L }
+                return Trend(
+                    monthToDate = cumulative(first, today.dayOfMonth),
+                    lastMonth = cumulative(lastFirst, lastFirst.lengthOfMonth()),
+                    daysInMonth = today.lengthOfMonth(),
+                    week = week,
+                    weekdayToday = today.dayOfWeek.value - 1,
+                    lastWeekTotal = lastWeek,
+                    weekAllowance = monthBudget?.takeIf { it > 0 }?.let { it * 7 / today.lengthOfMonth() },
+                )
+            }
+        }
+    }
 
     /** Share of the budget spent this month, 0..1 (null when nothing is budgeted). */
     val spentShare: Float? get() = if (budgeted.minor <= 0) null else (spent.minor.toFloat() / budgeted.minor).coerceIn(0f, 1f)
@@ -37,6 +91,14 @@ data class Glanceable(
             BillReminders.due(schedules, today, days, emptySet(), payeeName).take(max).map {
                 Bill(it.title, it.amount.abs(), it.date.toString(), it.whenText)
             }
+
+        /** The [max] categories with the most spent this month. */
+        fun topCategories(month: BudgetMonth, max: Int = 5): List<CategorySlice> = month.expenseGroups
+            .flatMap { it.categories }
+            .filter { !it.hidden && it.spent.minor < 0 }
+            .sortedBy { it.spent.minor }
+            .take(max)
+            .map { CategorySlice(it.name, it.spent.abs(), it.budgeted) }
 
         fun from(month: BudgetMonth, budgetName: String?, reviewCount: Int, bills: List<Bill>, now: Long, monthLabel: String) = Glanceable(
             budgetName = budgetName,

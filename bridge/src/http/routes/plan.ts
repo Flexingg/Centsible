@@ -267,6 +267,26 @@ export const planRoutes =
       return reply.status(204).send();
     });
 
+    app.put<{ Params: CategoryParams; Body: { accountId: string | null; retireOld?: boolean } }>(
+      '/v1/budgets/:budgetId/mortgages/:id/loan-account',
+      {
+        schema: {
+          body: {
+            type: 'object',
+            required: ['accountId'],
+            additionalProperties: false,
+            properties: { accountId: { type: ['string', 'null'], minLength: 1 }, retireOld: { type: 'boolean' } },
+          },
+        },
+      },
+      async (req) => {
+        requireBudget(deps, req, req.params.budgetId, 'member');
+        const m = await mortgages.linkLoanAccount(req.params.budgetId, req.params.id, req.body);
+        audit(deps, req, req.params.budgetId, 'mortgage.loan_account', req.params.id, { accountId: req.body.accountId, retired: m.retiredAccount });
+        return m;
+      },
+    );
+
     app.put<{ Params: CategoryParams; Body: { value: number } }>(
       '/v1/budgets/:budgetId/mortgages/:id/home-value',
       { schema: { body: { type: 'object', required: ['value'], additionalProperties: false, properties: { value: { type: 'integer', minimum: 0 } } } } },

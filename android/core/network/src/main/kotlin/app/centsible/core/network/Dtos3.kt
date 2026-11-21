@@ -75,6 +75,9 @@ import kotlinx.serialization.Serializable
     val loanAccountId: String? = null,
     val homeAccountId: String? = null,
     val loanSynced: Boolean = false,
+    val loanPositive: Boolean = false,
+    /** Only from the loan-account link: the old loan account that was closed. */
+    val retiredAccount: String? = null,
     val monthlyPayment: Long,
     val monthlyTotal: Long,
     val balance: Long,
@@ -93,6 +96,11 @@ import kotlinx.serialization.Serializable
     val unrecorded: Int = 0,
     val schedule: List<MortgageRowDto> = emptyList(),
 )
+@Serializable data class DaySpendingDto(val date: String, val amount: Long = 0)
+@Serializable data class DailySpendingDto(val from: String, val to: String, val total: Long = 0, val days: List<DaySpendingDto> = emptyList())
+/** accountId null unlinks; sent explicitly (JsonNull) because nulls are otherwise left out. */
+@Serializable data class MortgageLoanLinkDto(val accountId: kotlinx.serialization.json.JsonElement, val retireOld: Boolean = false)
+
 @Serializable data class MortgagesDto(val items: List<MortgageDto> = emptyList())
 @Serializable data class MortgageInputDto(
     val name: String,

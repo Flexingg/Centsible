@@ -73,4 +73,28 @@ class MortgageScreenshotTest {
         compose.waitForIdle()
         captureScreenRoboImage("screenshots/mortgage_setup.png")
     }
+
+    private val accountDetails = listOf(
+        app.centsible.core.model.Account(AccountId("a"), "Joint Checking", false, false, Money(832_166), syncSource = "simpleFin"),
+        app.centsible.core.model.Account(AccountId("l"), "House mortgage", true, false, Money(-now.balance.minor)),
+        app.centsible.core.model.Account(AccountId("h"), "House home", true, false, Money(42_000_000)),
+        app.centsible.core.model.Account(AccountId("wf"), "Wells Fargo Home Mortgage", true, false, Money(-28_731_406), syncSource = "simpleFin", type = app.centsible.core.model.AccountType.Mortgage),
+    )
+
+    @Test fun mortgage_link_bank_account() {
+        compose.setContent {
+            CentsibleTheme(darkTheme = false) {
+                MortgageScreen(MortgageUiState(Loadable.Ready(listOf(mortgage.copy(schedule = emptyList()))), canEdit = true, accountDetails = accountDetails, linking = mortgage), MortgageActions(), today = day)
+            }
+        }
+        compose.waitForIdle()
+        captureScreenRoboImage("screenshots/mortgage_link_bank_account.png")
+    }
+
+    @Test fun mortgage_linked_to_bank() {
+        val linked = mortgage.copy(schedule = emptyList(), loanAccountId = AccountId("wf"), loanSynced = true, unrecorded = 0, balance = Money(28_731_406))
+        compose.setContent { CentsibleTheme(darkTheme = false) { MortgageScreen(MortgageUiState(Loadable.Ready(listOf(linked)), canEdit = true, accountDetails = accountDetails), MortgageActions(), today = day) } }
+        compose.onRoot().captureRoboImage("screenshots/mortgage_linked_to_bank.png")
+        app.centsible.core.uitesting.A11y.assertOk(compose)
+    }
 }
