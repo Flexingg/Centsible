@@ -1,4 +1,5 @@
 [versions]
+glance = "1.2.0"
 plaid-link = "6.4.0"
 agp = "9.4.1"
 kotlin = "2.4.20"
@@ -23,6 +24,9 @@ robolectric = "4.17"
 roborazzi = "1.75.0"
 
 [libraries]
+androidx-glance-appwidget = { module = "androidx.glance:glance-appwidget", version.ref = "glance" }
+androidx-glance-material3 = { module = "androidx.glance:glance-material3", version.ref = "glance" }
+androidx-glance-appwidget-testing = { module = "androidx.glance:glance-appwidget-testing", version.ref = "glance" }
 plaid-link = { module = "com.plaid.link:sdk-core", version.ref = "plaid-link" }
 # Kotlin
 kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "coroutines" }

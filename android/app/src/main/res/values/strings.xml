@@ -1,3 +1,10 @@
 <resources>
     <string name="app_name">Centsible</string>
+    <string name="widget_budget_name">Budget</string>
+    <string name="widget_budget_description">This month: left to budget, spending, and transactions to review</string>
+    <string name="widget_bills_name">Upcoming bills</string>
+    <string name="widget_bills_description">The next bills from your recurring schedules</string>
+    <string name="tile_add">Add transaction</string>
+    <string name="tile_review">Review</string>
+    <string name="tile_sync">Sync banks</string>
 </resources>

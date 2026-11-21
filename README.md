@@ -66,6 +66,18 @@ Accounts can sync through either provider, and you can mix them account by accou
 
 Actual has no account types, so Centsible keeps them on the bridge: **Cash, Savings, Credit card, Investment, Mortgage, Loan**. They decide how the Accounts page groups accounts. On **Accounts → Edit types**, tap an account's type to change it, or choose **Automatic** to go back to guessing from the name and balance. Linking an account through Plaid sets its type from what the bank reports, and **Add account** asks for one.
 
+## Widgets and Quick Settings tiles
+
+- **Home screen widgets** (long-press the home screen → Widgets → Centsible):
+  - **Budget**: this month's "to budget" (or spending, for tracking budgets), how much of the budget is spent, and how many transactions wait for review, with **+ Add** and **Review** buttons. ↻ refreshes it.
+  - **Upcoming bills**: the next bills from your recurring schedules over two weeks.
+- **Quick Settings tiles** (pull down the notification shade twice → edit ✏️ → drag them in):
+  - **Add transaction** opens a new transaction.
+  - **Review** shows how many transactions wait and opens the review inbox.
+  - **Sync banks** starts a bank sync on the bridge without opening the app, and shows when it finished and what came in.
+
+They refresh about every hour, a few seconds after you change something in the app, and when you tap ↻. With the **app lock** on, they show no amounts or counts.
+
 ## Duplicates
 
 When a bank connection is reconnected or moved to another provider, the same purchase can come in twice. **Review → ⋮ → Find duplicates** (or the banner in Review) lists pairs: same account and amount, a few days apart. **Merge** uses Actual's own merge (Actual 26.10+), which keeps the bank's copy and carries over the category and notes from either.
@@ -77,7 +89,7 @@ Other apps (Home Assistant dashboards and notifications, launcher shortcuts) can
 | Link | Opens |
 |---|---|
 | `centsible://open/review` | your review inbox |
-| `centsible://open/transactions`, `/accounts`, `/budget`, `/net-worth`, `/recurring`, `/trends`, `/bank-sync`, `/plaid`, `/duplicates`, `/mortgage` | that screen |
+| `centsible://open/transactions`, `/accounts`, `/budget`, `/net-worth`, `/recurring`, `/trends`, `/bank-sync`, `/plaid`, `/new-transaction`, `/duplicates`, `/mortgage` | that screen |
 | `centsible://open/account/<account id>` | one account |
 | `centsible://open/category/<category id>?name=Groceries[&month=2026-11]` | a category's transactions |
 

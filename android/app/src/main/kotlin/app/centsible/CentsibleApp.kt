@@ -413,6 +413,7 @@ private fun NavHostController.open(link: app.centsible.core.domain.AppLink) {
             LinkScreen.Plaid -> navigate(Routes.PLAID) { launchSingleTop = true }
             LinkScreen.Duplicates -> navigate(Routes.DUPLICATES) { launchSingleTop = true }
             LinkScreen.Mortgage -> navigate(Routes.MORTGAGE) { launchSingleTop = true }
+            LinkScreen.NewTransaction -> navigate(Routes.transaction(null)) { launchSingleTop = true }
         }
         is app.centsible.core.domain.AppLink.Account -> go(Destination.Account(app.centsible.core.model.AccountId(link.id)))
         is app.centsible.core.domain.AppLink.Category -> {
