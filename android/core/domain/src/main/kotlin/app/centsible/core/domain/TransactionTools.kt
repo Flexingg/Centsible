@@ -6,6 +6,7 @@ import app.centsible.core.model.BudgetId
 import app.centsible.core.model.ReviewInbox
 import app.centsible.core.model.TransactionId
 import app.centsible.core.model.TransferMatches
+import app.centsible.core.model.TransferSearchOptions
 
 /** The review inbox and bulk edits. */
 interface TransactionTools {
@@ -16,7 +17,7 @@ interface TransactionTools {
     suspend fun batch(budget: BudgetId, ids: List<TransactionId>, change: BatchChange): BatchResult
 
     /** Card payments and other moves seen from both accounts, not yet linked. */
-    suspend fun transferMatches(budget: BudgetId): TransferMatches
+    suspend fun transferMatches(budget: BudgetId, options: TransferSearchOptions = TransferSearchOptions()): TransferMatches
     /** Makes the pair one transfer ([from] is where the money left). */
     suspend fun linkTransfer(budget: BudgetId, from: TransactionId, to: TransactionId)
     /** The other side of [id], to link by hand; [query] searches payee, notes and amount. */

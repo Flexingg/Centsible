@@ -16,7 +16,25 @@ data class BatchResult(val updated: Int, val deleted: Int, val skipped: List<Ski
 }
 
 /** Two transactions that look like one payment seen from both accounts. */
-data class TransferPair(val from: Transaction, val to: Transaction, val days: Int, val confident: Boolean)
+data class TransferPair(
+    val from: Transaction,
+    val to: Transaction,
+    val days: Int,
+    val confident: Boolean,
+    /** Difference in minor units between the two sides (0 for exact matches). */
+    val amountDiff: Long = 0L,
+    /** Match signal, e.g. "Card payment" or "Account name match". */
+    val reason: String? = null,
+)
+
+/** Options for finding transfer matches across all time or between two specific accounts. */
+data class TransferSearchOptions(
+    val allTime: Boolean = false,
+    val fromAccountId: AccountId? = null,
+    val toAccountId: AccountId? = null,
+    val windowDays: Int? = null,
+    val fuzzy: Boolean = false,
+)
 
 /** A possible other side of a transfer: [exact] is the same amount going the other way. */
 data class TransferCandidate(val transaction: Transaction, val exact: Boolean, val days: Int)
