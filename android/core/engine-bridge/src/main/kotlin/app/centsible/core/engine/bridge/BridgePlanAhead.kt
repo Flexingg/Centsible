@@ -147,6 +147,42 @@ class BridgePlanAhead(private val api: PlanningApi, private val onWrite: () -> U
     }
 
     override suspend fun recordPrincipal(budget: BudgetId, id: String): Int = api.recordPrincipal(budget.raw, id).recorded.also { onWrite() }
+
+    override suspend fun incomeOverview(budget: BudgetId, year: Int?) = api.incomeOverview(budget.raw, year).toModel()
+
+    override suspend fun setIncomeSettings(budget: BudgetId, mode: app.centsible.core.model.IncomeMode, categoryIds: List<CategoryId>) {
+        val m = if (mode == app.centsible.core.model.IncomeMode.Categories) "categories" else "all"
+        api.setIncomeSettings(budget.raw, app.centsible.core.network.IncomeSettingsDto(m, categoryIds.map { it.raw }))
+        onWrite()
+    }
+
+    override suspend fun savePayStub(budget: BudgetId, id: String?, input: app.centsible.core.model.PayStubInput): app.centsible.core.model.PayStub {
+        val body = app.centsible.core.network.PayStubInputDto(
+            date = input.date,
+            employer = input.employer,
+            hours = input.hours,
+            hourlyRate = input.hourlyRate?.minor,
+            gross = input.gross.minor,
+            deductions = input.deductions.map {
+                app.centsible.core.network.PayStubDeductionDto(
+                    name = it.name,
+                    kind = it.kind.wire,
+                    amount = it.amount.minor,
+                    mode = it.mode?.wire,
+                    rate = it.rate,
+                )
+            },
+            notes = input.notes,
+        )
+        val dto = if (id == null) api.createPayStub(budget.raw, body) else api.updatePayStub(budget.raw, id, body)
+        onWrite()
+        return dto.toModel()
+    }
+
+    override suspend fun deletePayStub(budget: BudgetId, id: String) {
+        api.deletePayStub(budget.raw, id)
+        onWrite()
+    }
 }
 
 private fun app.centsible.core.network.MortgageDto.toModel() = app.centsible.core.model.Mortgage(
@@ -216,4 +252,90 @@ private fun GoalDto.toModel() = Goal(
         "behind" -> Goal.Status.Behind
         else -> Goal.Status.Stalled
     },
+)
+
+private fun app.centsible.core.network.PayStubDto.toModel() = app.centsible.core.model.PayStub(
+    id = id,
+    date = date,
+    employer = employer,
+    hours = hours,
+    hourlyRate = hourlyRate?.let(::Money),
+    gross = Money(gross),
+    deductions = deductions.map {
+        app.centsible.core.model.PayStubDeduction(
+            name = it.name,
+            kind = app.centsible.core.model.DeductionKind.of(it.kind),
+            amount = Money(it.amount),
+            mode = app.centsible.core.model.DeductionMode.of(it.mode),
+            rate = it.rate,
+        )
+    },
+    net = Money(net),
+    notes = notes,
+)
+
+private fun app.centsible.core.network.IncomeOverviewDto.toModel() = app.centsible.core.model.IncomeOverview(
+    year = year,
+    mode = if (mode == "categories") app.centsible.core.model.IncomeMode.Categories else app.centsible.core.model.IncomeMode.All,
+    categoryIds = categoryIds.map(::CategoryId),
+    months = months.map {
+        app.centsible.core.model.IncomeMonth(
+            month = YearMonth(it.month),
+            amount = Money(it.amount),
+            count = it.count,
+            deltaFromPrev = it.deltaFromPrev?.let(::Money),
+            deltaPercent = it.deltaPercent,
+        )
+    },
+    summary = app.centsible.core.model.IncomeSummary(
+        ytdTotal = Money(summary.ytdTotal),
+        prevYearTotal = Money(summary.prevYearTotal),
+        monthlyAverage = Money(summary.monthlyAverage),
+        projectedAnnual = Money(summary.projectedAnnual),
+        elapsedMonths = summary.elapsedMonths,
+        remainingMonths = summary.remainingMonths,
+        variationPercent = summary.variationPercent,
+        minMonth = summary.minMonth?.let { app.centsible.core.model.IncomeMonthPoint(YearMonth(it.month), Money(it.amount)) },
+        maxMonth = summary.maxMonth?.let { app.centsible.core.model.IncomeMonthPoint(YearMonth(it.month), Money(it.amount)) },
+    ),
+    payStubs = payStubs.map { it.toModel() },
+    payStubSummary = app.centsible.core.model.PayStubSummary(
+        stubCount = payStubSummary.stubCount,
+        totalHours = payStubSummary.totalHours,
+        totalGross = Money(payStubSummary.totalGross),
+        totalNet = Money(payStubSummary.totalNet),
+        totalDeductions = Money(payStubSummary.totalDeductions),
+        effectiveTaxRate = payStubSummary.effectiveTaxRate,
+        takeHomeRate = payStubSummary.takeHomeRate,
+        byKind = app.centsible.core.model.PayStubByKind(
+            tax = Money(payStubSummary.byKind.tax),
+            retirement = Money(payStubSummary.byKind.retirement),
+            benefit = Money(payStubSummary.byKind.benefit),
+            other = Money(payStubSummary.byKind.other),
+        ),
+        byDeduction = payStubSummary.byDeduction.map {
+            app.centsible.core.model.DeductionBreakdown(
+                name = it.name,
+                kind = app.centsible.core.model.DeductionKind.of(it.kind),
+                total = Money(it.total),
+                avgPercentOfGross = it.avgPercentOfGross,
+            )
+        },
+        projectedAnnualGross = Money(payStubSummary.projectedAnnualGross),
+        projectedAnnualRetirement = Money(payStubSummary.projectedAnnualRetirement),
+        projectedAnnualTax = Money(payStubSummary.projectedAnnualTax),
+    ),
+    template = app.centsible.core.model.LearnedTemplate(
+        hourlyRate = template.hourlyRate?.let(::Money),
+        employer = template.employer,
+        deductions = template.deductions.map {
+            app.centsible.core.model.LearnedDeduction(
+                name = it.name,
+                kind = app.centsible.core.model.DeductionKind.of(it.kind),
+                mode = app.centsible.core.model.DeductionMode.of(it.mode) ?: app.centsible.core.model.DeductionMode.Fixed,
+                amount = Money(it.amount),
+                rate = it.rate,
+            )
+        },
+    ),
 )

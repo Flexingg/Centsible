@@ -122,6 +122,17 @@ class PlanningApi(private val client: BridgeClient) {
         client.get("${b(budgetId)}/reports/spending") { parameter("start", start); parameter("end", end) }
     suspend fun netWorth(budgetId: String, months: Int): NetWorthDto = client.get("${b(budgetId)}/reports/net-worth") { parameter("months", months) }
 
+    // ── Income & pay stubs ──
+    suspend fun incomeOverview(budgetId: String, year: Int?): IncomeOverviewDto =
+        client.get("${b(budgetId)}/income/overview") { year?.let { parameter("year", it) } }
+    suspend fun setIncomeSettings(budgetId: String, body: IncomeSettingsDto): IncomeSettingsDto =
+        client.send(HttpMethod.Put, "${b(budgetId)}/income/settings", body)
+    suspend fun createPayStub(budgetId: String, body: PayStubInputDto): PayStubDto =
+        client.send(HttpMethod.Post, "${b(budgetId)}/income/paystubs", body)
+    suspend fun updatePayStub(budgetId: String, id: String, body: PayStubInputDto): PayStubDto =
+        client.send(HttpMethod.Put, "${b(budgetId)}/income/paystubs/$id", body)
+    suspend fun deletePayStub(budgetId: String, id: String) { client.execute(HttpMethod.Delete, "${b(budgetId)}/income/paystubs/$id") }
+
     // ── Bank sync (SimpleFIN) ──
     suspend fun bankSyncOverview(): BankSyncOverviewDto = client.get("/v1/bank-sync")
     suspend fun connectSimpleFin(token: String): BankSyncOverviewDto = client.send(HttpMethod.Put, "/v1/bank-sync/simplefin", SetupTokenDto(token))

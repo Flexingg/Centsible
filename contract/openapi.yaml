@@ -2078,6 +2078,94 @@ paths:
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
 
+  /v1/budgets/{budgetId}/income/overview:
+    get:
+      tags: [plan]
+      operationId: incomeOverview
+      summary: Yearly income breakdown, variations, projections, pay stubs, and learned paycheck template.
+      parameters:
+        - $ref: '#/components/parameters/BudgetId'
+        - { name: year, in: query, schema: { type: integer, minimum: 1970, maximum: 2100 } }
+      responses:
+        '200':
+          description: Income overview
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/IncomeOverview' }
+
+  /v1/budgets/{budgetId}/income/settings:
+    put:
+      tags: [plan]
+      operationId: setIncomeSettings
+      summary: Save whether income tracks all inflows or specific categories.
+      parameters:
+        - $ref: '#/components/parameters/BudgetId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/IncomeSettings' }
+      responses:
+        '200':
+          description: Saved settings
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/IncomeSettings' }
+        '403': { $ref: '#/components/responses/Problem' }
+
+  /v1/budgets/{budgetId}/income/paystubs:
+    post:
+      tags: [plan]
+      operationId: createPayStub
+      summary: Record a manual pay stub with hours, gross pay, and deductions.
+      parameters:
+        - $ref: '#/components/parameters/BudgetId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PayStubInput' }
+      responses:
+        '201':
+          description: Created pay stub
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PayStub' }
+        '403': { $ref: '#/components/responses/Problem' }
+
+  /v1/budgets/{budgetId}/income/paystubs/{id}:
+    put:
+      tags: [plan]
+      operationId: updatePayStub
+      summary: Update a pay stub.
+      parameters:
+        - $ref: '#/components/parameters/BudgetId'
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PayStubInput' }
+      responses:
+        '200':
+          description: Updated pay stub
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PayStub' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+    delete:
+      tags: [plan]
+      operationId: deletePayStub
+      summary: Delete a pay stub.
+      parameters:
+        - $ref: '#/components/parameters/BudgetId'
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        '204': { description: Deleted }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+
   /v1/budgets/{budgetId}/categories/{id}/goal:
     put:
       tags: [plan]
@@ -4741,3 +4829,133 @@ components:
       properties:
         ok: { type: boolean }
         message: { type: string }
+
+    IncomeSettings:
+      type: object
+      required: [mode, categoryIds]
+      properties:
+        mode: { type: string, enum: [all, categories] }
+        categoryIds: { type: array, items: { type: string } }
+
+    PayStubDeduction:
+      type: object
+      required: [name, kind, amount]
+      properties:
+        name: { type: string }
+        kind: { type: string, enum: [tax, retirement, benefit, other] }
+        amount: { $ref: '#/components/schemas/Money' }
+        mode: { type: [string, 'null'], enum: [fixed, percent, null] }
+        rate: { type: [number, 'null'] }
+
+    PayStubInput:
+      type: object
+      required: [date, gross, deductions]
+      properties:
+        date: { type: string }
+        employer: { type: [string, 'null'] }
+        hours: { type: [number, 'null'] }
+        hourlyRate: { type: [integer, 'null'] }
+        gross: { $ref: '#/components/schemas/Money' }
+        deductions: { type: array, items: { $ref: '#/components/schemas/PayStubDeduction' } }
+        notes: { type: [string, 'null'] }
+
+    PayStub:
+      type: object
+      required: [id, date, employer, hours, hourlyRate, gross, deductions, net, notes]
+      properties:
+        id: { type: string }
+        date: { type: string }
+        employer: { type: [string, 'null'] }
+        hours: { type: [number, 'null'] }
+        hourlyRate: { type: [integer, 'null'] }
+        gross: { $ref: '#/components/schemas/Money' }
+        deductions: { type: array, items: { $ref: '#/components/schemas/PayStubDeduction' } }
+        net: { $ref: '#/components/schemas/Money' }
+        notes: { type: [string, 'null'] }
+
+    IncomeOverview:
+      type: object
+      required: [year, mode, categoryIds, months, summary, payStubs, payStubSummary, template]
+      properties:
+        year: { type: integer }
+        mode: { type: string, enum: [all, categories] }
+        categoryIds: { type: array, items: { type: string } }
+        months:
+          type: array
+          items:
+            type: object
+            required: [month, amount, count, deltaFromPrev, deltaPercent]
+            properties:
+              month: { type: string }
+              amount: { $ref: '#/components/schemas/Money' }
+              count: { type: integer }
+              deltaFromPrev: { type: [integer, 'null'] }
+              deltaPercent: { type: [number, 'null'] }
+        summary:
+          type: object
+          required: [ytdTotal, prevYearTotal, monthlyAverage, projectedAnnual, elapsedMonths, remainingMonths, variationPercent, minMonth, maxMonth]
+          properties:
+            ytdTotal: { $ref: '#/components/schemas/Money' }
+            prevYearTotal: { $ref: '#/components/schemas/Money' }
+            monthlyAverage: { $ref: '#/components/schemas/Money' }
+            projectedAnnual: { $ref: '#/components/schemas/Money' }
+            elapsedMonths: { type: integer }
+            remainingMonths: { type: integer }
+            variationPercent: { type: number }
+            minMonth:
+              type: [object, 'null']
+              properties: { month: { type: string }, amount: { $ref: '#/components/schemas/Money' } }
+            maxMonth:
+              type: [object, 'null']
+              properties: { month: { type: string }, amount: { $ref: '#/components/schemas/Money' } }
+        payStubs: { type: array, items: { $ref: '#/components/schemas/PayStub' } }
+        payStubSummary:
+          type: object
+          required: [stubCount, totalHours, totalGross, totalNet, totalDeductions, effectiveTaxRate, takeHomeRate, byKind, byDeduction, projectedAnnualGross, projectedAnnualRetirement, projectedAnnualTax]
+          properties:
+            stubCount: { type: integer }
+            totalHours: { type: number }
+            totalGross: { $ref: '#/components/schemas/Money' }
+            totalNet: { $ref: '#/components/schemas/Money' }
+            totalDeductions: { $ref: '#/components/schemas/Money' }
+            effectiveTaxRate: { type: number }
+            takeHomeRate: { type: number }
+            byKind:
+              type: object
+              required: [tax, retirement, benefit, other]
+              properties:
+                tax: { $ref: '#/components/schemas/Money' }
+                retirement: { $ref: '#/components/schemas/Money' }
+                benefit: { $ref: '#/components/schemas/Money' }
+                other: { $ref: '#/components/schemas/Money' }
+            byDeduction:
+              type: array
+              items:
+                type: object
+                required: [name, kind, total, avgPercentOfGross]
+                properties:
+                  name: { type: string }
+                  kind: { type: string, enum: [tax, retirement, benefit, other] }
+                  total: { $ref: '#/components/schemas/Money' }
+                  avgPercentOfGross: { type: number }
+            projectedAnnualGross: { $ref: '#/components/schemas/Money' }
+            projectedAnnualRetirement: { $ref: '#/components/schemas/Money' }
+            projectedAnnualTax: { $ref: '#/components/schemas/Money' }
+        template:
+          type: object
+          required: [hourlyRate, employer, deductions]
+          properties:
+            hourlyRate: { type: [integer, 'null'] }
+            employer: { type: [string, 'null'] }
+            deductions:
+              type: array
+              items:
+                type: object
+                required: [name, kind, mode, amount, rate]
+                properties:
+                  name: { type: string }
+                  kind: { type: string, enum: [tax, retirement, benefit, other] }
+                  mode: { type: string, enum: [fixed, percent] }
+                  amount: { $ref: '#/components/schemas/Money' }
+                  rate: { type: number }
+

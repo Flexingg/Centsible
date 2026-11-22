@@ -113,6 +113,7 @@ private object Routes {
     const val TRANSFERS = "transfers/match"
     const val DUPLICATES = "transactions/duplicates"
     const val MORTGAGE = "mortgage"
+    const val INCOME = "income"
     const val RULE = "rule?id={id}&payee={payee}&category={category}"
     fun rule(id: String?, payee: String? = null, category: String? = null) = "rule?id=${id.orEmpty()}&payee=${payee.orEmpty()}&category=${category.orEmpty()}"
     const val AUTOMATIONS = "automations?month={month}"
@@ -265,6 +266,7 @@ private fun MainScaffold(
                             MoreItem.Trends -> Routes.TRENDS
                             MoreItem.NetWorth -> Routes.NET_WORTH
                             MoreItem.Mortgage -> Routes.MORTGAGE
+                            MoreItem.Income -> Routes.INCOME
                             MoreItem.YearInReview -> Routes.review()
                             MoreItem.Reports -> Routes.REPORTS
                             MoreItem.Merchants -> Routes.MERCHANTS
@@ -349,6 +351,12 @@ private fun MainScaffold(
                 app.centsible.feature.transactions.ReviewRoute(onBack = { nav.popBackStack() }, onOpen = { nav.navigate(Routes.transaction(it)) }, onMakeRule = { p, c -> nav.navigate(Routes.rule(null, p.raw, c?.raw)) }, onMatchTransfers = { nav.navigate(Routes.TRANSFERS) }, onFindDuplicates = { nav.navigate(Routes.DUPLICATES) })
             }
             composable(Routes.MORTGAGE) { app.centsible.feature.planning.MortgageRoute(onBack = { nav.popBackStack() }) }
+            composable(Routes.INCOME) {
+                app.centsible.feature.planning.IncomeRoute(
+                    onBack = { nav.popBackStack() },
+                    onOpenTransactions = { nav.go(it) },
+                )
+            }
             composable(Routes.TRANSFERS) {
                 app.centsible.feature.transactions.TransfersRoute(
                     onBack = { nav.popBackStack() },

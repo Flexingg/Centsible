@@ -2,6 +2,7 @@ import * as api from '@actual-app/api';
 import type { FastifyPluginAsync } from 'fastify';
 import { AVERAGE_BASES, type Basis, type GoalInput } from '../../actual/plan-ops.js';
 import type { MortgageInput } from '../../actual/mortgage-ops.js';
+import type { IncomeSettings, PayStubInput } from '../../actual/income-ops.js';
 import type { TargetInput } from '../../actual/target-ops.js';
 import { ApiError } from '../../errors.js';
 import { audit, requireBudget, type Deps } from '../server.js';
@@ -11,11 +12,11 @@ type MonthParams = { budgetId: string; month: string };
 type CategoryParams = { budgetId: string; id: string };
 const monthParams = { type: 'object', properties: { month: MONTH } };
 
-/** Budget autopilot, savings goals, and the cash-flow forecast behind the bill calendar. */
+/** Budget autopilot, savings goals, mortgages, income/pay stubs, and cash-flow forecast. */
 export const planRoutes =
   (deps: Deps): FastifyPluginAsync =>
   async (app) => {
-    const { plan, targets, mortgages, annual, offBooks } = deps;
+    const { plan, targets, mortgages, income, annual, offBooks } = deps;
 
     app.get<{ Params: MonthParams }>('/v1/budgets/:budgetId/months/:month/autopilot', { schema: { params: monthParams } }, async (req) => {
       requireBudget(deps, req, req.params.budgetId);
@@ -326,4 +327,103 @@ export const planRoutes =
         return plan.forecast(req.params.budgetId, { days: req.query.days ?? 90, accountIds, includeTypical: req.query.includeTypical !== false });
       },
     );
+
+    // ── Income tracking & pay stubs ──────────────────────────────────────────
+    const PAYSTUB_BODY = {
+      type: 'object',
+      required: ['date', 'gross', 'deductions'],
+      additionalProperties: false,
+      properties: {
+        date: { type: 'string', pattern: '^\\d{4}-\\d{2}-\\d{2}$' },
+        employer: { type: ['string', 'null'], maxLength: 120 },
+        hours: { type: ['number', 'null'], minimum: 0, maximum: 1000 },
+        hourlyRate: { type: ['integer', 'null'], minimum: 0 },
+        gross: { type: 'integer', minimum: 0 },
+        notes: { type: ['string', 'null'], maxLength: 500 },
+        deductions: {
+          type: 'array',
+          maxItems: 40,
+          items: {
+            type: 'object',
+            required: ['name', 'kind', 'amount'],
+            additionalProperties: false,
+            properties: {
+              name: { type: 'string', minLength: 1, maxLength: 80 },
+              kind: { type: 'string', enum: ['tax', 'retirement', 'benefit', 'other'] },
+              amount: { type: 'integer', minimum: 0 },
+              mode: { type: ['string', 'null'], enum: ['fixed', 'percent', null] },
+              rate: { type: ['number', 'null'], minimum: 0, maximum: 100 },
+            },
+          },
+        },
+      },
+    };
+
+    app.get<{ Params: { budgetId: string }; Querystring: { year?: number } }>(
+      '/v1/budgets/:budgetId/income/overview',
+      {
+        schema: {
+          querystring: {
+            type: 'object',
+            properties: { year: { type: 'integer', minimum: 1970, maximum: 2100 } },
+          },
+        },
+      },
+      async (req) => {
+        requireBudget(deps, req, req.params.budgetId);
+        return income.overview(req.params.budgetId, req.query.year);
+      },
+    );
+
+    app.put<{ Params: { budgetId: string }; Body: IncomeSettings }>(
+      '/v1/budgets/:budgetId/income/settings',
+      {
+        schema: {
+          body: {
+            type: 'object',
+            required: ['mode', 'categoryIds'],
+            additionalProperties: false,
+            properties: {
+              mode: { type: 'string', enum: ['all', 'categories'] },
+              categoryIds: { type: 'array', maxItems: 50, items: { type: 'string', minLength: 1 } },
+            },
+          },
+        },
+      },
+      async (req) => {
+        requireBudget(deps, req, req.params.budgetId, 'member');
+        const s = income.setSettings(req.params.budgetId, req.body);
+        audit(deps, req, req.params.budgetId, 'income.settings', req.params.budgetId, s);
+        return s;
+      },
+    );
+
+    app.post<{ Params: { budgetId: string }; Body: PayStubInput }>(
+      '/v1/budgets/:budgetId/income/paystubs',
+      { schema: { body: PAYSTUB_BODY } },
+      async (req, reply) => {
+        requireBudget(deps, req, req.params.budgetId, 'member');
+        const stub = income.createPayStub(req.params.budgetId, req.body);
+        audit(deps, req, req.params.budgetId, 'paystub.created', stub.id);
+        return reply.status(201).send(stub);
+      },
+    );
+
+    app.put<{ Params: CategoryParams; Body: PayStubInput }>(
+      '/v1/budgets/:budgetId/income/paystubs/:id',
+      { schema: { body: PAYSTUB_BODY } },
+      async (req) => {
+        requireBudget(deps, req, req.params.budgetId, 'member');
+        const stub = income.updatePayStub(req.params.budgetId, req.params.id, req.body);
+        audit(deps, req, req.params.budgetId, 'paystub.updated', stub.id);
+        return stub;
+      },
+    );
+
+    app.delete<{ Params: CategoryParams }>('/v1/budgets/:budgetId/income/paystubs/:id', async (req, reply) => {
+      requireBudget(deps, req, req.params.budgetId, 'member');
+      income.deletePayStub(req.params.budgetId, req.params.id);
+      audit(deps, req, req.params.budgetId, 'paystub.deleted', req.params.id);
+      return reply.status(204).send();
+    });
   };
