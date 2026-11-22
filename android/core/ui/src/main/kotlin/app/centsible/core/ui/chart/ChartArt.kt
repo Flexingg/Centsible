@@ -92,7 +92,7 @@ class ChartArt(private val colors: CentsibleColors, private val density: Float) 
         val dataMax = (listOfNotNull(series.maxOrNull(), compare.maxOrNull()).maxOrNull() ?: 0L).coerceAtLeast(1)
         // A far-off budget would squash the lines flat: it only stretches the chart when it's near them.
         val showRef = reference != null && reference > 0 && reference <= dataMax * 1.6f
-        val maxV = maxOf(dataMax.toFloat(), if (showRef) reference!!.toFloat() else 0f) * 1.12f
+        val maxV = maxOf(dataMax.toFloat(), if (showRef) reference.toFloat() else 0f) * 1.12f
         val count = max(total, max(series.size, compare.size)).coerceAtLeast(2)
         val inset = dp(5f)
         fun x(i: Int) = inset + (width - 2 * inset) * i / (count - 1).toFloat()
@@ -106,7 +106,7 @@ class ChartArt(private val colors: CentsibleColors, private val density: Float) 
             c.drawPath(smooth(compare.mapIndexed { i, v -> x(i) to y(v) }), stroke(colors.textTertiary.argb(0.7f), dp(1.6f), floatArrayOf(dp(4f), dp(4f))))
         }
         if (showRef) {
-            val ry = y(reference!!)
+            val ry = y(reference)
             c.drawLine(0f, ry, width.toFloat(), ry, stroke(colors.textSecondary.argb(0.55f), dp(1.2f), floatArrayOf(dp(1.5f), dp(3.5f))))
             referenceLabel?.let { c.label(it, width - dp(2f), ry - dp(4f), Paint.Align.RIGHT, colors.textSecondary.argb()) }
         } else if (reference != null && reference > 0 && referenceLabel != null) {
