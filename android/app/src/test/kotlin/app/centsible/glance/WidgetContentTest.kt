@@ -91,58 +91,82 @@ class WidgetContentTest {
         categories = listOf(Glanceable.CategorySlice("Groceries", Money(42_000), Money(60_000)), Glanceable.CategorySlice("Dining Out", Money(31_000), Money(25_000))),
     )
 
-    @Test fun `pace widget compares with last month by the same day`() = runGlanceAppWidgetUnitTest {
-        setContext(context)
-        setAppWidgetSize(DpSize(260.dp, 180.dp))
-        provideComposable { PaceContent(context, withTrend) }
+    private val today = java.time.LocalDate.parse("2026-11-04")
+    private val rich = withTrend.copy(
+        categories = listOf(
+            Glanceable.CategorySlice("Groceries", Money(42_000), Money(60_000), "c-groc", Money(18_000)),
+            Glanceable.CategorySlice("Dining Out", Money(31_000), Money(25_000), "c-dine", Money(-6_000)),
+        ),
+        months = listOf(
+            Glanceable.MonthFlow("2026-09", Money(500_000), Money(320_000)),
+            Glanceable.MonthFlow("2026-10", Money(500_000), Money(410_000)),
+            Glanceable.MonthFlow("2026-11", Money(250_000), Money(41_000)),
+        ),
+        netWorth = listOf(Glanceable.NetWorthPoint("2026-09", Money(10_000_000)), Glanceable.NetWorthPoint("2026-10", Money(10_400_000)), Glanceable.NetWorthPoint("2026-11", Money(10_650_000))),
+    )
+
+    private fun chart(kind: app.centsible.core.domain.ChartKind, data: Glanceable? = rich, cat: String? = null, block: androidx.glance.appwidget.testing.unit.GlanceAppWidgetUnitTest.() -> Unit) =
+        runGlanceAppWidgetUnitTest {
+            setContext(context)
+            setAppWidgetSize(DpSize(280.dp, 190.dp))
+            provideComposable { ChartContent(context, data, app.centsible.core.domain.ChartWidgetConfig(kind, cat, cat?.let { "Groceries" }), today) }
+            block()
+        }
+
+    @Test fun `pace chart compares with last month by the same day`() = chart(app.centsible.core.domain.ChartKind.Pace) {
         onNode(hasTextEqualTo("$410")).assertExists()
         // Last month by the 4th: $360, so $50 more.
         onNode(hasTextEqualTo("$50 more than last month by now")).assertExists()
     }
 
-    @Test fun `week widget shows the week against the allowance`() = runGlanceAppWidgetUnitTest {
-        setContext(context)
-        setAppWidgetSize(DpSize(260.dp, 180.dp))
-        provideComposable { WeekContent(context, withTrend) }
+    @Test fun `week chart shows the week against the allowance`() = chart(app.centsible.core.domain.ChartKind.Week) {
         onNode(hasTextEqualTo("$150")).assertExists()
-        onNode(hasTextEqualTo("$550 left of $700 · last week $520")).assertExists()
+        onNode(hasTextEqualTo("$550 left of $700")).assertExists()
     }
 
-    @Test fun `categories widget lists spent against budgeted`() = runGlanceAppWidgetUnitTest {
-        setContext(context)
-        setAppWidgetSize(DpSize(260.dp, 180.dp))
-        provideComposable { CategoriesContent(context, withTrend) }
+    @Test fun `category ring and its legend`() = chart(app.centsible.core.domain.ChartKind.Categories) {
+        onNode(hasTextEqualTo("$730")).assertExists()
         onNode(hasTextEqualTo("Groceries")).assertExists()
-        onNode(hasTextEqualTo("$420 / $600")).assertExists()
-        onNode(hasTextEqualTo("$310 / $250")).assertExists()
+        onNode(hasTextEqualTo("Dining Out")).assertExists()
     }
 
-    @Test fun `chart widgets hide everything when locked, and ask for a bridge update without daily data`() {
-        runGlanceAppWidgetUnitTest {
-            setContext(context)
-            provideComposable { PaceContent(context, withTrend.copy(locked = true)) }
-            onNode(hasText("$")).assertDoesNotExist()
+    @Test fun `one category shows what's left`() = chart(app.centsible.core.domain.ChartKind.Category, cat = "c-groc") {
+        onNode(hasTextEqualTo("$180")).assertExists()
+        onNode(hasText("Groceries")).assertExists()
+    }
+
+    @Test fun `monthly, cash flow and net worth charts`() {
+        chart(app.centsible.core.domain.ChartKind.Monthly) {
+            onNode(hasTextEqualTo("$410")).assertExists()
+            onNode(hasText("average $3,650")).assertExists()
         }
-        runGlanceAppWidgetUnitTest {
-            setContext(context)
-            provideComposable { WeekContent(context, data) }
-            onNode(hasText("Update Centsible on your server")).assertExists()
+        chart(app.centsible.core.domain.ChartKind.CashFlow) {
+            onNode(hasTextEqualTo("+$2,090")).assertExists()
         }
-        runGlanceAppWidgetUnitTest {
-            setContext(context)
-            provideComposable { CategoriesContent(context, withTrend.copy(locked = true)) }
-            onNode(hasText("Groceries")).assertDoesNotExist()
+        chart(app.centsible.core.domain.ChartKind.NetWorth) {
+            onNode(hasTextEqualTo("$106,500")).assertExists()
+            onNode(hasTextEqualTo("up $6,500 in 2 months")).assertExists()
         }
     }
 
-    @Test fun `charts draw at the requested size`() {
-        val colors = Charts.Colors(0xFF1C9A62.toInt(), 0xFF9A9DA5.toInt(), 0xFFE9E6E1.toInt(), 0xFFDC3F42.toInt())
-        val pace = Charts.pace(trend, 600_000, 600, 240, colors)
-        org.junit.Assert.assertEquals(600, pace.width)
-        org.junit.Assert.assertEquals(240, pace.height)
-        val week = Charts.week(trend, 500, 200, colors)
-        org.junit.Assert.assertEquals(500, week.width)
-        // Degenerate sizes don't crash.
-        Charts.pace(trend.copy(monthToDate = emptyList(), lastMonth = emptyList()), null, 0, 0, colors)
+    @Test fun `charts hide everything when locked, and ask for a server update without the data`() {
+        chart(app.centsible.core.domain.ChartKind.Pace, data = rich.copy(locked = true)) { onNode(hasText("$")).assertDoesNotExist() }
+        chart(app.centsible.core.domain.ChartKind.Week, data = data) { onNode(hasText("Update Centsible on your server")).assertExists() }
+        chart(app.centsible.core.domain.ChartKind.NetWorth, data = data) { onNode(hasText("Update Centsible on your server")).assertExists() }
+        chart(app.centsible.core.domain.ChartKind.Category, cat = null) { onNode(hasText("Pick a category")).assertExists() }
+    }
+
+    @Test fun `every chart draws at the requested size, light and dark, even with nothing in it`() {
+        for (palette in listOf(app.centsible.core.designsystem.theme.LightCentsibleColors, app.centsible.core.designsystem.theme.DarkCentsibleColors)) {
+            val art = app.centsible.core.ui.chart.ChartArt(palette, 2f)
+            for (kind in app.centsible.core.domain.ChartKind.entries) {
+                val face = app.centsible.core.ui.chart.ChartFaces.face(app.centsible.core.domain.ChartWidgetConfig(kind, "c-groc"), rich, today, art)
+                val bmp = face.draw!!(art, 500, 260)
+                org.junit.Assert.assertEquals(if (face.square) 260 else 500, bmp.width)
+            }
+            art.area(0, 0, emptyList(), 0)
+            art.bars(10, 10, emptyList(), emptyList())
+            art.donut(1, emptyList(), "", "")
+        }
     }
 }

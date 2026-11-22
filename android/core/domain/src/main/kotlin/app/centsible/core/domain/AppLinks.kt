@@ -18,6 +18,7 @@ sealed interface AppLink {
         Duplicates("duplicates"),
         Mortgage("mortgage"),
         NewTransaction("new-transaction"),
+        Widgets("widgets"),
     }
 
     data class To(val screen: Screen) : AppLink
@@ -31,7 +32,7 @@ sealed interface AppLink {
  *
  *     centsible://open/review                       the review inbox
  *     centsible://open/<screen>                     transactions, accounts, budget, net-worth,
- *                                                   recurring, trends, bank-sync, plaid, new-transaction,
+ *                                                   recurring, trends, bank-sync, plaid, new-transaction, widgets,
  *                                                   duplicates, mortgage
  *     centsible://open/account/<id>                 one account
  *     centsible://open/category/<id>?name=Groceries[&month=2026-11]

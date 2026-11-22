@@ -41,6 +41,14 @@ import androidx.glance.text.TextAlign
 import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
 import app.centsible.MainActivity
+import java.time.LocalDate
+import app.centsible.core.ui.chart.ChartFaces
+import app.centsible.core.ui.chart.ChartFace
+import app.centsible.core.ui.chart.ChartArt
+import app.centsible.core.domain.ChartWidgetConfig
+import app.centsible.core.domain.ChartKind
+import androidx.glance.layout.size
+import androidx.glance.appwidget.GlanceAppWidgetManager
 import app.centsible.core.designsystem.component.MoneyFormat
 import app.centsible.core.domain.Glanceable
 import java.text.DateFormat
@@ -107,26 +115,26 @@ class BillsWidgetReceiver : GlanceAppWidgetReceiver() {
 @Composable
 private fun Frame(context: Context, open: String, content: @Composable ColumnScope.() -> Unit) {
     Column(
-        GlanceModifier.fillMaxSize().cornerRadius(20.dp).background(GlanceTheme.colors.widgetBackground)
-            .padding(14.dp).clickable(actionStartActivity(openIntent(context, open))),
+        GlanceModifier.fillMaxSize().cornerRadius(24.dp).background(CG.card)
+            .padding(16.dp).clickable(actionStartActivity(openIntent(context, open))),
     ) { content() }
 }
 
 @Composable
-private fun Label(text: String) = Text(text, style = TextStyle(color = GlanceTheme.colors.onSurfaceVariant, fontSize = 12.sp, fontWeight = FontWeight.Medium), maxLines = 1)
+private fun Label(text: String) = Text(text, style = TextStyle(color = CG.textSecondary, fontSize = 12.sp, fontWeight = FontWeight.Medium), maxLines = 1)
 
 @Composable
-private fun Big(text: String) = Text(text, style = TextStyle(color = GlanceTheme.colors.onSurface, fontSize = 26.sp, fontWeight = FontWeight.Bold), maxLines = 1)
+private fun Big(text: String) = Text(text, style = TextStyle(color = CG.textPrimary, fontSize = 26.sp, fontWeight = FontWeight.Bold), maxLines = 1)
 
 @Composable
-private fun Small(text: String) = Text(text, style = TextStyle(color = GlanceTheme.colors.onSurfaceVariant, fontSize = 12.sp), maxLines = 2)
+private fun Small(text: String) = Text(text, style = TextStyle(color = CG.textSecondary, fontSize = 12.sp), maxLines = 2)
 
 @Composable
 private fun Chip(context: Context, text: String, open: String) {
     Text(
         text,
-        style = TextStyle(color = GlanceTheme.colors.onPrimary, fontSize = 13.sp, fontWeight = FontWeight.Medium),
-        modifier = GlanceModifier.cornerRadius(14.dp).background(GlanceTheme.colors.primary).padding(horizontal = 12.dp, vertical = 6.dp)
+        style = TextStyle(color = CG.onAccent, fontSize = 13.sp, fontWeight = FontWeight.Medium),
+        modifier = GlanceModifier.cornerRadius(14.dp).background(CG.accent).padding(horizontal = 12.dp, vertical = 6.dp)
             .clickable(actionStartActivity(openIntent(context, open))),
     )
 }
@@ -154,7 +162,7 @@ internal fun BudgetContent(context: Context, data: Glanceable?) {
         Row(GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Label(data.month + (data.budgetName?.let { " · $it" } ?: ""))
             Spacer(GlanceModifier.defaultWeight())
-            Text("↻", style = TextStyle(color = GlanceTheme.colors.onSurfaceVariant, fontSize = 14.sp), modifier = GlanceModifier.clickable(actionRunCallback<RefreshAction>()))
+            Text("↻", style = TextStyle(color = CG.textSecondary, fontSize = 14.sp), modifier = GlanceModifier.clickable(actionRunCallback<RefreshAction>()))
         }
         Spacer(GlanceModifier.height(4.dp))
         if (data.envelope) {
@@ -169,8 +177,8 @@ internal fun BudgetContent(context: Context, data: Glanceable?) {
             LinearProgressIndicator(
                 progress = share,
                 modifier = GlanceModifier.fillMaxWidth().height(6.dp),
-                color = if (share >= 1f) GlanceTheme.colors.error else GlanceTheme.colors.primary,
-                backgroundColor = GlanceTheme.colors.secondaryContainer,
+                color = if (share >= 1f) CG.negative else CG.accent,
+                backgroundColor = CG.track,
             )
             Spacer(GlanceModifier.height(4.dp))
             Small("${MoneyFormat.format(data.spent, showCents = false)} of ${MoneyFormat.format(data.budgeted, showCents = false)} spent")
@@ -199,10 +207,10 @@ internal fun BillsContent(context: Context, data: Glanceable?) {
         data.bills.take(rows).forEach { bill ->
             Row(GlanceModifier.fillMaxWidth().padding(vertical = 3.dp), verticalAlignment = Alignment.CenterVertically) {
                 Column(GlanceModifier.defaultWeight()) {
-                    Text(bill.title, style = TextStyle(color = GlanceTheme.colors.onSurface, fontSize = 14.sp, fontWeight = FontWeight.Medium), maxLines = 1)
+                    Text(bill.title, style = TextStyle(color = CG.textPrimary, fontSize = 14.sp, fontWeight = FontWeight.Medium), maxLines = 1)
                     Small(bill.whenText)
                 }
-                Text(MoneyFormat.format(bill.amount), style = TextStyle(color = GlanceTheme.colors.onSurface, fontSize = 14.sp), maxLines = 1)
+                Text(MoneyFormat.format(bill.amount), style = TextStyle(color = CG.textPrimary, fontSize = 14.sp), maxLines = 1)
             }
         }
         Spacer(GlanceModifier.defaultWeight())
@@ -210,183 +218,148 @@ internal fun BillsContent(context: Context, data: Glanceable?) {
     }
 }
 
-// ── Chart widgets ──
+// ── Centsible colours ──
 
-/** The widget's size in pixels, for drawing a chart that fills [fraction] of its height. */
-@Composable
-private fun chartPx(context: Context, heightFraction: Float, reserved: Int = 0): Pair<Int, Int> {
-    val density = context.resources.displayMetrics.density
-    val size = LocalSize.current
-    val w = ((size.width.value - 28) * density).toInt().coerceAtLeast(40)
-    val h = (((size.height.value - 28 - reserved) * heightFraction) * density).toInt().coerceAtLeast(30)
-    return w to h
+/** The app's palette for widgets, switching with the phone's dark mode (not the wallpaper's colours). */
+internal object CG {
+    private fun dn(l: androidx.compose.ui.graphics.Color, d: androidx.compose.ui.graphics.Color) = androidx.glance.color.ColorProvider(day = l, night = d)
+    private val L = app.centsible.core.designsystem.theme.LightCentsibleColors
+    private val D = app.centsible.core.designsystem.theme.DarkCentsibleColors
+    val card = dn(L.card, D.card)
+    val cardMuted = dn(L.cardMuted, D.cardMuted)
+    val textPrimary = dn(L.textPrimary, D.textPrimary)
+    val textSecondary = dn(L.textSecondary, D.textSecondary)
+    val textTertiary = dn(L.textTertiary, D.textTertiary)
+    val accent = dn(L.accent, D.accent)
+    val accentSoft = dn(L.accentSoft, D.accentSoft)
+    val onAccent = dn(androidx.compose.ui.graphics.Color.White, androidx.compose.ui.graphics.Color(0xFF1A1C20))
+    val positive = dn(L.positive, D.positive)
+    val negative = dn(L.negative, D.negative)
+    val track = dn(L.track, D.track)
+
+    fun palette(context: Context) =
+        if (context.resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK == android.content.res.Configuration.UI_MODE_NIGHT_YES) D else L
 }
 
-@Composable
-private fun chartColors(context: Context) = Charts.Colors(
-    line = GlanceTheme.colors.primary.getColor(context).toArgb(),
-    muted = GlanceTheme.colors.onSurfaceVariant.getColor(context).copy(alpha = 0.55f).toArgb(),
-    grid = GlanceTheme.colors.outline.getColor(context).copy(alpha = 0.35f).toArgb(),
-    over = GlanceTheme.colors.error.getColor(context).toArgb(),
-)
+// ── The configurable chart widget ──
 
-private fun money(cents: Long) = MoneyFormat.format(app.centsible.core.model.Money(cents), showCents = false)
-
-/** Spending pace: this month's running total against last month's, day by day. */
-class PaceWidget : GlanceAppWidget() {
+/**
+ * A chart widget: what it shows is chosen per widget (when it's placed, by long-pressing it
+ * to reconfigure, or in Settings → Widgets & tiles). [preset] is the choice for a widget
+ * that hasn't been configured (the widget picker's "Spending pace" etc.).
+ */
+class ChartWidget(private val preset: ChartKind = ChartKind.Pace) : GlanceAppWidget() {
     override val sizeMode = SizeMode.Exact
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
-        val data = context.glanceDeps().store().read()
-        provideContent { GlanceTheme { PaceContent(context, data) } }
+        val deps = context.glanceDeps()
+        val widgetId = runCatching { GlanceAppWidgetManager(context).getAppWidgetId(id) }.getOrNull()
+        val config = widgetId?.let { deps.widgetSettings().chart(it) } ?: ChartWidgetConfig(preset)
+        val data = deps.store().read()
+        provideContent { ChartContent(context, data, config, LocalDate.now()) }
     }
 }
 
-class PaceWidgetReceiver : ChartReceiver(PaceWidget())
-
-/** This week: Monday to Sunday against the weekly allowance. */
-class WeekWidget : GlanceAppWidget() {
-    override val sizeMode = SizeMode.Exact
-
-    override suspend fun provideGlance(context: Context, id: GlanceId) {
-        val data = context.glanceDeps().store().read()
-        provideContent { GlanceTheme { WeekContent(context, data) } }
-    }
-}
-
-class WeekWidgetReceiver : ChartReceiver(WeekWidget())
-
-/** Where the money goes this month: the biggest categories, spent against budgeted. */
-class CategoriesWidget : GlanceAppWidget() {
-    override val sizeMode = SizeMode.Exact
-
-    override suspend fun provideGlance(context: Context, id: GlanceId) {
-        val data = context.glanceDeps().store().read()
-        provideContent { GlanceTheme { CategoriesContent(context, data) } }
-    }
-}
-
-class CategoriesWidgetReceiver : ChartReceiver(CategoriesWidget())
-
-open class ChartReceiver(private val widget: GlanceAppWidget) : GlanceAppWidgetReceiver() {
-    override val glanceAppWidget: GlanceAppWidget get() = widget
+open class ChartReceiver(preset: ChartKind) : GlanceAppWidgetReceiver() {
+    override val glanceAppWidget: GlanceAppWidget = ChartWidget(preset)
 
     override fun onEnabled(context: Context) {
         super.onEnabled(context)
         GlanceRefresher.schedule(context)
         GlanceRefresher.refreshSoon(context)
     }
-}
 
-@Composable
-private fun NeedsBridgeUpdate(context: Context) {
-    Frame(context, "budget") {
-        Label("Centsible")
-        Spacer(GlanceModifier.height(6.dp))
-        Small("Update Centsible on your server (Home Assistant) to show this chart.")
+    override fun onDeleted(context: Context, appWidgetIds: IntArray) {
+        super.onDeleted(context, appWidgetIds)
+        val settings = context.glanceDeps().widgetSettings()
+        kotlinx.coroutines.runBlocking { appWidgetIds.forEach { settings.removeChart(it) } }
     }
 }
 
+/** "Centsible chart": asks which chart when it's placed. */
+class ChartWidgetReceiver : ChartReceiver(ChartKind.Pace)
+// The first chart widgets, kept so ones already on home screens carry on (and can be reconfigured).
+class PaceWidgetReceiver : ChartReceiver(ChartKind.Pace)
+class WeekWidgetReceiver : ChartReceiver(ChartKind.Week)
+class CategoriesWidgetReceiver : ChartReceiver(ChartKind.Categories)
+
 @Composable
-internal fun PaceContent(context: Context, data: Glanceable?) {
+internal fun ChartContent(context: Context, data: Glanceable?, config: ChartWidgetConfig, today: LocalDate) {
     if (data == null || data.locked) return Placeholder(context, data)
-    val t = data.trend ?: return NeedsBridgeUpdate(context)
-    val diff = t.spentThisMonth - t.lastMonthByNow
-    Frame(context, "trends") {
+    val art = ChartArt(CG.palette(context), context.resources.displayMetrics.density)
+    val face = ChartFaces.face(config, data, today, art)
+    val size = LocalSize.current
+    val density = context.resources.displayMetrics.density
+    Frame(context, face.link) {
         Row(GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Label("Spending · ${data.month}")
-            Spacer(GlanceModifier.defaultWeight())
-            Text("↻", style = TextStyle(color = GlanceTheme.colors.onSurfaceVariant, fontSize = 14.sp), modifier = GlanceModifier.clickable(actionRunCallback<RefreshAction>()))
-        }
-        Big(money(t.spentThisMonth))
-        Text(
-            when {
-                t.lastMonthByNow == 0L -> "spent so far"
-                diff > 0 -> "${money(diff)} more than last month by now"
-                diff < 0 -> "${money(-diff)} less than last month by now"
-                else -> "the same as last month by now"
-            },
-            style = TextStyle(color = if (diff > 0) GlanceTheme.colors.error else GlanceTheme.colors.onSurfaceVariant, fontSize = 12.sp),
-            maxLines = 1,
-        )
-        Spacer(GlanceModifier.height(6.dp))
-        val (w, h) = chartPx(context, 1f, reserved = 74)
-        Image(
-            provider = ImageProvider(Charts.pace(t, data.budgeted.minor.takeIf { it > 0 }, w, h, chartColors(context))),
-            contentDescription = "This month's spending, ${money(t.spentThisMonth)}, against last month's",
-            modifier = GlanceModifier.fillMaxWidth().defaultWeight(),
-        )
-    }
-}
-
-@Composable
-internal fun WeekContent(context: Context, data: Glanceable?) {
-    if (data == null || data.locked) return Placeholder(context, data)
-    val t = data.trend ?: return NeedsBridgeUpdate(context)
-    val allowance = t.weekAllowance
-    Frame(context, "transactions") {
-        Row(GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Label("This week")
-            Spacer(GlanceModifier.defaultWeight())
-            Text("↻", style = TextStyle(color = GlanceTheme.colors.onSurfaceVariant, fontSize = 14.sp), modifier = GlanceModifier.clickable(actionRunCallback<RefreshAction>()))
-        }
-        Big(money(t.weekTotal))
-        Text(
-            when {
-                allowance == null -> "last week: ${money(t.lastWeekTotal)}"
-                t.weekTotal > allowance -> "${money(t.weekTotal - allowance)} over this week's ${money(allowance)}"
-                else -> "${money(allowance - t.weekTotal)} left of ${money(allowance)} · last week ${money(t.lastWeekTotal)}"
-            },
-            style = TextStyle(color = if (allowance != null && t.weekTotal > allowance) GlanceTheme.colors.error else GlanceTheme.colors.onSurfaceVariant, fontSize = 12.sp),
-            maxLines = 1,
-        )
-        Spacer(GlanceModifier.height(6.dp))
-        val (w, h) = chartPx(context, 1f, reserved = 92)
-        Image(
-            provider = ImageProvider(Charts.week(t, w, h, chartColors(context))),
-            contentDescription = "Spending each day this week",
-            modifier = GlanceModifier.fillMaxWidth().defaultWeight(),
-        )
-        Row(GlanceModifier.fillMaxWidth()) {
-            listOf("M", "T", "W", "T", "F", "S", "S").forEachIndexed { i, d ->
-                Text(
-                    d,
-                    style = TextStyle(
-                        color = if (i == t.weekdayToday) GlanceTheme.colors.primary else GlanceTheme.colors.onSurfaceVariant,
-                        fontSize = 11.sp, fontWeight = if (i == t.weekdayToday) FontWeight.Bold else FontWeight.Normal, textAlign = TextAlign.Center,
-                    ),
-                    modifier = GlanceModifier.defaultWeight(),
-                )
-            }
-        }
-    }
-}
-
-@Composable
-internal fun CategoriesContent(context: Context, data: Glanceable?) {
-    if (data == null || data.locked) return Placeholder(context, data)
-    Frame(context, "budget") {
-        Label("Top spending · ${data.month}")
-        Spacer(GlanceModifier.height(6.dp))
-        if (data.categories.isEmpty()) Small("Nothing spent yet this month.")
-        val rows = ((LocalSize.current.height.value - 40) / 34).toInt().coerceIn(1, 5)
-        data.categories.take(rows).forEach { c ->
-            Row(GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Text(c.name, style = TextStyle(color = GlanceTheme.colors.onSurface, fontSize = 13.sp, fontWeight = FontWeight.Medium), maxLines = 1, modifier = GlanceModifier.defaultWeight())
-                Text(
-                    if (c.budgeted.minor > 0) "${MoneyFormat.format(c.spent, showCents = false)} / ${MoneyFormat.format(c.budgeted, showCents = false)}" else MoneyFormat.format(c.spent, showCents = false),
-                    style = TextStyle(color = GlanceTheme.colors.onSurfaceVariant, fontSize = 12.sp),
-                    maxLines = 1,
-                )
-            }
-            val share = if (c.budgeted.minor > 0) (c.spent.minor.toFloat() / c.budgeted.minor).coerceIn(0f, 1f) else 1f
-            LinearProgressIndicator(
-                progress = share,
-                modifier = GlanceModifier.fillMaxWidth().height(5.dp),
-                color = if (c.budgeted.minor > 0 && c.spent.minor > c.budgeted.minor) GlanceTheme.colors.error else GlanceTheme.colors.primary,
-                backgroundColor = GlanceTheme.colors.secondaryContainer,
+            Text(face.title, style = TextStyle(color = CG.textSecondary, fontSize = 12.sp, fontWeight = FontWeight.Medium), maxLines = 1, modifier = GlanceModifier.defaultWeight())
+            Text(
+                "↻",
+                style = TextStyle(color = CG.textTertiary, fontSize = 14.sp),
+                modifier = GlanceModifier.padding(start = 8.dp).clickable(actionRunCallback<RefreshAction>()),
             )
-            Spacer(GlanceModifier.height(7.dp))
         }
+        val draw = face.draw
+        if (draw == null) {
+            Spacer(GlanceModifier.height(8.dp))
+            Small(face.emptyMessage.orEmpty())
+            return@Frame
+        }
+        val tone = when (face.tone) {
+            ChartFace.Tone.Good -> CG.positive
+            ChartFace.Tone.Bad -> CG.negative
+            ChartFace.Tone.Neutral -> CG.textSecondary
+        }
+        if (face.square) {
+            // Ring or donut beside the numbers and the legend.
+            val ringDp = (minOf(size.height.value - 50, size.width.value * 0.45f)).coerceAtLeast(56f)
+            Row(GlanceModifier.fillMaxSize().padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                Image(
+                    provider = ImageProvider(draw(art, (ringDp * density).toInt(), (ringDp * density).toInt())),
+                    contentDescription = "${face.title}: ${face.headline}",
+                    modifier = GlanceModifier.size(ringDp.dp),
+                )
+                Spacer(GlanceModifier.width(14.dp))
+                Column(GlanceModifier.defaultWeight()) {
+                    Text(face.headline, style = TextStyle(color = CG.textPrimary, fontSize = 22.sp, fontWeight = FontWeight.Bold), maxLines = 1)
+                    Text(face.subtitle, style = TextStyle(color = tone, fontSize = 11.sp), maxLines = 2)
+                    Spacer(GlanceModifier.height(6.dp))
+                    val rows = ((size.height.value - 90) / 20).toInt().coerceIn(0, face.legend.size)
+                    face.legend.take(rows).forEach { item -> LegendRow(context, item) }
+                }
+            }
+        } else {
+            Text(face.headline, style = TextStyle(color = CG.textPrimary, fontSize = 24.sp, fontWeight = FontWeight.Bold), maxLines = 1)
+            Text(face.subtitle, style = TextStyle(color = tone, fontSize = 12.sp), maxLines = 1)
+            if (face.legend.isNotEmpty() && size.height.value > 150) {
+                Row(GlanceModifier.padding(top = 4.dp)) {
+                    face.legend.forEach { item ->
+                        Text("● ", style = TextStyle(color = androidx.glance.unit.ColorProvider(item.color), fontSize = 10.sp))
+                        Text(item.label + "   ", style = TextStyle(color = CG.textSecondary, fontSize = 10.sp))
+                    }
+                }
+            }
+            Spacer(GlanceModifier.height(6.dp))
+            val reserved = if (face.legend.isNotEmpty() && size.height.value > 150) 86 else 70
+            val w = ((size.width.value - 32) * density).toInt().coerceAtLeast(60)
+            val h = ((size.height.value - 32 - reserved) * density).toInt().coerceAtLeast(40)
+            Image(
+                provider = ImageProvider(draw(art, w, h)),
+                contentDescription = "${face.title}: ${face.headline}, ${face.subtitle}",
+                modifier = GlanceModifier.fillMaxWidth().defaultWeight(),
+            )
+        }
+    }
+}
+
+/** A legend row; tapping it opens that category's transactions when it has one. */
+@Composable
+private fun LegendRow(context: Context, item: ChartFace.LegendItem) {
+    val modifier = GlanceModifier.fillMaxWidth().padding(vertical = 1.dp).let { m -> item.link?.let { m.clickable(actionStartActivity(openIntent(context, it))) } ?: m }
+    Row(modifier, verticalAlignment = Alignment.CenterVertically) {
+        Text("●", style = TextStyle(color = androidx.glance.unit.ColorProvider(item.color), fontSize = 11.sp))
+        Spacer(GlanceModifier.width(6.dp))
+        Text(item.label, style = TextStyle(color = CG.textPrimary, fontSize = 12.sp), maxLines = 1, modifier = GlanceModifier.defaultWeight())
+        if (item.value.isNotEmpty()) Text(item.value, style = TextStyle(color = CG.textSecondary, fontSize = 12.sp), maxLines = 1)
     }
 }

@@ -37,6 +37,7 @@ dependencies {
     implementation(project(":core:domain"))
     implementation(project(":core:data"))
     implementation(project(":core:designsystem"))
+    implementation(project(":core:ui")) // widget charts
     implementation(project(":core:extensions"))
     implementation(project(":feature:onboarding"))
     implementation(project(":feature:dashboard"))

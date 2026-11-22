@@ -53,7 +53,7 @@ import app.centsible.core.model.PairingInvite
 import app.centsible.core.model.Role
 
 @Composable
-fun SettingsRoute(onOpenBankSync: () -> Unit = {}, viewModel: SettingsViewModel = hiltViewModel()) {
+fun SettingsRoute(onOpenBankSync: () -> Unit = {}, onOpenWidgets: () -> Unit = {}, viewModel: SettingsViewModel = hiltViewModel()) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val context = androidx.compose.ui.platform.LocalContext.current
     // What to turn on once notifications are allowed: bill reminders or spending alerts.
@@ -90,6 +90,7 @@ fun SettingsRoute(onOpenBankSync: () -> Unit = {}, viewModel: SettingsViewModel 
             toggleReview = { p -> if (p !in state.reviews) askNotifications { viewModel.toggleReview(p) } else viewModel.toggleReview(p) },
             setReminderDays = viewModel::setReminderDays,
             openBankSync = onOpenBankSync,
+            openWidgets = onOpenWidgets,
         ),
         deviceSecure = run {
             val context = androidx.compose.ui.platform.LocalContext.current
@@ -114,6 +115,7 @@ data class SettingsActions(
     val setAlerts: (Boolean) -> Unit = {},
     val toggleReview: (String) -> Unit = {},
     val openBankSync: () -> Unit = {},
+    val openWidgets: () -> Unit = {},
 )
 
 @Composable
@@ -176,6 +178,15 @@ fun SettingsScreen(state: SettingsUiState, actions: SettingsActions, renderQr: B
                                 "Link bank accounts with SimpleFIN, choose how they import, and sync them automatically.",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = colors.textSecondary,
+                            )
+                        }
+                    }
+                    item {
+                        SectionCard("Widgets & tiles", action = "Open", onAction = actions.openWidgets) {
+                            Text(
+                                "Choose the charts on your home screen and the budget figures in Quick Settings.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = CentsibleTheme.colors.textSecondary,
                             )
                         }
                     }

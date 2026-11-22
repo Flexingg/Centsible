@@ -91,4 +91,6 @@ class MainActivity : ComponentActivity() {
 
     /** centsible://open/... links are handed to the app as the screen to open. */
     private fun Intent.appLink(): String? = data?.takeIf { it.scheme == app.centsible.core.domain.AppLinks.SCHEME }?.toString()
+        // Long-pressing a Centsible Quick Settings tile opens its settings.
+        ?: "centsible://open/widgets".takeIf { action == android.service.quicksettings.TileService.ACTION_QS_TILE_PREFERENCES }
 }

@@ -14,6 +14,7 @@ class AppLinksTest {
         assertEquals(AppLink.To(AppLink.Screen.Plaid), AppLinks.parse("centsible://open/teller"))
         assertEquals(AppLink.To(AppLink.Screen.NetWorth), AppLinks.parse("CENTSIBLE://open/Net-Worth"))
         assertEquals(AppLink.To(AppLink.Screen.NewTransaction), AppLinks.parse("centsible://open/new-transaction"))
+        assertEquals(AppLink.To(AppLink.Screen.Widgets), AppLinks.parse("centsible://open/widgets"))
     }
 
     @Test

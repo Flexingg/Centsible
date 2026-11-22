@@ -19,6 +19,8 @@ class CentsibleApplication : Application() {
     @Inject lateinit var reminderScheduler: ReminderScheduler
     @Inject lateinit var changes: app.centsible.core.domain.BudgetChanges
     @Inject lateinit var appLock: app.centsible.core.domain.AppLockSettings
+    @Inject lateinit var glanceRefresher: app.centsible.glance.GlanceRefresher
+    private var lastNight = -1
 
     override fun onCreate() {
         super.onCreate()
@@ -35,5 +37,15 @@ class CentsibleApplication : Application() {
         }
         scope.launch { appLock.enabled.drop(1).collect { app.centsible.glance.GlanceRefresher.refreshSoon(this@CentsibleApplication) } }
         app.centsible.glance.GlanceRefresher.refreshSoon(this)
+    }
+
+    /** The charts on widgets are drawn in the light or dark palette: redraw them when that changes. */
+    override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {
+        super.onConfigurationChanged(newConfig)
+        val night = newConfig.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK
+        if (night != lastNight) {
+            lastNight = night
+            CoroutineScope(SupervisorJob() + Dispatchers.Default).launch { runCatching { glanceRefresher.redraw() } }
+        }
     }
 }

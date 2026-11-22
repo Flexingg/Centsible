@@ -27,12 +27,27 @@ data class Glanceable(
     val locked: Boolean = false,
     /** Day-by-day spending for the charts; null on a bridge without the daily report. */
     val trend: Trend? = null,
-    /** This month's biggest spending categories (most spent first). */
+    /** This month's spending categories, most spent first (visible ones, including those with nothing spent yet). */
     val categories: List<CategorySlice> = emptyList(),
+    /** What's left in the budget's spending categories this month (their balances, with rollover). */
+    val leftInBudget: Money = Money.Zero,
+    /** Income and spending for the last six months, oldest first (this month last). */
+    val months: List<MonthFlow> = emptyList(),
+    /** Net worth at the end of each of the last twelve months, oldest first. */
+    val netWorth: List<NetWorthPoint> = emptyList(),
 ) {
     data class Bill(val title: String, val amount: Money, val date: String, val whenText: String)
 
-    data class CategorySlice(val name: String, val spent: Money, val budgeted: Money)
+    /** [balance] is what's left in the category this month; [id] opens its transactions. */
+    data class CategorySlice(val name: String, val spent: Money, val budgeted: Money, val id: String? = null, val balance: Money = Money.Zero)
+
+    /** One month's money in and out ([month] is yyyy-MM). Both positive. */
+    data class MonthFlow(val month: String, val income: Money, val spending: Money)
+
+    data class NetWorthPoint(val month: String, val value: Money)
+
+    /** Spent today (from the day-by-day trend), when the bridge reports it. */
+    val spentToday: Money? get() = trend?.monthToDate?.let { m -> if (m.isEmpty()) null else Money(m.last() - (m.getOrNull(m.size - 2) ?: 0)) }
 
     /**
      * Running totals for the month so far and all of last month (cents, by day), and this
@@ -93,12 +108,18 @@ data class Glanceable(
             }
 
         /** The [max] categories with the most spent this month. */
-        fun topCategories(month: BudgetMonth, max: Int = 5): List<CategorySlice> = month.expenseGroups
+        fun topCategories(month: BudgetMonth, max: Int = 5): List<CategorySlice> = allCategories(month).filter { it.spent.minor > 0 }.take(max)
+
+        /** Every visible spending category this month, most spent first. */
+        fun allCategories(month: BudgetMonth): List<CategorySlice> = month.expenseGroups
+            .filter { !it.hidden }
             .flatMap { it.categories }
-            .filter { !it.hidden && it.spent.minor < 0 }
+            .filter { !it.hidden }
             .sortedBy { it.spent.minor }
-            .take(max)
-            .map { CategorySlice(it.name, it.spent.abs(), it.budgeted) }
+            .map { CategorySlice(it.name, Money(maxOf(0, -it.spent.minor)), it.budgeted, it.id.raw, it.balance) }
+
+        /** What's left across the visible spending categories (negative balances count against it). */
+        fun leftInBudget(month: BudgetMonth): Money = Money(month.expenseGroups.filter { !it.hidden }.flatMap { it.categories }.filter { !it.hidden }.sumOf { it.balance.minor })
 
         fun from(month: BudgetMonth, budgetName: String?, reviewCount: Int, bills: List<Bill>, now: Long, monthLabel: String) = Glanceable(
             budgetName = budgetName,

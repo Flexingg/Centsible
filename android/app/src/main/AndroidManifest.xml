@@ -41,7 +41,22 @@
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="centsible" android:host="open" />
             </intent-filter>
+            <!-- Long-pressing a Quick Settings tile: Settings → Widgets & tiles. -->
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE_PREFERENCES" />
+            </intent-filter>
         </activity>
+
+        <!-- Picks the chart when a chart widget is placed or reconfigured. -->
+        <activity
+            android:name=".glance.ChartConfigActivity"
+            android:exported="true"
+            android:theme="@style/Theme.Centsible">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" />
+            </intent-filter>
+        </activity>
+        <receiver android:name=".glance.PinnedChartReceiver" android:exported="false" />
 
         <!-- Home screen widgets -->
         <receiver android:name=".glance.BudgetWidgetReceiver" android:exported="true" android:label="@string/widget_budget_name">
@@ -75,6 +90,13 @@
             <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_categories" />
         </receiver>
 
+        <receiver android:name=".glance.ChartWidgetReceiver" android:exported="true" android:label="@string/widget_chart_name">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_chart" />
+        </receiver>
+
         <!-- Quick Settings tiles -->
         <service
             android:name=".glance.AddTransactionTileService"
@@ -101,6 +123,26 @@
             android:exported="true"
             android:icon="@drawable/ic_tile_sync"
             android:label="@string/tile_sync"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+        <service
+            android:name=".glance.BudgetTileService"
+            android:exported="true"
+            android:icon="@drawable/ic_tile_figure"
+            android:label="@string/tile_figure"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+        <service
+            android:name=".glance.BudgetTile2Service"
+            android:exported="true"
+            android:icon="@drawable/ic_tile_figure"
+            android:label="@string/tile_figure_2"
             android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
             <intent-filter>
                 <action android:name="android.service.quicksettings.action.QS_TILE" />

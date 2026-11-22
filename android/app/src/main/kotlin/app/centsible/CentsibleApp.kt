@@ -93,6 +93,7 @@ private object Routes {
     const val RECURRING = "recurring"
     const val BANK_SYNC = "bank-sync"
     const val PLAID = "bank-sync/plaid"
+    const val WIDGETS = "settings/widgets"
     const val REPORTS = "reports"
     const val MERCHANTS = "merchants"
     const val MERCHANT_RULES = "merchants/rules"
@@ -281,7 +282,8 @@ private fun MainScaffold(
                     )
                 })
             }
-            composable(Routes.SETTINGS) { SettingsRoute(onOpenBankSync = { nav.navigate(Routes.BANK_SYNC) }) }
+            composable(Routes.SETTINGS) { SettingsRoute(onOpenBankSync = { nav.navigate(Routes.BANK_SYNC) }, onOpenWidgets = { nav.navigate(Routes.WIDGETS) { launchSingleTop = true } }) }
+            composable(Routes.WIDGETS) { app.centsible.feature.settings.WidgetsRoute(onBack = { nav.popBackStack() }) }
             composable(Routes.SERVER) { app.centsible.feature.settings.ServerRoute(onBack = { nav.popBackStack() }) }
             composable(Routes.BANK_SYNC) { app.centsible.feature.settings.BankSyncRoute(onBack = { nav.popBackStack() }, onOpenPlaid = { nav.navigate(Routes.PLAID) { launchSingleTop = true } }) }
             composable(Routes.PLAID) { app.centsible.feature.settings.PlaidRoute(onBack = { nav.popBackStack() }) }
@@ -442,6 +444,7 @@ private fun NavHostController.open(link: app.centsible.core.domain.AppLink) {
             LinkScreen.Duplicates -> navigate(Routes.DUPLICATES) { launchSingleTop = true }
             LinkScreen.Mortgage -> navigate(Routes.MORTGAGE) { launchSingleTop = true }
             LinkScreen.NewTransaction -> navigate(Routes.transaction(null)) { launchSingleTop = true }
+            LinkScreen.Widgets -> navigate(Routes.WIDGETS) { launchSingleTop = true }
         }
         is app.centsible.core.domain.AppLink.Account -> go(Destination.Account(app.centsible.core.model.AccountId(link.id)))
         is app.centsible.core.domain.AppLink.Category -> {
