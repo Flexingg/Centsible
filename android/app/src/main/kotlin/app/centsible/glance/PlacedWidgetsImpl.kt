@@ -20,6 +20,7 @@ import app.centsible.core.domain.ChartWidgetConfig
 import app.centsible.core.domain.GlanceableStore
 import app.centsible.core.domain.PlacedWidgets
 import app.centsible.core.domain.WidgetSettings
+import app.centsible.core.domain.WidgetTheme
 import app.centsible.feature.settings.ChartPickerContent
 import dagger.Binds
 import dagger.Module
@@ -31,6 +32,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 private val CHART_RECEIVERS = listOf(ChartWidgetReceiver::class.java, PaceWidgetReceiver::class.java, WeekWidgetReceiver::class.java, CategoriesWidgetReceiver::class.java)
@@ -135,12 +137,14 @@ class ChartConfigActivity : ComponentActivity() {
         lifecycleScope.launch {
             val data = store.read()
             val current = settings.chart(widgetId) ?: settings.consumePendingPin() ?: defaultFor(widgetId)
+            val widgetTheme = runCatching { settings.widgetTheme.first() }.getOrDefault(WidgetTheme.Classic)
             setContent {
                 CentsibleTheme {
                     ChartPickerContent(
                         data = data,
                         initial = current,
                         showCustomization = true,
+                        widgetTheme = widgetTheme,
                         onSave = { config ->
                             lifecycleScope.launch {
                                 settings.setChart(widgetId, config)

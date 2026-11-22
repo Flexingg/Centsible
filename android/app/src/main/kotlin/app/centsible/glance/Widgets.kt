@@ -53,7 +53,9 @@ import app.centsible.core.domain.ChartKind
 import androidx.glance.layout.size
 import androidx.glance.appwidget.GlanceAppWidgetManager
 import app.centsible.core.designsystem.component.MoneyFormat
+import app.centsible.core.designsystem.theme.materialExpressiveTokens
 import app.centsible.core.domain.Glanceable
+import app.centsible.core.domain.WidgetTheme
 import java.text.DateFormat
 import java.util.Date
 
@@ -80,8 +82,13 @@ class BudgetWidget : GlanceAppWidget() {
     override val sizeMode = SizeMode.Responsive(setOf(SMALL, WIDE))
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
-        val data = context.glanceDeps().store().read()
-        provideContent { GlanceTheme { BudgetContent(context, data) } }
+        val deps = context.glanceDeps()
+        val data = deps.store().read()
+        val initialTheme = runCatching { deps.widgetSettings().widgetTheme.first() }.getOrDefault(WidgetTheme.Classic)
+        provideContent {
+            val theme by deps.widgetSettings().widgetTheme.collectAsState(initial = initialTheme)
+            GlanceTheme { BudgetContent(context, data, theme) }
+        }
     }
 }
 
@@ -100,8 +107,13 @@ class BillsWidget : GlanceAppWidget() {
     override val sizeMode = SizeMode.Exact
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
-        val data = context.glanceDeps().store().read()
-        provideContent { GlanceTheme { BillsContent(context, data) } }
+        val deps = context.glanceDeps()
+        val data = deps.store().read()
+        val initialTheme = runCatching { deps.widgetSettings().widgetTheme.first() }.getOrDefault(WidgetTheme.Classic)
+        provideContent {
+            val theme by deps.widgetSettings().widgetTheme.collectAsState(initial = initialTheme)
+            GlanceTheme { BillsContent(context, data, theme) }
+        }
     }
 }
 
@@ -158,7 +170,8 @@ private fun Placeholder(context: Context, data: Glanceable?) {
 }
 
 @Composable
-internal fun BudgetContent(context: Context, data: Glanceable?) {
+internal fun BudgetContent(context: Context, data: Glanceable?, theme: WidgetTheme = WidgetTheme.Classic) {
+    if (theme == WidgetTheme.MaterialExpressive) return ExpressiveBudgetContent(context, data)
     if (data == null || data.locked) return Placeholder(context, data)
     val wide = LocalSize.current.width >= WIDE.width
     Frame(context, "budget") {
@@ -198,7 +211,8 @@ internal fun BudgetContent(context: Context, data: Glanceable?) {
 }
 
 @Composable
-internal fun BillsContent(context: Context, data: Glanceable?) {
+internal fun BillsContent(context: Context, data: Glanceable?, theme: WidgetTheme = WidgetTheme.Classic) {
+    if (theme == WidgetTheme.MaterialExpressive) return ExpressiveBillsContent(context, data)
     if (data == null || data.locked) return Placeholder(context, data)
     Frame(context, "recurring") {
         Label("Upcoming bills")
@@ -240,8 +254,10 @@ internal object CG {
     val negative = dn(L.negative, D.negative)
     val track = dn(L.track, D.track)
 
-    fun palette(context: Context) =
-        if (context.resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK == android.content.res.Configuration.UI_MODE_NIGHT_YES) D else L
+    fun isDark(context: Context): Boolean =
+        context.resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK == android.content.res.Configuration.UI_MODE_NIGHT_YES
+
+    fun palette(context: Context) = if (isDark(context)) D else L
 }
 
 // ── The configurable chart widget ──
@@ -258,11 +274,13 @@ class ChartWidget(private val preset: ChartKind = ChartKind.Pace) : GlanceAppWid
         val deps = context.glanceDeps()
         val widgetId = runCatching { GlanceAppWidgetManager(context).getAppWidgetId(id) }.getOrNull()
         val initialCharts = runCatching { deps.widgetSettings().charts.first() }.getOrDefault(emptyMap())
+        val initialTheme = runCatching { deps.widgetSettings().widgetTheme.first() }.getOrDefault(WidgetTheme.Classic)
         val data = deps.store().read()
         provideContent {
             val charts by deps.widgetSettings().charts.collectAsState(initial = initialCharts)
+            val theme by deps.widgetSettings().widgetTheme.collectAsState(initial = initialTheme)
             val config = widgetId?.let { charts[it] } ?: ChartWidgetConfig(preset)
-            ChartContent(context, data, config, LocalDate.now())
+            GlanceTheme { ChartContent(context, data, config, LocalDate.now(), theme) }
         }
     }
 }
@@ -291,7 +309,18 @@ class WeekWidgetReceiver : ChartReceiver(ChartKind.Week)
 class CategoriesWidgetReceiver : ChartReceiver(ChartKind.Categories)
 
 @Composable
-internal fun ChartContent(context: Context, data: Glanceable?, config: ChartWidgetConfig, today: LocalDate) {
+internal fun ChartContent(
+    context: Context,
+    data: Glanceable?,
+    config: ChartWidgetConfig,
+    today: LocalDate,
+    theme: WidgetTheme = WidgetTheme.Classic,
+) {
+    val effectiveTheme = config.theme ?: theme
+    if (effectiveTheme == WidgetTheme.MaterialExpressive) {
+        ExpressiveChartContent(context, data, config, today)
+        return
+    }
     if (data == null || data.locked) return Placeholder(context, data)
     val art = ChartArt(CG.palette(context), context.resources.displayMetrics.density)
     val face = ChartFaces.face(config, data, today, art)
@@ -368,5 +397,272 @@ private fun LegendRow(context: Context, item: ChartFace.LegendItem) {
         Spacer(GlanceModifier.width(6.dp))
         Text(item.label, style = TextStyle(color = CG.textPrimary, fontSize = 12.sp), maxLines = 1, modifier = GlanceModifier.defaultWeight())
         if (item.value.isNotEmpty()) Text(item.value, style = TextStyle(color = CG.textSecondary, fontSize = 12.sp), maxLines = 1)
+    }
+}
+
+// ── Material 3 Expressive + Material You widget faces ──
+
+@Composable
+private fun ExpressiveFrame(context: Context, open: String, content: @Composable ColumnScope.() -> Unit) {
+    Column(
+        GlanceModifier.fillMaxSize().cornerRadius(28.dp).background(GlanceTheme.colors.widgetBackground)
+            .padding(16.dp).clickable(actionStartActivity(openIntent(context, open))),
+    ) { content() }
+}
+
+@Composable
+private fun ExpressivePlaceholder(context: Context, data: Glanceable?) {
+    ExpressiveFrame(context, if (data?.locked == true) "budget" else "review") {
+        Text(
+            "Centsible",
+            style = TextStyle(color = GlanceTheme.colors.onPrimaryContainer, fontSize = 12.sp, fontWeight = FontWeight.Bold),
+            modifier = GlanceModifier.cornerRadius(16.dp).background(GlanceTheme.colors.primaryContainer).padding(horizontal = 10.dp, vertical = 4.dp),
+            maxLines = 1,
+        )
+        Spacer(GlanceModifier.height(8.dp))
+        Text(
+            when {
+                data?.locked == true -> "App lock is on, so amounts stay hidden. Tap to open Centsible."
+                else -> "Open Centsible once to show your budget here."
+            },
+            style = TextStyle(color = GlanceTheme.colors.onSurfaceVariant, fontSize = 12.sp),
+            maxLines = 3,
+        )
+    }
+}
+
+@Composable
+private fun ExpressiveBudgetContent(context: Context, data: Glanceable?) {
+    if (data == null || data.locked) return ExpressivePlaceholder(context, data)
+    val wide = LocalSize.current.width >= WIDE.width
+    val c = GlanceTheme.colors
+    ExpressiveFrame(context, "budget") {
+        Row(GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                data.month + (data.budgetName?.let { " · $it" } ?: ""),
+                style = TextStyle(color = c.onPrimaryContainer, fontSize = 12.sp, fontWeight = FontWeight.Bold),
+                modifier = GlanceModifier.cornerRadius(16.dp).background(c.primaryContainer).padding(horizontal = 10.dp, vertical = 4.dp),
+                maxLines = 1,
+            )
+            Spacer(GlanceModifier.defaultWeight())
+            Text(
+                "↻",
+                style = TextStyle(color = c.onSecondaryContainer, fontSize = 14.sp, fontWeight = FontWeight.Bold),
+                modifier = GlanceModifier.cornerRadius(16.dp).background(c.secondaryContainer)
+                    .padding(horizontal = 8.dp, vertical = 3.dp).clickable(actionRunCallback<RefreshAction>()),
+            )
+        }
+        Spacer(GlanceModifier.height(8.dp))
+        if (data.envelope) {
+            Text(MoneyFormat.format(data.toBudget, showCents = false), style = TextStyle(color = c.onSurface, fontSize = 28.sp, fontWeight = FontWeight.Bold), maxLines = 1)
+            Text(
+                if (data.toBudget.isNegative) "over-assigned" else "to budget",
+                style = TextStyle(color = if (data.toBudget.isNegative) c.onErrorContainer else c.onSecondaryContainer, fontSize = 11.sp, fontWeight = FontWeight.Medium),
+                modifier = GlanceModifier.padding(top = 2.dp).cornerRadius(12.dp)
+                    .background(if (data.toBudget.isNegative) c.errorContainer else c.secondaryContainer)
+                    .padding(horizontal = 8.dp, vertical = 2.dp),
+                maxLines = 1,
+            )
+        } else {
+            Text(MoneyFormat.format(data.spent, showCents = false), style = TextStyle(color = c.onSurface, fontSize = 28.sp, fontWeight = FontWeight.Bold), maxLines = 1)
+            Text("spent this month", style = TextStyle(color = c.onSurfaceVariant, fontSize = 12.sp), maxLines = 1)
+        }
+        data.spentShare?.let { share ->
+            Spacer(GlanceModifier.height(10.dp))
+            LinearProgressIndicator(
+                progress = share,
+                modifier = GlanceModifier.fillMaxWidth().height(10.dp).cornerRadius(8.dp),
+                color = if (share >= 1f) c.error else c.primary,
+                backgroundColor = c.surfaceVariant,
+            )
+            Spacer(GlanceModifier.height(4.dp))
+            Text(
+                "${MoneyFormat.format(data.spent, showCents = false)} of ${MoneyFormat.format(data.budgeted, showCents = false)} spent",
+                style = TextStyle(color = c.onSurfaceVariant, fontSize = 11.sp),
+                maxLines = 1,
+            )
+        }
+        Spacer(GlanceModifier.defaultWeight())
+        Row(GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                "+ Add",
+                style = TextStyle(color = c.onPrimary, fontSize = 13.sp, fontWeight = FontWeight.Bold),
+                modifier = GlanceModifier.cornerRadius(20.dp).background(c.primary)
+                    .padding(horizontal = 14.dp, vertical = 7.dp)
+                    .clickable(actionStartActivity(openIntent(context, "new-transaction"))),
+            )
+            if (wide || data.reviewCount > 0) {
+                Spacer(GlanceModifier.width(8.dp))
+                Text(
+                    if (data.reviewCount > 0) "Review ${data.reviewCount}" else "Review",
+                    style = TextStyle(color = c.onTertiaryContainer, fontSize = 13.sp, fontWeight = FontWeight.Medium),
+                    modifier = GlanceModifier.cornerRadius(20.dp).background(c.tertiaryContainer)
+                        .padding(horizontal = 14.dp, vertical = 7.dp)
+                        .clickable(actionStartActivity(openIntent(context, "review"))),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ExpressiveBillsContent(context: Context, data: Glanceable?) {
+    if (data == null || data.locked) return ExpressivePlaceholder(context, data)
+    val c = GlanceTheme.colors
+    ExpressiveFrame(context, "recurring") {
+        Text(
+            "Upcoming bills",
+            style = TextStyle(color = c.onPrimaryContainer, fontSize = 12.sp, fontWeight = FontWeight.Bold),
+            modifier = GlanceModifier.cornerRadius(16.dp).background(c.primaryContainer).padding(horizontal = 10.dp, vertical = 4.dp),
+            maxLines = 1,
+        )
+        Spacer(GlanceModifier.height(8.dp))
+        if (data.bills.isEmpty()) {
+            Text("Nothing due in the next two weeks.", style = TextStyle(color = c.onSurfaceVariant, fontSize = 12.sp), maxLines = 2)
+        }
+        val rows = (LocalSize.current.height.value / 52).toInt().coerceIn(1, 4)
+        data.bills.take(rows).forEach { bill ->
+            Row(
+                GlanceModifier.fillMaxWidth().padding(bottom = 6.dp).cornerRadius(16.dp)
+                    .background(c.surfaceVariant).padding(horizontal = 10.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(GlanceModifier.defaultWeight()) {
+                    Text(bill.title, style = TextStyle(color = c.onSurface, fontSize = 13.sp, fontWeight = FontWeight.Bold), maxLines = 1)
+                    Text(bill.whenText, style = TextStyle(color = c.onSurfaceVariant, fontSize = 11.sp), maxLines = 1)
+                }
+                Text(
+                    MoneyFormat.format(bill.amount),
+                    style = TextStyle(color = c.onSecondaryContainer, fontSize = 13.sp, fontWeight = FontWeight.Bold),
+                    modifier = GlanceModifier.cornerRadius(12.dp).background(c.secondaryContainer).padding(horizontal = 8.dp, vertical = 3.dp),
+                    maxLines = 1,
+                )
+            }
+        }
+        Spacer(GlanceModifier.defaultWeight())
+        Text(
+            "Updated " + DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(data.updatedAt)),
+            style = TextStyle(color = c.onSurfaceVariant, fontSize = 11.sp),
+            maxLines = 1,
+        )
+    }
+}
+
+@Composable
+private fun ExpressiveChartContent(context: Context, data: Glanceable?, config: ChartWidgetConfig, today: LocalDate) {
+    if (data == null || data.locked) return ExpressivePlaceholder(context, data)
+    val c = GlanceTheme.colors
+    val density = context.resources.displayMetrics.density
+    val m3 = materialExpressiveTokens(context, CG.isDark(context))
+    val art = ChartArt(m3.colors, density, expressive = true, customPalette = m3.palette)
+    val face = ChartFaces.face(config, data, today, art)
+    val size = LocalSize.current
+    ExpressiveFrame(context, face.link) {
+        Row(GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                face.title,
+                style = TextStyle(color = c.onPrimaryContainer, fontSize = 12.sp, fontWeight = FontWeight.Bold),
+                maxLines = 1,
+                modifier = GlanceModifier.cornerRadius(16.dp).background(c.primaryContainer).padding(horizontal = 10.dp, vertical = 4.dp),
+            )
+            Spacer(GlanceModifier.defaultWeight())
+            Text(
+                "↻",
+                style = TextStyle(color = c.onSecondaryContainer, fontSize = 14.sp, fontWeight = FontWeight.Bold),
+                modifier = GlanceModifier.cornerRadius(16.dp).background(c.secondaryContainer)
+                    .padding(horizontal = 8.dp, vertical = 3.dp).clickable(actionRunCallback<RefreshAction>()),
+            )
+        }
+        val draw = face.draw
+        if (draw == null) {
+            Spacer(GlanceModifier.height(8.dp))
+            Text(face.emptyMessage.orEmpty(), style = TextStyle(color = c.onSurfaceVariant, fontSize = 12.sp), maxLines = 3)
+            return@ExpressiveFrame
+        }
+        val (pillBg, pillFg) = when (face.tone) {
+            ChartFace.Tone.Good -> c.tertiaryContainer to c.onTertiaryContainer
+            ChartFace.Tone.Bad -> c.errorContainer to c.onErrorContainer
+            ChartFace.Tone.Neutral -> c.secondaryContainer to c.onSecondaryContainer
+        }
+        Spacer(GlanceModifier.height(6.dp))
+        if (face.square) {
+            val ringDp = (minOf(size.height.value - 66, size.width.value * 0.42f)).coerceAtLeast(54f)
+            Row(
+                GlanceModifier.fillMaxSize().cornerRadius(20.dp).background(c.surfaceVariant).padding(10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Image(
+                    provider = ImageProvider(draw(art, (ringDp * density).toInt(), (ringDp * density).toInt())),
+                    contentDescription = "${face.title}: ${face.headline}",
+                    modifier = GlanceModifier.size(ringDp.dp),
+                )
+                Spacer(GlanceModifier.width(12.dp))
+                Column(GlanceModifier.defaultWeight()) {
+                    Text(face.headline, style = TextStyle(color = c.onSurface, fontSize = 23.sp, fontWeight = FontWeight.Bold), maxLines = 1)
+                    if (face.subtitle.isNotBlank()) {
+                        Spacer(GlanceModifier.height(2.dp))
+                        Text(
+                            face.subtitle,
+                            style = TextStyle(color = pillFg, fontSize = 10.sp, fontWeight = FontWeight.Medium),
+                            modifier = GlanceModifier.cornerRadius(10.dp).background(pillBg).padding(horizontal = 7.dp, vertical = 2.dp),
+                            maxLines = 1,
+                        )
+                    }
+                    Spacer(GlanceModifier.height(5.dp))
+                    val rows = ((size.height.value - 108) / 20).toInt().coerceIn(0, face.legend.size)
+                    face.legend.take(rows).forEach { item -> ExpressiveLegendRow(context, item) }
+                }
+            }
+        } else {
+            Row(GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text(face.headline, style = TextStyle(color = c.onSurface, fontSize = 25.sp, fontWeight = FontWeight.Bold), maxLines = 1)
+                if (face.subtitle.isNotBlank() && size.width.value >= 210f) {
+                    Spacer(GlanceModifier.width(8.dp))
+                    Text(
+                        face.subtitle,
+                        style = TextStyle(color = pillFg, fontSize = 11.sp, fontWeight = FontWeight.Medium),
+                        modifier = GlanceModifier.cornerRadius(12.dp).background(pillBg).padding(horizontal = 8.dp, vertical = 2.dp),
+                        maxLines = 1,
+                    )
+                }
+            }
+            if (face.subtitle.isNotBlank() && size.width.value < 210f) {
+                Text(face.subtitle, style = TextStyle(color = pillFg, fontSize = 11.sp), maxLines = 1)
+            }
+            if (face.legend.isNotEmpty() && size.height.value > 165) {
+                Row(GlanceModifier.padding(top = 3.dp)) {
+                    face.legend.forEach { item ->
+                        Text("● ", style = TextStyle(color = androidx.glance.unit.ColorProvider(item.color), fontSize = 10.sp))
+                        Text(item.label + "   ", style = TextStyle(color = c.onSurfaceVariant, fontSize = 10.sp))
+                    }
+                }
+            }
+            Spacer(GlanceModifier.height(6.dp))
+            val reserved = if (face.legend.isNotEmpty() && size.height.value > 165) 104 else 88
+            val w = ((size.width.value - 48) * density).toInt().coerceAtLeast(60)
+            val h = ((size.height.value - 44 - reserved) * density).toInt().coerceAtLeast(40)
+            Column(
+                GlanceModifier.fillMaxWidth().defaultWeight().cornerRadius(20.dp)
+                    .background(c.surfaceVariant).padding(horizontal = 8.dp, vertical = 6.dp),
+            ) {
+                Image(
+                    provider = ImageProvider(draw(art, w, h)),
+                    contentDescription = "${face.title}: ${face.headline}, ${face.subtitle}",
+                    modifier = GlanceModifier.fillMaxSize(),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ExpressiveLegendRow(context: Context, item: ChartFace.LegendItem) {
+    val c = GlanceTheme.colors
+    val modifier = GlanceModifier.fillMaxWidth().padding(vertical = 1.dp).let { m -> item.link?.let { m.clickable(actionStartActivity(openIntent(context, it))) } ?: m }
+    Row(modifier, verticalAlignment = Alignment.CenterVertically) {
+        Text("●", style = TextStyle(color = androidx.glance.unit.ColorProvider(item.color), fontSize = 11.sp))
+        Spacer(GlanceModifier.width(6.dp))
+        Text(item.label, style = TextStyle(color = c.onSurface, fontSize = 11.sp, fontWeight = FontWeight.Medium), maxLines = 1, modifier = GlanceModifier.defaultWeight())
+        if (item.value.isNotEmpty()) Text(item.value, style = TextStyle(color = c.onSurfaceVariant, fontSize = 11.sp), maxLines = 1)
     }
 }

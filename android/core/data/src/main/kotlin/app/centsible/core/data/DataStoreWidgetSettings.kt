@@ -14,6 +14,7 @@ import app.centsible.core.domain.SavedChart
 import app.centsible.core.domain.TileConfig
 import app.centsible.core.domain.TileMetric
 import app.centsible.core.domain.WidgetSettings
+import app.centsible.core.domain.WidgetTheme
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -27,6 +28,7 @@ import kotlinx.serialization.json.Json
 private const val CHART_PREFIX = "widget_chart_"
 private val SAVED_CHARTS_KEY = stringPreferencesKey("custom_saved_charts_v1")
 private val PENDING_PIN_KEY = stringPreferencesKey("widget_pending_pin_v1")
+private val WIDGET_THEME_KEY = stringPreferencesKey("widget_theme_v1")
 private fun tileKey(slot: Int) = stringPreferencesKey("tile_config_$slot")
 
 private val codecJson = Json { ignoreUnknownKeys = true; encodeDefaults = true }
@@ -45,6 +47,7 @@ private data class ChartConfigWire(
     val showComparison: Boolean = true,
     val showLegend: Boolean = true,
     val categoryIds: List<String> = emptyList(),
+    val theme: String? = null,
 ) {
     fun toModel(): ChartWidgetConfig? = ChartKind.of(kind)?.let { k ->
         ChartWidgetConfig(
@@ -60,6 +63,7 @@ private data class ChartConfigWire(
             showComparison = showComparison,
             showLegend = showLegend,
             categoryIds = categoryIds,
+            theme = theme?.let(WidgetTheme::of),
         )
     }
 
@@ -77,6 +81,7 @@ private data class ChartConfigWire(
             showComparison = c.showComparison,
             showLegend = c.showLegend,
             categoryIds = c.categoryIds,
+            theme = c.theme?.id,
         )
     }
 }
@@ -180,6 +185,13 @@ class DataStoreWidgetSettings @Inject constructor(@ApplicationContext private va
             }
         }
         return found
+    }
+
+    override val widgetTheme: Flow<WidgetTheme> = store.data.map { prefs ->
+        WidgetTheme.of(prefs[WIDGET_THEME_KEY])
+    }
+    override suspend fun setWidgetTheme(theme: WidgetTheme) {
+        store.edit { it[WIDGET_THEME_KEY] = theme.id }
     }
 
     override val tiles: Flow<List<TileConfig>> = store.data.map { prefs ->
