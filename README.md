@@ -72,17 +72,22 @@ Actual has no account types, so Centsible keeps them on the bridge: **Cash, Savi
 
 ## Widgets and Quick Settings tiles
 
-- **Home screen widgets** (long-press the home screen → Widgets → Centsible):
-  - **Budget**: this month's "to budget" (or spending, for tracking budgets), how much of the budget is spent, and how many transactions wait for review, with **+ Add** and **Review** buttons. ↻ refreshes it.
-  - **Upcoming bills**: the next bills from your recurring schedules over two weeks.
-- **Quick Settings tiles** (pull down the notification shade twice → edit ✏️ → drag them in):
-  - **Add transaction** opens a new transaction.
-  - **Review** shows how many transactions wait and opens the review inbox.
-  - **Sync banks** starts a bank sync on the bridge without opening the app, and shows when it finished and what came in.
+**Settings → Widgets & tiles** shows every chart widget on your home screen and both figure tiles, with live previews, and lets you change what each one shows.
 
-  - **Spending pace**: this month's running spending as a line over last month's (dashed), with the month's budget, and how far ahead or behind last month you are by today.
-  - **This week**: Monday to Sunday as bars against a daily allowance (the month's budget over its days), with what's left of the week's allowance and last week's total.
-  - **Top spending**: this month's biggest categories, spent against budgeted.
+- **Chart widgets** (long-press the home screen → Widgets → Centsible, or **Add** in Widgets & tiles). Each one shows the chart you pick when you place it; long-press it later to choose again:
+  - **Spending pace**: this month's running spending against last month's, with the budget line.
+  - **This week**: Monday to Sunday against your daily allowance.
+  - **Where it went**: this month by category, as a ring; tap a category in the legend to open its transactions.
+  - **One category**: a category's budget as a ring, what's left, and whether it's spending faster than the month.
+  - **Monthly spending**: six months with the average.
+  - **Income vs spending**: six months of money in and out.
+  - **Net worth**: twelve months.
+
+  Charts use Centsible's colours, light or dark with the phone. Tapping a chart opens that screen in the app; ↻ refreshes it.
+- **Budget** and **Upcoming bills** widgets: this month's to-budget and spending with **+ Add** and **Review**, and the next bills.
+- **Quick Settings tiles** (pull down the shade twice → ✏️ → drag them in):
+  - **Budget figure** and **Budget figure (2)**: each shows the figure you pick, such as left to spend today (what's left this month spread over the days left, minus today's spending), left this month, left this week, spent today, to budget, or one category's balance. Long-press one to change it.
+  - **Add transaction**, **Review** (with the count waiting) and **Sync banks**.
 
 They refresh about every hour, a few seconds after you change something in the app, and when you tap ↻. With the **app lock** on, they show no amounts or counts.
 
@@ -97,7 +102,7 @@ Other apps (Home Assistant dashboards and notifications, launcher shortcuts) can
 | Link | Opens |
 |---|---|
 | `centsible://open/review` | your review inbox |
-| `centsible://open/transactions`, `/accounts`, `/budget`, `/net-worth`, `/recurring`, `/trends`, `/bank-sync`, `/plaid`, `/new-transaction`, `/duplicates`, `/mortgage` | that screen |
+| `centsible://open/transactions`, `/accounts`, `/budget`, `/net-worth`, `/recurring`, `/trends`, `/bank-sync`, `/plaid`, `/new-transaction`, `/widgets`, `/duplicates`, `/mortgage` | that screen |
 | `centsible://open/account/<account id>` | one account |
 | `centsible://open/category/<category id>?name=Groceries[&month=2026-11]` | a category's transactions |
 

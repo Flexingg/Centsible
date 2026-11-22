@@ -11,4 +11,6 @@
     android:updatePeriodMillis="0"
     android:initialLayout="@layout/glance_default_loading_layout"
     android:previewLayout="@layout/glance_default_loading_layout"
+    android:configure="app.centsible.glance.ChartConfigActivity"
+    android:widgetFeatures="reconfigurable|configuration_optional"
     android:description="@string/widget_week_description" />

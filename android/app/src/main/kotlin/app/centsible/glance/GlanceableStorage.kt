@@ -57,7 +57,10 @@ class PrefsGlanceableStore @Inject constructor(@ApplicationContext context: Cont
             .put("updatedAt", g.updatedAt)
             .put("locked", g.locked)
             .put("bills", JSONArray(g.bills.map { JSONObject().put("title", it.title).put("amount", it.amount.minor).put("date", it.date).put("when", it.whenText) }))
-            .put("categories", JSONArray(g.categories.map { JSONObject().put("name", it.name).put("spent", it.spent.minor).put("budgeted", it.budgeted.minor) }))
+            .put("categories", JSONArray(g.categories.map { JSONObject().put("name", it.name).put("spent", it.spent.minor).put("budgeted", it.budgeted.minor).put("id", it.id ?: JSONObject.NULL).put("balance", it.balance.minor) }))
+            .put("leftInBudget", g.leftInBudget.minor)
+            .put("months", JSONArray(g.months.map { JSONObject().put("month", it.month).put("income", it.income.minor).put("spending", it.spending.minor) }))
+            .put("netWorth", JSONArray(g.netWorth.map { JSONObject().put("month", it.month).put("value", it.value.minor) }))
             .put("trend", g.trend?.let { t ->
                 JSONObject()
                     .put("monthToDate", JSONArray(t.monthToDate))
@@ -98,7 +101,18 @@ class PrefsGlanceableStore @Inject constructor(@ApplicationContext context: Cont
                     )
                 },
                 categories = (o.optJSONArray("categories") ?: JSONArray()).let { a ->
-                    (0 until a.length()).map { i -> a.getJSONObject(i).let { c -> Glanceable.CategorySlice(c.getString("name"), Money(c.getLong("spent")), Money(c.getLong("budgeted"))) } }
+                    (0 until a.length()).map { i ->
+                        a.getJSONObject(i).let { c ->
+                            Glanceable.CategorySlice(c.getString("name"), Money(c.getLong("spent")), Money(c.getLong("budgeted")), if (c.isNull("id")) null else c.optString("id"), Money(c.optLong("balance", 0)))
+                        }
+                    }
+                },
+                leftInBudget = Money(o.optLong("leftInBudget", 0)),
+                months = (o.optJSONArray("months") ?: JSONArray()).let { a ->
+                    (0 until a.length()).map { i -> a.getJSONObject(i).let { m -> Glanceable.MonthFlow(m.getString("month"), Money(m.getLong("income")), Money(m.getLong("spending"))) } }
+                },
+                netWorth = (o.optJSONArray("netWorth") ?: JSONArray()).let { a ->
+                    (0 until a.length()).map { i -> a.getJSONObject(i).let { p -> Glanceable.NetWorthPoint(p.getString("month"), Money(p.getLong("value"))) } }
                 },
             )
         }

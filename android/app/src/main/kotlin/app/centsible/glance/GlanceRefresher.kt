@@ -73,7 +73,14 @@ class GlanceRefresher @Inject constructor(
                 Glanceable.Trend.from(days, today, month.totalBudgeted.minor)
             }.getOrNull()
             Glanceable.from(month, name, review, bills, System.currentTimeMillis(), today.month.getDisplayName(TextStyle.FULL, Locale.getDefault()))
-                .copy(locked = locked, trend = trend, categories = Glanceable.topCategories(month))
+                .copy(
+                    locked = locked, trend = trend, categories = Glanceable.allCategories(month), leftInBudget = Glanceable.leftInBudget(month),
+                    months = runCatching {
+                        reports.cashFlow(budget, YearMonth(today.minusMonths(5).toString().take(7)), ym)
+                            .map { Glanceable.MonthFlow(it.month.raw, it.income.abs(), it.expenses.abs()) }
+                    }.getOrDefault(emptyList()),
+                    netWorth = runCatching { reports.netWorth(budget, 12).map { Glanceable.NetWorthPoint(it.month.raw, it.netWorth) } }.getOrDefault(emptyList()),
+                )
         }
         result.onSuccess { store.write(it) }
         // Locking or unlocking still applies to the copy already there.
@@ -85,10 +92,8 @@ class GlanceRefresher @Inject constructor(
     suspend fun redraw() {
         runCatching { BudgetWidget().updateAll(context) }
         runCatching { BillsWidget().updateAll(context) }
-        runCatching { PaceWidget().updateAll(context) }
-        runCatching { WeekWidget().updateAll(context) }
-        runCatching { CategoriesWidget().updateAll(context) }
-        for (tile in listOf(ReviewTileService::class.java, SyncTileService::class.java)) {
+        runCatching { ChartWidget().updateAll(context) }
+        for (tile in listOf(ReviewTileService::class.java, SyncTileService::class.java, BudgetTileService::class.java, BudgetTile2Service::class.java)) {
             runCatching { TileService.requestListeningState(context, ComponentName(context, tile)) }
         }
     }
@@ -134,6 +139,7 @@ interface GlanceDeps {
     fun store(): GlanceableStore
     fun sessions(): SessionStore
     fun services(): AccountServices
+    fun widgetSettings(): app.centsible.core.domain.WidgetSettings
 }
 
 internal fun Context.glanceDeps(): GlanceDeps = EntryPointAccessors.fromApplication(applicationContext, GlanceDeps::class.java)

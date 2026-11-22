@@ -10,6 +10,10 @@
     <string name="widget_week_description">Spending each day this week against your weekly allowance</string>
     <string name="widget_categories_name">Top spending</string>
     <string name="widget_categories_description">This month\'s biggest categories, spent against budgeted</string>
+    <string name="widget_chart_name">Centsible chart</string>
+    <string name="widget_chart_description">Any chart you choose: pace, week, categories, one category, monthly, income vs spending, net worth</string>
+    <string name="tile_figure">Budget figure</string>
+    <string name="tile_figure_2">Budget figure (2)</string>
     <string name="tile_add">Add transaction</string>
     <string name="tile_review">Review</string>
     <string name="tile_sync">Sync banks</string>
