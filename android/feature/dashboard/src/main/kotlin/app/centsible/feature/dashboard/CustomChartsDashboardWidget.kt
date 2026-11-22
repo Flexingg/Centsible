@@ -20,9 +20,9 @@ import app.centsible.core.extensions.DashboardWidget
 import app.centsible.core.extensions.Destination
 import app.centsible.core.model.CategoryId
 import app.centsible.core.model.Feature
+import app.centsible.core.model.YearMonth
 import app.centsible.core.ui.chart.ChartPreviewCard
 import java.time.LocalDate
-import java.time.YearMonth
 import javax.inject.Inject
 
 /** Renders user-created custom charts pinned to the in-app Home dashboard. */
@@ -68,7 +68,8 @@ class CustomChartsDashboardWidget @Inject constructor(
         ChartKind.Category -> {
             val cid = config.categoryId
             val name = config.categoryName ?: "Category"
-            if (cid != null) Destination.TransactionsFor.month(name, context.month?.month ?: YearMonth.now(), categoryId = CategoryId(cid))
+            val ym = context.month?.month ?: LocalDate.now().let { YearMonth.of(it.year, it.monthValue) }
+            if (cid != null) Destination.TransactionsFor.month(name, ym, categoryId = CategoryId(cid))
             else Destination.Budget
         }
     }
