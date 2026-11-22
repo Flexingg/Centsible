@@ -1,14 +1,13 @@
 package app.centsible.feature.settings
 
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -21,7 +20,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.CircleShape
@@ -32,15 +30,18 @@ import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -53,14 +54,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -68,21 +66,24 @@ import androidx.lifecycle.viewModelScope
 import app.centsible.core.designsystem.component.MoneyFormat
 import app.centsible.core.designsystem.component.SectionCard
 import app.centsible.core.designsystem.theme.CentsibleTheme
+import app.centsible.core.domain.ChartAccent
 import app.centsible.core.domain.ChartKind
+import app.centsible.core.domain.ChartSeries
+import app.centsible.core.domain.ChartStyle
 import app.centsible.core.domain.ChartWidgetConfig
 import app.centsible.core.domain.DEFAULT_TILES
 import app.centsible.core.domain.Glanceable
 import app.centsible.core.domain.GlanceableStore
 import app.centsible.core.domain.PlacedWidgets
+import app.centsible.core.domain.SavedChart
 import app.centsible.core.domain.TileConfig
 import app.centsible.core.domain.TileMetric
 import app.centsible.core.domain.TileMetrics
 import app.centsible.core.domain.WidgetSettings
-import app.centsible.core.ui.chart.ChartArt
-import app.centsible.core.ui.chart.ChartFace
-import app.centsible.core.ui.chart.ChartFaces
+import app.centsible.core.ui.chart.ChartPreviewCard
 import dagger.hilt.android.lifecycle.HiltViewModel
 import java.time.LocalDate
+import java.util.UUID
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -102,6 +103,12 @@ data class WidgetsUiState(
     /** The tile slot being chosen. */
     val choosingTile: Int? = null,
     val message: String? = null,
+    /** User-created custom charts that can be shown on the Home dashboard and/or pinned as widgets. */
+    val savedCharts: List<SavedChart> = emptyList(),
+    /** Custom chart currently being created/edited in the chart builder sheet. */
+    val editingSavedChart: SavedChart? = null,
+    /** Enables the Custom Charts studio section (kept false in legacy screenshot defaults). */
+    val showCustomCharts: Boolean = false,
 ) {
     companion object {
         const val NEW = -1
@@ -114,7 +121,7 @@ class WidgetsViewModel @Inject constructor(
     private val settings: WidgetSettings,
     private val widgets: PlacedWidgets,
 ) : ViewModel() {
-    private val state = MutableStateFlow(WidgetsUiState())
+    private val state = MutableStateFlow(WidgetsUiState(showCustomCharts = true))
     val uiState: StateFlow<WidgetsUiState> = state.asStateFlow()
 
     init { load() }
@@ -125,11 +132,59 @@ class WidgetsViewModel @Inject constructor(
         val placed = runCatching { widgets.chartWidgets() }.getOrDefault(emptyMap())
             .map { (id, preset) -> id to (chosen[id] ?: ChartWidgetConfig(preset)) }
             .sortedBy { it.first }
-        state.update { it.copy(data = data, placed = placed, tiles = settings.tiles.first()) }
+        state.update {
+            it.copy(
+                data = data,
+                placed = placed,
+                tiles = settings.tiles.first(),
+                savedCharts = settings.savedCharts.first(),
+            )
+        }
     }
 
     fun chooseChart(id: Int?) = state.update { it.copy(choosingChart = id) }
     fun chooseTile(slot: Int?) = state.update { it.copy(choosingTile = slot) }
+
+    fun startNewCustomChart() = state.update {
+        it.copy(editingSavedChart = SavedChart(id = UUID.randomUUID().toString(), config = ChartWidgetConfig(ChartKind.Monthly), showOnDashboard = true))
+    }
+
+    fun editCustomChart(chart: SavedChart) = state.update { it.copy(editingSavedChart = chart) }
+    fun dismissCustomChart() = state.update { it.copy(editingSavedChart = null) }
+
+    fun saveCustomChart(config: ChartWidgetConfig, showOnDashboard: Boolean) = viewModelScope.launch {
+        val editing = state.value.editingSavedChart ?: return@launch
+        val saved = editing.copy(config = config, showOnDashboard = showOnDashboard)
+        settings.saveCustomChart(saved)
+        state.update {
+            it.copy(
+                editingSavedChart = null,
+                message = if (showOnDashboard) "Custom chart saved and added to Home" else "Custom chart saved",
+            )
+        }
+        load()
+    }
+
+    fun toggleCustomChartDashboard(chart: SavedChart, show: Boolean) = viewModelScope.launch {
+        settings.saveCustomChart(chart.copy(showOnDashboard = show))
+        load()
+    }
+
+    fun deleteCustomChart(chart: SavedChart) = viewModelScope.launch {
+        settings.deleteCustomChart(chart.id)
+        state.update { it.copy(message = "Custom chart removed") }
+        load()
+    }
+
+    fun pinCustomChart(chart: SavedChart) {
+        val asked = widgets.requestPin(chart.config)
+        state.update {
+            it.copy(
+                message = if (asked) "Your home screen asks where to put it"
+                else "Your home screen can't add widgets from apps. Long-press the home screen → Widgets → Centsible instead.",
+            )
+        }
+    }
 
     fun saveChart(config: ChartWidgetConfig) = viewModelScope.launch {
         val id = state.value.choosingChart ?: return@launch
@@ -142,7 +197,7 @@ class WidgetsViewModel @Inject constructor(
         } else {
             settings.setChart(id, config)
             widgets.redraw()
-            state.update { it.copy(message = "Widget now shows ${config.kind.title.lowercase()}") }
+            state.update { it.copy(message = "Widget now shows ${(config.title?.takeIf { t -> t.isNotBlank() } ?: config.kind.title).lowercase()}") }
         }
         load()
     }
@@ -171,6 +226,13 @@ fun WidgetsRoute(onBack: () -> Unit, viewModel: WidgetsViewModel = hiltViewModel
         chooseTile = viewModel::chooseTile,
         saveTile = viewModel::saveTile,
         messageShown = viewModel::messageShown,
+        onNewCustomChart = viewModel::startNewCustomChart,
+        onEditCustomChart = viewModel::editCustomChart,
+        onDismissCustomChart = viewModel::dismissCustomChart,
+        onSaveCustomChart = viewModel::saveCustomChart,
+        onToggleCustomChartDashboard = viewModel::toggleCustomChartDashboard,
+        onDeleteCustomChart = viewModel::deleteCustomChart,
+        onPinCustomChart = viewModel::pinCustomChart,
     )
 }
 
@@ -183,6 +245,13 @@ fun WidgetsScreen(
     chooseTile: (Int?) -> Unit = {},
     saveTile: (TileConfig) -> Unit = {},
     messageShown: () -> Unit = {},
+    onNewCustomChart: () -> Unit = {},
+    onEditCustomChart: (SavedChart) -> Unit = {},
+    onDismissCustomChart: () -> Unit = {},
+    onSaveCustomChart: (ChartWidgetConfig, Boolean) -> Unit = { _, _ -> },
+    onToggleCustomChartDashboard: (SavedChart, Boolean) -> Unit = { _, _ -> },
+    onDeleteCustomChart: (SavedChart) -> Unit = {},
+    onPinCustomChart: (SavedChart) -> Unit = {},
     today: LocalDate = LocalDate.now(),
 ) {
     val colors = CentsibleTheme.colors
@@ -211,6 +280,41 @@ fun WidgetsScreen(
                     modifier = Modifier.padding(horizontal = 4.dp),
                 )
             }
+            if (state.showCustomCharts) {
+                item {
+                    SectionCard("Custom charts", action = "New", onAction = onNewCustomChart) {
+                        if (state.savedCharts.isEmpty()) {
+                            Text(
+                                "Build custom charts with your choice of metric, style, colors, and range — then show them on your Home dashboard, pin them as a widget, or both.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = colors.textSecondary,
+                            )
+                        }
+                        state.savedCharts.forEachIndexed { idx, chart ->
+                            if (idx > 0) {
+                                Spacer(Modifier.height(10.dp))
+                                HorizontalDivider(color = colors.border)
+                                Spacer(Modifier.height(10.dp))
+                            }
+                            ChartPreview(chart.config, state.data, today, height = 170.dp, onClick = { onEditCustomChart(chart) })
+                            Spacer(Modifier.height(6.dp))
+                            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                                Text("Show on Home dashboard", style = MaterialTheme.typography.bodySmall, color = colors.textSecondary, modifier = Modifier.weight(1f))
+                                Switch(
+                                    checked = chart.showOnDashboard,
+                                    onCheckedChange = { onToggleCustomChartDashboard(chart, it) },
+                                )
+                            }
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                TextButton(onClick = { onPinCustomChart(chart) }) { Text("Pin widget") }
+                                TextButton(onClick = { onEditCustomChart(chart) }) { Text("Customize") }
+                                Spacer(Modifier.weight(1f))
+                                TextButton(onClick = { onDeleteCustomChart(chart) }) { Text("Delete", color = colors.negative) }
+                            }
+                        }
+                    }
+                }
+            }
             item {
                 SectionCard("Chart widgets", action = "Add", onAction = { chooseChart(WidgetsUiState.NEW) }) {
                     if (state.placed.isEmpty()) {
@@ -218,7 +322,8 @@ fun WidgetsScreen(
                     }
                     state.placed.forEachIndexed { i, (id, config) ->
                         if (i > 0) Spacer(Modifier.height(12.dp))
-                        Text("Widget ${i + 1} · ${config.kind.title}" + (config.categoryName?.let { " · $it" } ?: ""), style = MaterialTheme.typography.labelLarge, color = colors.textSecondary)
+                        val label = config.title?.takeIf { it.isNotBlank() } ?: (config.kind.title + (config.categoryName?.let { " · $it" } ?: ""))
+                        Text("Widget ${i + 1} · $label", style = MaterialTheme.typography.labelLarge, color = colors.textSecondary)
                         Spacer(Modifier.height(6.dp))
                         ChartPreview(config, state.data, today, height = 170.dp, onClick = { chooseChart(id) })
                         TextButton(onClick = { chooseChart(id) }) { Text("Change what it shows") }
@@ -242,7 +347,24 @@ fun WidgetsScreen(
     }
     state.choosingChart?.let { id ->
         val current = state.placed.firstOrNull { it.first == id }?.second ?: ChartWidgetConfig(ChartKind.Pace)
-        ChartPickerSheet(state.data, current, isNew = id == WidgetsUiState.NEW, today = today, onSave = saveChart, onDismiss = { chooseChart(null) })
+        ChartPickerSheet(
+            data = state.data,
+            current = current,
+            isNew = id == WidgetsUiState.NEW,
+            showCustomization = state.showCustomCharts,
+            today = today,
+            onSave = saveChart,
+            onDismiss = { chooseChart(null) },
+        )
+    }
+    state.editingSavedChart?.let { editing ->
+        CustomChartBuilderSheet(
+            data = state.data,
+            initial = editing,
+            today = today,
+            onSave = onSaveCustomChart,
+            onDismiss = onDismissCustomChart,
+        )
     }
     state.choosingTile?.let { slot ->
         TilePickerSheet(slot, state.tiles.getOrElse(slot) { DEFAULT_TILES[0] }, state.data, today, onSave = saveTile, onDismiss = { chooseTile(null) })
@@ -280,84 +402,51 @@ private fun TileRow(slot: Int, config: TileConfig, data: Glanceable?, today: Loc
  */
 @Composable
 fun ChartPreview(config: ChartWidgetConfig, data: Glanceable?, today: LocalDate, height: Dp, modifier: Modifier = Modifier, onClick: (() -> Unit)? = null, compact: Boolean = false) {
-    val colors = CentsibleTheme.colors
-    val density = LocalDensity.current.density
-    val art = remember(colors, density) { ChartArt(colors, density) }
-    val face = data?.let { ChartFaces.face(config, it, today, art) }
-    Column(
-        modifier.fillMaxWidth().height(height).clip(RoundedCornerShape(24.dp)).background(colors.card).border(1.dp, colors.border, RoundedCornerShape(24.dp))
-            .let { m -> onClick?.let { m.clickable(onClick = it) } ?: m }.padding(16.dp),
-    ) {
-        if (face == null) {
-            Text(config.kind.title, style = MaterialTheme.typography.labelLarge, color = colors.textSecondary)
-            Text("Open the app's Home once to fill the preview.", style = MaterialTheme.typography.bodySmall, color = colors.textTertiary)
-            return@Column
-        }
-        Text(face.title, style = MaterialTheme.typography.labelMedium, color = colors.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        val draw = face.draw
-        if (draw == null) {
-            Text(face.emptyMessage.orEmpty(), style = MaterialTheme.typography.bodySmall, color = colors.textTertiary, modifier = Modifier.padding(top = 6.dp))
-            return@Column
-        }
-        val tone = when (face.tone) {
-            ChartFace.Tone.Good -> colors.positive
-            ChartFace.Tone.Bad -> colors.negative
-            ChartFace.Tone.Neutral -> colors.textSecondary
-        }
-        BoxWithConstraints(Modifier.fillMaxWidth().weight(1f)) {
-            if (face.square) {
-                val ring = minOf(maxHeight, maxWidth * 0.45f)
-                val ringPx = with(LocalDensity.current) { ring.toPx() }.toInt()
-                val bmp = remember(face, ringPx, colors) { draw(art, ringPx, ringPx) }
-                Row(Modifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically) {
-                    Image(bmp.asImageBitmap(), contentDescription = "${face.title}: ${face.headline}", modifier = Modifier.size(ring))
-                    Spacer(Modifier.width(14.dp))
-                    Column(Modifier.weight(1f)) {
-                        Text(face.headline, fontSize = if (compact) 16.sp else 22.sp, fontWeight = FontWeight.Bold, color = colors.textPrimary, maxLines = 1)
-                        Text(face.subtitle, style = MaterialTheme.typography.labelSmall, color = tone, maxLines = 2)
-                        if (!compact) face.legend.take(4).forEach { item ->
-                            Row(Modifier.padding(top = 3.dp), verticalAlignment = Alignment.CenterVertically) {
-                                Box(Modifier.size(8.dp).background(item.color, CircleShape))
-                                Spacer(Modifier.width(6.dp))
-                                Text(item.label, style = MaterialTheme.typography.labelSmall, color = colors.textPrimary, maxLines = 1, modifier = Modifier.weight(1f))
-                                Text(item.value, style = MaterialTheme.typography.labelSmall, color = colors.textSecondary)
-                            }
-                        }
-                    }
-                }
-            } else {
-                Column(Modifier.fillMaxSize()) {
-                    Text(face.headline, fontSize = if (compact) 16.sp else 22.sp, fontWeight = FontWeight.Bold, color = colors.textPrimary, maxLines = 1)
-                    Text(face.subtitle, style = MaterialTheme.typography.labelSmall, color = tone, maxLines = 1)
-                    if (face.legend.isNotEmpty()) {
-                        Row(Modifier.padding(top = 2.dp), verticalAlignment = Alignment.CenterVertically) {
-                            face.legend.forEach { item ->
-                                Box(Modifier.size(7.dp).background(item.color, CircleShape))
-                                Text(" ${item.label}   ", style = MaterialTheme.typography.labelSmall, color = colors.textSecondary)
-                            }
-                        }
-                    }
-                    Spacer(Modifier.height(4.dp))
-                    BoxWithConstraints(Modifier.fillMaxWidth().weight(1f)) {
-                        val cw = with(LocalDensity.current) { maxWidth.toPx() }.toInt().coerceAtLeast(40)
-                        val ch = with(LocalDensity.current) { maxHeight.toPx() }.toInt().coerceAtLeast(30)
-                        val bmp = remember(face, cw, ch, colors) { draw(art, cw, ch) }
-                        Image(bmp.asImageBitmap(), contentDescription = "${face.title}: ${face.headline}, ${face.subtitle}", modifier = Modifier.fillMaxSize())
-                    }
-                }
-            }
-        }
-    }
+    ChartPreviewCard(config, data, today, height, modifier, onClick, compact)
 }
 
-/** Picking a chart: every kind with a small live preview; a category for "One category". */
+/** Picking and customizing a chart: every kind with a live preview, plus style, color, range and toggles. */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun ChartPickerContent(data: Glanceable?, initial: ChartWidgetConfig, onSave: (ChartWidgetConfig) -> Unit, onCancel: () -> Unit, isNew: Boolean = false, today: LocalDate = LocalDate.now()) {
+fun ChartPickerContent(
+    data: Glanceable?,
+    initial: ChartWidgetConfig,
+    onSave: (ChartWidgetConfig) -> Unit,
+    onCancel: () -> Unit,
+    isNew: Boolean = false,
+    showCustomization: Boolean = false,
+    today: LocalDate = LocalDate.now(),
+    extraFooter: (@Composable () -> Unit)? = null,
+    saveLabel: String? = null,
+) {
     val colors = CentsibleTheme.colors
-    var kind by remember { mutableStateOf(initial.kind) }
-    var category by remember { mutableStateOf(initial.categoryId?.let { it to (initial.categoryName ?: "") }) }
+    var kind by remember(initial) { mutableStateOf(initial.kind) }
+    var category by remember(initial) { mutableStateOf(initial.categoryId?.let { it to (initial.categoryName ?: "") }) }
+    var customTitle by remember(initial) { mutableStateOf(initial.title.orEmpty()) }
+    var style by remember(initial) { mutableStateOf(initial.style) }
+    var accent by remember(initial) { mutableStateOf(initial.accent) }
+    var series by remember(initial) { mutableStateOf(initial.series) }
+    var months by remember(initial) { mutableStateOf(initial.months) }
+    var showReference by remember(initial) { mutableStateOf(initial.showReference) }
+    var showComparison by remember(initial) { mutableStateOf(initial.showComparison) }
+    var showLegend by remember(initial) { mutableStateOf(initial.showLegend) }
+    var categoryIds by remember(initial) { mutableStateOf(initial.categoryIds) }
+
     val categories = data?.categories.orEmpty().filter { it.id != null }
-    val config = ChartWidgetConfig(kind, category?.first.takeIf { kind == ChartKind.Category }, category?.second.takeIf { kind == ChartKind.Category })
+    val config = ChartWidgetConfig(
+        kind = kind,
+        categoryId = category?.first.takeIf { kind == ChartKind.Category },
+        categoryName = category?.second.takeIf { kind == ChartKind.Category },
+        title = customTitle.trim().takeIf { it.isNotEmpty() },
+        style = style,
+        accent = accent,
+        series = series,
+        months = months,
+        showReference = showReference,
+        showComparison = showComparison,
+        showLegend = showLegend,
+        categoryIds = if (kind == ChartKind.Categories) categoryIds else emptyList(),
+    )
     Column(Modifier.fillMaxSize().background(colors.canvas).statusBarsPadding().navigationBarsPadding()) {
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Text(if (isNew) "Add a chart" else "Choose a chart", style = MaterialTheme.typography.headlineSmall)
@@ -383,21 +472,143 @@ fun ChartPickerContent(data: Glanceable?, initial: ChartWidgetConfig, onSave: (C
                     categories.forEach { c -> FilterChip(selected = category?.first == c.id, onClick = { category = c.id!! to c.name }, label = { Text(c.name) }) }
                 }
             }
+
+            if (showCustomization) {
+                HorizontalDivider(Modifier.padding(vertical = 4.dp), color = colors.border)
+                Text("Customize appearance", style = MaterialTheme.typography.titleSmall)
+
+                OutlinedTextField(
+                    value = customTitle,
+                    onValueChange = { customTitle = it },
+                    label = { Text("Custom title (optional)") },
+                    placeholder = { Text(kind.title) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+
+                if (kind == ChartKind.Monthly) {
+                    Text("Metric", style = MaterialTheme.typography.labelLarge, color = colors.textSecondary)
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        ChartSeries.entries.forEach { s ->
+                            FilterChip(selected = series == s, onClick = { series = s }, label = { Text(s.label) })
+                        }
+                    }
+                }
+
+                if (kind == ChartKind.Monthly || kind == ChartKind.NetWorth || kind == ChartKind.Week) {
+                    Text("Chart style", style = MaterialTheme.typography.labelLarge, color = colors.textSecondary)
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        ChartStyle.entries.forEach { st ->
+                            FilterChip(selected = style == st, onClick = { style = st }, label = { Text(st.label) })
+                        }
+                    }
+                }
+
+                if (kind == ChartKind.Monthly || kind == ChartKind.CashFlow || kind == ChartKind.NetWorth) {
+                    val defaultMonths = if (kind == ChartKind.NetWorth) 12 else 6
+                    val activeMonths = months ?: defaultMonths
+                    Text("Time range", style = MaterialTheme.typography.labelLarge, color = colors.textSecondary)
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        listOf(3, 6, 12).forEach { m ->
+                            FilterChip(selected = activeMonths == m, onClick = { months = m }, label = { Text("$m months") })
+                        }
+                    }
+                }
+
+                if (kind == ChartKind.Categories && categories.isNotEmpty()) {
+                    Text("Filter categories (leave empty for all)", style = MaterialTheme.typography.labelLarge, color = colors.textSecondary)
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        categories.forEach { c ->
+                            val cid = c.id!!
+                            val picked = cid in categoryIds
+                            FilterChip(
+                                selected = picked,
+                                onClick = { categoryIds = if (picked) categoryIds - cid else categoryIds + cid },
+                                label = { Text(c.name) },
+                            )
+                        }
+                    }
+                }
+
+                if (kind != ChartKind.Categories && kind != ChartKind.CashFlow) {
+                    Text("Color accent", style = MaterialTheme.typography.labelLarge, color = colors.textSecondary)
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        ChartAccent.entries.forEach { a ->
+                            FilterChip(selected = accent == a, onClick = { accent = a }, label = { Text(a.label) })
+                        }
+                    }
+                }
+
+                if (kind == ChartKind.Pace || kind == ChartKind.Week || kind == ChartKind.Monthly) {
+                    ToggleRow("Reference / average line", showReference) { showReference = it }
+                }
+                if (kind == ChartKind.Pace) {
+                    ToggleRow("Compare to last month", showComparison) { showComparison = it }
+                }
+                if (kind == ChartKind.Categories || kind == ChartKind.Category || kind == ChartKind.CashFlow) {
+                    ToggleRow("Show legend", showLegend) { showLegend = it }
+                }
+
+                extraFooter?.invoke()
+            }
         }
         Row(Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedButton(onClick = onCancel, modifier = Modifier.weight(1f)) { Text("Cancel") }
             Button(onClick = { onSave(config) }, enabled = kind != ChartKind.Category || category != null, modifier = Modifier.weight(1f)) {
-                Text(if (isNew) "Add to home screen" else "Save")
+                Text(saveLabel ?: if (isNew) "Add to home screen" else "Save")
             }
         }
     }
 }
 
+@Composable
+private fun ToggleRow(label: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
+    Row(Modifier.fillMaxWidth().padding(vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+        Text(label, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+        Switch(checked = checked, onCheckedChange = onCheckedChange)
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun ChartPickerSheet(data: Glanceable?, current: ChartWidgetConfig, isNew: Boolean, today: LocalDate, onSave: (ChartWidgetConfig) -> Unit, onDismiss: () -> Unit) {
+private fun ChartPickerSheet(
+    data: Glanceable?,
+    current: ChartWidgetConfig,
+    isNew: Boolean,
+    showCustomization: Boolean,
+    today: LocalDate,
+    onSave: (ChartWidgetConfig) -> Unit,
+    onDismiss: () -> Unit,
+) {
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true), containerColor = CentsibleTheme.colors.canvas) {
-        ChartPickerContent(data, current, onSave = onSave, onCancel = onDismiss, isNew = isNew, today = today)
+        ChartPickerContent(data, current, onSave = onSave, onCancel = onDismiss, isNew = isNew, showCustomization = showCustomization, today = today)
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun CustomChartBuilderSheet(
+    data: Glanceable?,
+    initial: SavedChart,
+    today: LocalDate,
+    onSave: (ChartWidgetConfig, Boolean) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var showOnDashboard by remember(initial) { mutableStateOf(initial.showOnDashboard) }
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true), containerColor = CentsibleTheme.colors.canvas) {
+        ChartPickerContent(
+            data = data,
+            initial = initial.config,
+            onSave = { cfg -> onSave(cfg, showOnDashboard) },
+            onCancel = onDismiss,
+            isNew = false,
+            showCustomization = true,
+            today = today,
+            saveLabel = "Save chart",
+            extraFooter = {
+                ToggleRow("Show on app Home dashboard", showOnDashboard) { showOnDashboard = it }
+            },
+        )
     }
 }
 

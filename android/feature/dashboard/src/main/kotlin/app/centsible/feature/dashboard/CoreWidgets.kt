@@ -160,6 +160,7 @@ private fun Column2(label: String, value: @Composable () -> Unit) {
 abstract class CoreWidgetsModule {
     @Binds @IntoSet abstract fun dial(w: BudgetDialWidget): DashboardWidget
     @Binds @IntoSet abstract fun review(w: ReviewWidget): DashboardWidget
+    @Binds @IntoSet abstract fun customCharts(w: CustomChartsDashboardWidget): DashboardWidget
     @Binds @IntoSet abstract fun netWorth(w: NetWorthWidget): DashboardWidget
     @Binds @IntoSet abstract fun budget(w: BudgetSummaryWidget): DashboardWidget
     @Binds @IntoSet abstract fun recent(w: RecentTransactionsWidget): DashboardWidget

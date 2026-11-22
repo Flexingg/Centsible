@@ -76,7 +76,7 @@ class GlanceRefresher @Inject constructor(
                 .copy(
                     locked = locked, trend = trend, categories = Glanceable.allCategories(month), leftInBudget = Glanceable.leftInBudget(month),
                     months = runCatching {
-                        reports.cashFlow(budget, YearMonth(today.minusMonths(5).toString().take(7)), ym)
+                        reports.cashFlow(budget, YearMonth(today.minusMonths(11).toString().take(7)), ym)
                             .map { Glanceable.MonthFlow(it.month.raw, it.income.abs(), it.expenses.abs()) }
                     }.getOrDefault(emptyList()),
                     netWorth = runCatching { reports.netWorth(budget, 12).map { Glanceable.NetWorthPoint(it.month.raw, it.netWorth) } }.getOrDefault(emptyList()),
