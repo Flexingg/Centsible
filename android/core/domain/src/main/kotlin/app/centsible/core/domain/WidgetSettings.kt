@@ -19,8 +19,80 @@ enum class ChartKind(val id: String, val title: String, val description: String,
     }
 }
 
-/** One chart widget's choice. [categoryId]/[categoryName] are for [ChartKind.Category]. */
-data class ChartWidgetConfig(val kind: ChartKind, val categoryId: String? = null, val categoryName: String? = null)
+/** Visual style override for customizable charts. */
+enum class ChartStyle(val id: String, val label: String) {
+    Auto("auto", "Auto"),
+    Area("area", "Area line"),
+    Bars("bars", "Bars"),
+    ;
+
+    companion object {
+        fun of(id: String?): ChartStyle = entries.firstOrNull { it.id == id } ?: Auto
+    }
+}
+
+/** Accent color palette override for customizable charts. */
+enum class ChartAccent(val id: String, val label: String) {
+    Default("default", "Default"),
+    Brand("brand", "Brand"),
+    Green("green", "Green"),
+    Coral("coral", "Coral"),
+    Ocean("ocean", "Ocean"),
+    Plum("plum", "Plum"),
+    Amber("amber", "Amber"),
+    ;
+
+    companion object {
+        fun of(id: String?): ChartAccent = entries.firstOrNull { it.id == id } ?: Default
+    }
+}
+
+/** Which metric series [ChartKind.Monthly] plots. */
+enum class ChartSeries(val id: String, val label: String) {
+    Spending("spending", "Spending"),
+    Income("income", "Income"),
+    Savings("savings", "Net savings"),
+    ;
+
+    companion object {
+        fun of(id: String?): ChartSeries = entries.firstOrNull { it.id == id } ?: Spending
+    }
+}
+
+/**
+ * Configuration for a chart shown on a home-screen widget or the in-app dashboard.
+ * All customization fields default to the classic preset behavior.
+ */
+data class ChartWidgetConfig(
+    val kind: ChartKind,
+    val categoryId: String? = null,
+    val categoryName: String? = null,
+    /** Optional custom title override (null/blank uses the automatic title). */
+    val title: String? = null,
+    /** Visual style override (Area line vs Bars, or Auto for the kind's default). */
+    val style: ChartStyle = ChartStyle.Auto,
+    /** Accent color override. */
+    val accent: ChartAccent = ChartAccent.Default,
+    /** Metric plotted by [ChartKind.Monthly] (Spending, Income, or Net savings). */
+    val series: ChartSeries = ChartSeries.Spending,
+    /** Number of months (e.g. 3, 6, 12) for multi-month charts. */
+    val months: Int? = null,
+    /** Show reference / average / budget target line. */
+    val showReference: Boolean = true,
+    /** Show comparison line (e.g. last month's spending pace). */
+    val showComparison: Boolean = true,
+    /** Show legend rows. */
+    val showLegend: Boolean = true,
+    /** Optional subset of category IDs for [ChartKind.Categories]. */
+    val categoryIds: List<String> = emptyList(),
+)
+
+/** A user-created custom chart that can be shown on the Home dashboard, pinned as a widget, or both. */
+data class SavedChart(
+    val id: String,
+    val config: ChartWidgetConfig,
+    val showOnDashboard: Boolean = true,
+)
 
 /** What a configurable Quick Settings tile shows. */
 enum class TileMetric(val id: String, val title: String, val description: String) {
@@ -42,13 +114,22 @@ data class TileConfig(val metric: TileMetric, val categoryId: String? = null, va
 /** The two configurable tiles' defaults. */
 val DEFAULT_TILES = listOf(TileConfig(TileMetric.LeftToday), TileConfig(TileMetric.LeftMonth))
 
-/** Per-widget chart choices and the configurable tiles' choices, kept on the phone. */
+/** Per-widget chart choices, saved custom charts, and the configurable tiles' choices, kept on the phone. */
 interface WidgetSettings {
     /** Chart widgets by their Android widget id. */
     val charts: Flow<Map<Int, ChartWidgetConfig>>
     suspend fun chart(widgetId: Int): ChartWidgetConfig?
     suspend fun setChart(widgetId: Int, config: ChartWidgetConfig)
     suspend fun removeChart(widgetId: Int)
+
+    /** User-created custom charts (for app dashboard and/or pinning as widgets). */
+    val savedCharts: Flow<List<SavedChart>>
+    suspend fun saveCustomChart(chart: SavedChart)
+    suspend fun deleteCustomChart(id: String)
+
+    /** Pending config saved right before requestPinAppWidget so launchers that open ChartConfigActivity pick it up. */
+    suspend fun setPendingPin(config: ChartWidgetConfig?)
+    suspend fun consumePendingPin(): ChartWidgetConfig?
 
     /** Tile slots 0 and 1. */
     val tiles: Flow<List<TileConfig>>

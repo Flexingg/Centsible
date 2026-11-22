@@ -92,7 +92,7 @@ class ChartArt(private val colors: CentsibleColors, private val density: Float) 
         val dataMax = (listOfNotNull(series.maxOrNull(), compare.maxOrNull()).maxOrNull() ?: 0L).coerceAtLeast(1)
         // A far-off budget would squash the lines flat: it only stretches the chart when it's near them.
         val showRef = reference != null && reference > 0 && reference <= dataMax * 1.6f
-        val maxV = maxOf(dataMax.toFloat(), if (showRef) reference!!.toFloat() else 0f) * 1.12f
+        val maxV = maxOf(dataMax.toFloat(), if (showRef) reference.toFloat() else 0f) * 1.12f
         val count = max(total, max(series.size, compare.size)).coerceAtLeast(2)
         val inset = dp(5f)
         fun x(i: Int) = inset + (width - 2 * inset) * i / (count - 1).toFloat()
@@ -106,7 +106,7 @@ class ChartArt(private val colors: CentsibleColors, private val density: Float) 
             c.drawPath(smooth(compare.mapIndexed { i, v -> x(i) to y(v) }), stroke(colors.textTertiary.argb(0.7f), dp(1.6f), floatArrayOf(dp(4f), dp(4f))))
         }
         if (showRef) {
-            val ry = y(reference!!)
+            val ry = y(reference)
             c.drawLine(0f, ry, width.toFloat(), ry, stroke(colors.textSecondary.argb(0.55f), dp(1.2f), floatArrayOf(dp(1.5f), dp(3.5f))))
             referenceLabel?.let { c.label(it, width - dp(2f), ry - dp(4f), Paint.Align.RIGHT, colors.textSecondary.argb()) }
         } else if (reference != null && reference > 0 && referenceLabel != null) {
@@ -256,15 +256,15 @@ class ChartArt(private val colors: CentsibleColors, private val density: Float) 
     }
 
     /** One category's budget as a ring: [share] used (0..1+), red past full. */
-    fun ring(size: Int, share: Float, centre: String, caption: String): Bitmap {
+    fun ring(size: Int, share: Float, centre: String, caption: String, tone: Color = colors.accent): Bitmap {
         val over = share > 1f
         val (bmp, c) = canvas(size, size)
         val thickness = size * 0.11f
         val rect = RectF(thickness / 2 + dp(2f), thickness / 2 + dp(2f), size - thickness / 2 - dp(2f), size - thickness / 2 - dp(2f))
         c.drawArc(rect, 0f, 360f, false, stroke(colors.track.argb(), thickness))
-        val tone = if (over) colors.negative else colors.accent
+        val ringTone = if (over) colors.negative else tone
         val sweep = 360f * share.coerceIn(0f, 1f)
-        if (sweep > 0.5f) c.drawArc(rect, -90f, sweep, false, stroke(tone.argb(), thickness))
+        if (sweep > 0.5f) c.drawArc(rect, -90f, sweep, false, stroke(ringTone.argb(), thickness))
         val big = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             textAlign = Paint.Align.CENTER
             color = (if (over) colors.negative else colors.textPrimary).argb()
@@ -275,6 +275,17 @@ class ChartArt(private val colors: CentsibleColors, private val density: Float) 
         c.drawText(centre, size / 2f, size / 2f + big.textSize * 0.25f, big)
         c.label(caption, size / 2f, size / 2f + big.textSize * 0.25f + dp(13f), Paint.Align.CENTER)
         return bmp
+    }
+
+    /** Resolves a user-picked [app.centsible.core.domain.ChartAccent] to a colour, or null for Default. */
+    fun accentColor(accent: app.centsible.core.domain.ChartAccent): Color? = when (accent) {
+        app.centsible.core.domain.ChartAccent.Default -> null
+        app.centsible.core.domain.ChartAccent.Brand -> colors.accent
+        app.centsible.core.domain.ChartAccent.Green -> colors.positive
+        app.centsible.core.domain.ChartAccent.Coral -> colors.negative
+        app.centsible.core.domain.ChartAccent.Ocean -> colors.series1
+        app.centsible.core.domain.ChartAccent.Plum -> Color(0xFF8E6BD8)
+        app.centsible.core.domain.ChartAccent.Amber -> colors.warning
     }
 
     /** Category colours for the donut and its legend: the app's chart and brand colours. */

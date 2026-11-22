@@ -4,7 +4,10 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.unit.DpSize
+import kotlinx.coroutines.flow.first
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.glance.GlanceId
@@ -254,9 +257,13 @@ class ChartWidget(private val preset: ChartKind = ChartKind.Pace) : GlanceAppWid
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         val deps = context.glanceDeps()
         val widgetId = runCatching { GlanceAppWidgetManager(context).getAppWidgetId(id) }.getOrNull()
-        val config = widgetId?.let { deps.widgetSettings().chart(it) } ?: ChartWidgetConfig(preset)
+        val initialCharts = runCatching { deps.widgetSettings().charts.first() }.getOrDefault(emptyMap())
         val data = deps.store().read()
-        provideContent { ChartContent(context, data, config, LocalDate.now()) }
+        provideContent {
+            val charts by deps.widgetSettings().charts.collectAsState(initial = initialCharts)
+            val config = widgetId?.let { charts[it] } ?: ChartWidgetConfig(preset)
+            ChartContent(context, data, config, LocalDate.now())
+        }
     }
 }
 
