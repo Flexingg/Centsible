@@ -4,6 +4,7 @@ import type { ReviewOps } from '../actual/review-ops.js';
 import type { AnnualOps } from '../actual/annual-ops.js';
 import type { OffBooks } from '../actual/off-books.js';
 import type { MortgageOps } from '../actual/mortgage-ops.js';
+import type { IncomeOps } from '../actual/income-ops.js';
 import type { TargetOps } from '../actual/target-ops.js';
 import type { TransferOps } from '../actual/transfer-ops.js';
 import Fastify, { type FastifyError, type FastifyInstance, type FastifyRequest } from 'fastify';
@@ -56,6 +57,7 @@ export type Deps = {
   transfers: TransferOps;
   targets: TargetOps;
   mortgages: MortgageOps;
+  income: IncomeOps;
   annual: AnnualOps;
   offBooks: OffBooks;
   automations: AutomationOps;

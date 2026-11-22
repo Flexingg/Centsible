@@ -17,6 +17,7 @@ import { ReviewOps } from './actual/review-ops.js';
 import { AnnualOps } from './actual/annual-ops.js';
 import { OffBooks } from './actual/off-books.js';
 import { MortgageOps } from './actual/mortgage-ops.js';
+import { IncomeOps } from './actual/income-ops.js';
 import { TargetOps } from './actual/target-ops.js';
 import { TransferOps } from './actual/transfer-ops.js';
 import { DuplicateOps } from './actual/duplicate-ops.js';
@@ -80,6 +81,7 @@ export function createDeps(config: BridgeConfig, store: HouseholdStore, host: Ac
     duplicates: new DuplicateOps(host, store),
     targets: new TargetOps(host, store),
     mortgages,
+    income: new IncomeOps(host, store, offBooks),
     annual,
     automations: new AutomationOps(host),
     ruleTools: new RuleTools(host),

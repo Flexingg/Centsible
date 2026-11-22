@@ -51,4 +51,10 @@ interface PlanAheadGateway {
     suspend fun annualBudgets(budget: BudgetId, month: YearMonth): List<app.centsible.core.model.AnnualBudget>
     /** Sets a yearly amount (and applies it to this month); null amount removes it. */
     suspend fun setAnnualBudget(budget: BudgetId, category: CategoryId, amount: app.centsible.core.model.Money?, startMonth: Int = 1)
+
+    suspend fun incomeOverview(budget: BudgetId, year: Int? = null): app.centsible.core.model.IncomeOverview
+    suspend fun setIncomeSettings(budget: BudgetId, mode: app.centsible.core.model.IncomeMode, categoryIds: List<CategoryId>)
+    /** [id] null creates a new pay stub. */
+    suspend fun savePayStub(budget: BudgetId, id: String?, input: app.centsible.core.model.PayStubInput): app.centsible.core.model.PayStub
+    suspend fun deletePayStub(budget: BudgetId, id: String)
 }
