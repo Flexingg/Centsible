@@ -96,8 +96,9 @@ object IncomeCalc {
                 rateText = if (mode == DeductionMode.Percent) formatPercent(computedRate) else "",
             )
         }
-        val derivedRate = stub.hourlyRate ?: if (stub.hours != null && stub.hours > 0.0 && stub.gross.minor > 0) {
-            Money((stub.gross.minor / stub.hours).roundToLong())
+        val stubHours = stub.hours
+        val derivedRate = stub.hourlyRate ?: if (stubHours != null && stubHours > 0.0 && stub.gross.minor > 0) {
+            Money((stub.gross.minor / stubHours).roundToLong())
         } else {
             null
         }
