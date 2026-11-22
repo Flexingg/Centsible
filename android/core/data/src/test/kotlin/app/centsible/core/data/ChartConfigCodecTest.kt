@@ -5,6 +5,7 @@ import app.centsible.core.domain.ChartKind
 import app.centsible.core.domain.ChartSeries
 import app.centsible.core.domain.ChartStyle
 import app.centsible.core.domain.ChartWidgetConfig
+import app.centsible.core.domain.WidgetTheme
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
@@ -22,6 +23,7 @@ class ChartConfigCodecTest {
             showComparison = false,
             showLegend = false,
             categoryIds = listOf("c1", "c2"),
+            theme = WidgetTheme.MaterialExpressive,
         )
         val decoded = ChartConfigCodec.decode(ChartConfigCodec.encode(original))
         assertEquals(original, decoded)

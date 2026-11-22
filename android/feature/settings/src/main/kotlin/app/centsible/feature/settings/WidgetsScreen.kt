@@ -66,6 +66,7 @@ import androidx.lifecycle.viewModelScope
 import app.centsible.core.designsystem.component.MoneyFormat
 import app.centsible.core.designsystem.component.SectionCard
 import app.centsible.core.designsystem.theme.CentsibleTheme
+import app.centsible.core.designsystem.theme.rememberMaterialExpressiveTokens
 import app.centsible.core.domain.ChartAccent
 import app.centsible.core.domain.ChartKind
 import app.centsible.core.domain.ChartSeries
@@ -80,6 +81,7 @@ import app.centsible.core.domain.TileConfig
 import app.centsible.core.domain.TileMetric
 import app.centsible.core.domain.TileMetrics
 import app.centsible.core.domain.WidgetSettings
+import app.centsible.core.domain.WidgetTheme
 import app.centsible.core.ui.chart.ChartPreviewCard
 import dagger.hilt.android.lifecycle.HiltViewModel
 import java.time.LocalDate
@@ -109,6 +111,8 @@ data class WidgetsUiState(
     val editingSavedChart: SavedChart? = null,
     /** Enables the Custom Charts studio section (kept false in legacy screenshot defaults). */
     val showCustomCharts: Boolean = false,
+    /** Global visual design system for widgets & custom chart cards. */
+    val widgetTheme: WidgetTheme = WidgetTheme.Classic,
 ) {
     companion object {
         const val NEW = -1
@@ -138,8 +142,15 @@ class WidgetsViewModel @Inject constructor(
                 placed = placed,
                 tiles = settings.tiles.first(),
                 savedCharts = settings.savedCharts.first(),
+                widgetTheme = settings.widgetTheme.first(),
             )
         }
+    }
+
+    fun selectWidgetTheme(theme: WidgetTheme) = viewModelScope.launch {
+        settings.setWidgetTheme(theme)
+        state.update { it.copy(widgetTheme = theme, message = "Widget design set to ${theme.label}") }
+        widgets.redraw()
     }
 
     fun chooseChart(id: Int?) = state.update { it.copy(choosingChart = id) }
@@ -233,6 +244,7 @@ fun WidgetsRoute(onBack: () -> Unit, viewModel: WidgetsViewModel = hiltViewModel
         onToggleCustomChartDashboard = viewModel::toggleCustomChartDashboard,
         onDeleteCustomChart = viewModel::deleteCustomChart,
         onPinCustomChart = viewModel::pinCustomChart,
+        onSelectWidgetTheme = viewModel::selectWidgetTheme,
     )
 }
 
@@ -252,6 +264,7 @@ fun WidgetsScreen(
     onToggleCustomChartDashboard: (SavedChart, Boolean) -> Unit = { _, _ -> },
     onDeleteCustomChart: (SavedChart) -> Unit = {},
     onPinCustomChart: (SavedChart) -> Unit = {},
+    onSelectWidgetTheme: (WidgetTheme) -> Unit = {},
     today: LocalDate = LocalDate.now(),
 ) {
     val colors = CentsibleTheme.colors
@@ -282,6 +295,12 @@ fun WidgetsScreen(
             }
             if (state.showCustomCharts) {
                 item {
+                    WidgetDesignCard(
+                        selected = state.widgetTheme,
+                        onSelect = onSelectWidgetTheme,
+                    )
+                }
+                item {
                     SectionCard("Custom charts", action = "New", onAction = onNewCustomChart) {
                         if (state.savedCharts.isEmpty()) {
                             Text(
@@ -296,7 +315,7 @@ fun WidgetsScreen(
                                 HorizontalDivider(color = colors.border)
                                 Spacer(Modifier.height(10.dp))
                             }
-                            ChartPreview(chart.config, state.data, today, height = 170.dp, onClick = { onEditCustomChart(chart) })
+                            ChartPreview(chart.config, state.data, today, height = 170.dp, onClick = { onEditCustomChart(chart) }, widgetTheme = state.widgetTheme)
                             Spacer(Modifier.height(6.dp))
                             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                                 Text("Show on Home dashboard", style = MaterialTheme.typography.bodySmall, color = colors.textSecondary, modifier = Modifier.weight(1f))
@@ -325,7 +344,7 @@ fun WidgetsScreen(
                         val label = config.title?.takeIf { it.isNotBlank() } ?: (config.kind.title + (config.categoryName?.let { " · $it" } ?: ""))
                         Text("Widget ${i + 1} · $label", style = MaterialTheme.typography.labelLarge, color = colors.textSecondary)
                         Spacer(Modifier.height(6.dp))
-                        ChartPreview(config, state.data, today, height = 170.dp, onClick = { chooseChart(id) })
+                        ChartPreview(config, state.data, today, height = 170.dp, onClick = { chooseChart(id) }, widgetTheme = state.widgetTheme)
                         TextButton(onClick = { chooseChart(id) }) { Text("Change what it shows") }
                     }
                 }
@@ -352,6 +371,7 @@ fun WidgetsScreen(
             current = current,
             isNew = id == WidgetsUiState.NEW,
             showCustomization = state.showCustomCharts,
+            widgetTheme = state.widgetTheme,
             today = today,
             onSave = saveChart,
             onDismiss = { chooseChart(null) },
@@ -361,6 +381,7 @@ fun WidgetsScreen(
         CustomChartBuilderSheet(
             data = state.data,
             initial = editing,
+            widgetTheme = state.widgetTheme,
             today = today,
             onSave = onSaveCustomChart,
             onDismiss = onDismissCustomChart,
@@ -368,6 +389,57 @@ fun WidgetsScreen(
     }
     state.choosingTile?.let { slot ->
         TilePickerSheet(slot, state.tiles.getOrElse(slot) { DEFAULT_TILES[0] }, state.data, today, onSave = saveTile, onDismiss = { chooseTile(null) })
+    }
+}
+
+@Composable
+private fun WidgetDesignCard(selected: WidgetTheme, onSelect: (WidgetTheme) -> Unit) {
+    val colors = CentsibleTheme.colors
+    val m3 = rememberMaterialExpressiveTokens(darkTheme = colors.isDark)
+    SectionCard("Widget design") {
+        Text(
+            "Choose how your home-screen widgets and custom dashboard charts look. You can also override individual charts when customizing.",
+            style = MaterialTheme.typography.bodySmall,
+            color = colors.textSecondary,
+        )
+        Spacer(Modifier.height(10.dp))
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            WidgetTheme.entries.forEach { theme ->
+                val isSelected = selected == theme
+                val cardBg = if (theme == WidgetTheme.MaterialExpressive) m3.surfaceContainer else colors.cardMuted
+                val titleColor = if (theme == WidgetTheme.MaterialExpressive) m3.colors.textPrimary else colors.textPrimary
+                val descColor = if (theme == WidgetTheme.MaterialExpressive) m3.colors.textSecondary else colors.textSecondary
+                val borderColor = if (isSelected) (if (theme == WidgetTheme.MaterialExpressive) m3.primary else colors.accent) else colors.border
+                val swatches = if (theme == WidgetTheme.MaterialExpressive) {
+                    listOf(m3.primary, m3.tertiary, m3.primaryContainer)
+                } else {
+                    listOf(colors.accent, colors.series1, colors.positive)
+                }
+                Column(
+                    Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(if (theme == WidgetTheme.MaterialExpressive) 24.dp else 18.dp))
+                        .background(cardBg)
+                        .border(if (isSelected) 2.dp else 1.dp, borderColor, RoundedCornerShape(if (theme == WidgetTheme.MaterialExpressive) 24.dp else 18.dp))
+                        .selectable(selected = isSelected, role = Role.RadioButton) { onSelect(theme) }
+                        .padding(12.dp),
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                        swatches.forEach { swatch ->
+                            Box(Modifier.size(12.dp).background(swatch, CircleShape))
+                        }
+                        Spacer(Modifier.weight(1f))
+                        if (isSelected) {
+                            Text("Active", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = borderColor)
+                        }
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    Text(theme.label, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = titleColor, maxLines = 1)
+                    Spacer(Modifier.height(2.dp))
+                    Text(theme.description, style = MaterialTheme.typography.labelSmall, color = descColor, maxLines = 3, overflow = TextOverflow.Ellipsis)
+                }
+            }
+        }
     }
 }
 
@@ -401,8 +473,17 @@ private fun TileRow(slot: Int, config: TileConfig, data: Glanceable?, today: Loc
  * app's light or dark palette, whichever the app is in.
  */
 @Composable
-fun ChartPreview(config: ChartWidgetConfig, data: Glanceable?, today: LocalDate, height: Dp, modifier: Modifier = Modifier, onClick: (() -> Unit)? = null, compact: Boolean = false) {
-    ChartPreviewCard(config, data, today, height, modifier, onClick, compact)
+fun ChartPreview(
+    config: ChartWidgetConfig,
+    data: Glanceable?,
+    today: LocalDate,
+    height: Dp,
+    modifier: Modifier = Modifier,
+    onClick: (() -> Unit)? = null,
+    compact: Boolean = false,
+    widgetTheme: WidgetTheme = WidgetTheme.Classic,
+) {
+    ChartPreviewCard(config, data, today, height, modifier, onClick, compact, widgetTheme = widgetTheme)
 }
 
 /** Picking and customizing a chart: every kind with a live preview, plus style, color, range and toggles. */
@@ -418,6 +499,7 @@ fun ChartPickerContent(
     today: LocalDate = LocalDate.now(),
     extraFooter: (@Composable () -> Unit)? = null,
     saveLabel: String? = null,
+    widgetTheme: WidgetTheme = WidgetTheme.Classic,
 ) {
     val colors = CentsibleTheme.colors
     var kind by remember(initial) { mutableStateOf(initial.kind) }
@@ -431,6 +513,7 @@ fun ChartPickerContent(
     var showComparison by remember(initial) { mutableStateOf(initial.showComparison) }
     var showLegend by remember(initial) { mutableStateOf(initial.showLegend) }
     var categoryIds by remember(initial) { mutableStateOf(initial.categoryIds) }
+    var cardTheme by remember(initial) { mutableStateOf(initial.theme) }
 
     val categories = data?.categories.orEmpty().filter { it.id != null }
     val config = ChartWidgetConfig(
@@ -446,11 +529,12 @@ fun ChartPickerContent(
         showComparison = showComparison,
         showLegend = showLegend,
         categoryIds = if (kind == ChartKind.Categories) categoryIds else emptyList(),
+        theme = cardTheme,
     )
     Column(Modifier.fillMaxSize().background(colors.canvas).statusBarsPadding().navigationBarsPadding()) {
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Text(if (isNew) "Add a chart" else "Choose a chart", style = MaterialTheme.typography.headlineSmall)
-            ChartPreview(config, data, today, height = 180.dp)
+            ChartPreview(config, data, today, height = 180.dp, widgetTheme = widgetTheme)
             ChartKind.entries.forEach { k ->
                 Row(
                     Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(if (k == kind) colors.accentSoft else colors.card)
@@ -485,6 +569,14 @@ fun ChartPickerContent(
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
+
+                Text("Card design", style = MaterialTheme.typography.labelLarge, color = colors.textSecondary)
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    FilterChip(selected = cardTheme == null, onClick = { cardTheme = null }, label = { Text("App default (${widgetTheme.label})") })
+                    WidgetTheme.entries.forEach { t ->
+                        FilterChip(selected = cardTheme == t, onClick = { cardTheme = t }, label = { Text(t.label) })
+                    }
+                }
 
                 if (kind == ChartKind.Monthly) {
                     Text("Metric", style = MaterialTheme.typography.labelLarge, color = colors.textSecondary)
@@ -576,12 +668,13 @@ private fun ChartPickerSheet(
     current: ChartWidgetConfig,
     isNew: Boolean,
     showCustomization: Boolean,
+    widgetTheme: WidgetTheme,
     today: LocalDate,
     onSave: (ChartWidgetConfig) -> Unit,
     onDismiss: () -> Unit,
 ) {
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true), containerColor = CentsibleTheme.colors.canvas) {
-        ChartPickerContent(data, current, onSave = onSave, onCancel = onDismiss, isNew = isNew, showCustomization = showCustomization, today = today)
+        ChartPickerContent(data, current, onSave = onSave, onCancel = onDismiss, isNew = isNew, showCustomization = showCustomization, today = today, widgetTheme = widgetTheme)
     }
 }
 
@@ -590,6 +683,7 @@ private fun ChartPickerSheet(
 private fun CustomChartBuilderSheet(
     data: Glanceable?,
     initial: SavedChart,
+    widgetTheme: WidgetTheme,
     today: LocalDate,
     onSave: (ChartWidgetConfig, Boolean) -> Unit,
     onDismiss: () -> Unit,
@@ -605,6 +699,7 @@ private fun CustomChartBuilderSheet(
             showCustomization = true,
             today = today,
             saveLabel = "Save chart",
+            widgetTheme = widgetTheme,
             extraFooter = {
                 ToggleRow("Show on app Home dashboard", showOnDashboard) { showOnDashboard = it }
             },

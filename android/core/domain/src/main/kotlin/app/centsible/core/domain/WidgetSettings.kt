@@ -59,6 +59,17 @@ enum class ChartSeries(val id: String, val label: String) {
     }
 }
 
+/** Visual design system for home-screen widgets and custom chart cards. */
+enum class WidgetTheme(val id: String, val label: String, val description: String) {
+    Classic("classic", "Classic", "Calm neutral card with Centsible's signature warm palette"),
+    MaterialExpressive("material-expressive", "Material Expressive", "Dynamic Material You wallpaper colors, expressive shapes & tonal pills"),
+    ;
+
+    companion object {
+        fun of(id: String?): WidgetTheme = entries.firstOrNull { it.id == id } ?: Classic
+    }
+}
+
 /**
  * Configuration for a chart shown on a home-screen widget or the in-app dashboard.
  * All customization fields default to the classic preset behavior.
@@ -85,6 +96,8 @@ data class ChartWidgetConfig(
     val showLegend: Boolean = true,
     /** Optional subset of category IDs for [ChartKind.Categories]. */
     val categoryIds: List<String> = emptyList(),
+    /** Optional per-chart theme override; null follows the global [WidgetSettings.widgetTheme]. */
+    val theme: WidgetTheme? = null,
 )
 
 /** A user-created custom chart that can be shown on the Home dashboard, pinned as a widget, or both. */
@@ -130,6 +143,10 @@ interface WidgetSettings {
     /** Pending config saved right before requestPinAppWidget so launchers that open ChartConfigActivity pick it up. */
     suspend fun setPendingPin(config: ChartWidgetConfig?)
     suspend fun consumePendingPin(): ChartWidgetConfig?
+
+    /** Global design system for home-screen widgets and custom chart cards (Classic vs Material Expressive). */
+    val widgetTheme: Flow<WidgetTheme>
+    suspend fun setWidgetTheme(theme: WidgetTheme)
 
     /** Tile slots 0 and 1. */
     val tiles: Flow<List<TileConfig>>

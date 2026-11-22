@@ -32,8 +32,10 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.centsible.core.designsystem.theme.CentsibleTheme
+import app.centsible.core.designsystem.theme.rememberMaterialExpressiveTokens
 import app.centsible.core.domain.ChartWidgetConfig
 import app.centsible.core.domain.Glanceable
+import app.centsible.core.domain.WidgetTheme
 import java.time.LocalDate
 
 /**
@@ -49,7 +51,13 @@ fun ChartPreviewCard(
     modifier: Modifier = Modifier,
     onClick: (() -> Unit)? = null,
     compact: Boolean = false,
+    widgetTheme: WidgetTheme = WidgetTheme.Classic,
 ) {
+    val effectiveTheme = config.theme ?: widgetTheme
+    if (effectiveTheme == WidgetTheme.MaterialExpressive) {
+        ExpressiveChartPreviewCard(config, data, today, height, modifier, onClick, compact)
+        return
+    }
     val colors = CentsibleTheme.colors
     val density = LocalDensity.current.density
     val art = remember(colors, density) { ChartArt(colors, density) }
@@ -118,6 +126,142 @@ fun ChartPreviewCard(
                         val cw = with(LocalDensity.current) { maxWidth.toPx() }.toInt().coerceAtLeast(40)
                         val ch = with(LocalDensity.current) { maxHeight.toPx() }.toInt().coerceAtLeast(30)
                         val bmp = remember(face, cw, ch, colors) { draw(art, cw, ch) }
+                        Image(bmp.asImageBitmap(), contentDescription = "${face.title}: ${face.headline}, ${face.subtitle}", modifier = Modifier.fillMaxSize())
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ExpressiveChartPreviewCard(
+    config: ChartWidgetConfig,
+    data: Glanceable?,
+    today: LocalDate,
+    height: Dp,
+    modifier: Modifier,
+    onClick: (() -> Unit)?,
+    compact: Boolean,
+) {
+    val m3 = rememberMaterialExpressiveTokens(darkTheme = CentsibleTheme.colors.isDark)
+    val density = LocalDensity.current.density
+    val art = remember(m3, density) { ChartArt(m3.colors, density, expressive = true, customPalette = m3.palette) }
+    val face = data?.let { ChartFaces.face(config, it, today, art) }
+    Column(
+        modifier
+            .fillMaxWidth()
+            .height(height)
+            .clip(RoundedCornerShape(28.dp))
+            .background(m3.surfaceContainer)
+            .let { m -> onClick?.let { m.clickable(onClick = it) } ?: m }
+            .padding(if (compact) 12.dp else 16.dp),
+    ) {
+        val titleText = face?.title ?: config.title?.takeIf { it.isNotBlank() } ?: config.kind.title
+        Box(
+            Modifier
+                .clip(RoundedCornerShape(50))
+                .background(m3.primaryContainer)
+                .padding(horizontal = if (compact) 8.dp else 10.dp, vertical = 3.dp),
+        ) {
+            Text(
+                titleText,
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = m3.onPrimaryContainer,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        if (face == null) {
+            Spacer(Modifier.height(6.dp))
+            Text("Open the app's Home once to fill the preview.", style = MaterialTheme.typography.bodySmall, color = m3.colors.textSecondary)
+            return@Column
+        }
+        val draw = face.draw
+        if (draw == null) {
+            Text(face.emptyMessage.orEmpty(), style = MaterialTheme.typography.bodySmall, color = m3.colors.textSecondary, modifier = Modifier.padding(top = 8.dp))
+            return@Column
+        }
+        val (pillBg, pillFg) = when (face.tone) {
+            ChartFace.Tone.Good -> m3.tertiaryContainer to m3.onTertiaryContainer
+            ChartFace.Tone.Bad -> m3.errorContainer to m3.onErrorContainer
+            ChartFace.Tone.Neutral -> m3.secondaryContainer to m3.onSecondaryContainer
+        }
+        Spacer(Modifier.height(if (compact) 4.dp else 6.dp))
+        BoxWithConstraints(Modifier.fillMaxWidth().weight(1f)) {
+            if (face.square) {
+                val ring = minOf(maxHeight, maxWidth * 0.44f)
+                val ringPx = with(LocalDensity.current) { ring.toPx() }.toInt().coerceAtLeast(24)
+                val bmp = remember(face, ringPx, m3) { draw(art, ringPx, ringPx) }
+                Row(
+                    Modifier
+                        .fillMaxSize()
+                        .clip(RoundedCornerShape(20.dp))
+                        .background(m3.surfaceContainerLow)
+                        .padding(if (compact) 8.dp else 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Image(bmp.asImageBitmap(), contentDescription = "${face.title}: ${face.headline}", modifier = Modifier.size(ring))
+                    Spacer(Modifier.width(12.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(face.headline, fontSize = if (compact) 17.sp else 23.sp, fontWeight = FontWeight.ExtraBold, color = m3.colors.textPrimary, maxLines = 1)
+                        if (face.subtitle.isNotBlank()) {
+                            Spacer(Modifier.height(2.dp))
+                            Box(Modifier.clip(RoundedCornerShape(50)).background(pillBg).padding(horizontal = 8.dp, vertical = 2.dp)) {
+                                Text(face.subtitle, style = MaterialTheme.typography.labelSmall, color = pillFg, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            }
+                        }
+                        if (!compact) face.legend.take(3).forEach { item ->
+                            Row(Modifier.padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Box(Modifier.size(8.dp).background(item.color, CircleShape))
+                                Spacer(Modifier.width(6.dp))
+                                Text(item.label, style = MaterialTheme.typography.labelSmall, color = m3.colors.textPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                                Text(item.value, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.SemiBold, color = m3.colors.textSecondary)
+                            }
+                        }
+                    }
+                }
+            } else {
+                Column(Modifier.fillMaxSize()) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            face.headline,
+                            fontSize = if (compact) 17.sp else 24.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = m3.colors.textPrimary,
+                            maxLines = 1,
+                        )
+                        if (!compact && face.subtitle.isNotBlank()) {
+                            Spacer(Modifier.width(8.dp))
+                            Box(Modifier.clip(RoundedCornerShape(50)).background(pillBg).padding(horizontal = 8.dp, vertical = 2.dp)) {
+                                Text(face.subtitle, style = MaterialTheme.typography.labelSmall, color = pillFg, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            }
+                        }
+                    }
+                    if (compact && face.subtitle.isNotBlank()) {
+                        Text(face.subtitle, style = MaterialTheme.typography.labelSmall, color = pillFg, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
+                    if (!compact && face.legend.isNotEmpty()) {
+                        Row(Modifier.padding(top = 3.dp), verticalAlignment = Alignment.CenterVertically) {
+                            face.legend.forEach { item ->
+                                Box(Modifier.size(7.dp).background(item.color, CircleShape))
+                                Text(" ${item.label}   ", style = MaterialTheme.typography.labelSmall, color = m3.colors.textSecondary)
+                            }
+                        }
+                    }
+                    Spacer(Modifier.height(6.dp))
+                    BoxWithConstraints(
+                        Modifier
+                            .fillMaxWidth()
+                            .weight(1f)
+                            .clip(RoundedCornerShape(20.dp))
+                            .background(m3.surfaceContainerLow)
+                            .padding(horizontal = 8.dp, vertical = 6.dp),
+                    ) {
+                        val cw = with(LocalDensity.current) { maxWidth.toPx() }.toInt().coerceAtLeast(40)
+                        val ch = with(LocalDensity.current) { maxHeight.toPx() }.toInt().coerceAtLeast(30)
+                        val bmp = remember(face, cw, ch, m3) { draw(art, cw, ch) }
                         Image(bmp.asImageBitmap(), contentDescription = "${face.title}: ${face.headline}, ${face.subtitle}", modifier = Modifier.fillMaxSize())
                     }
                 }

@@ -15,6 +15,7 @@ import app.centsible.core.domain.ChartWidgetConfig
 import app.centsible.core.domain.Glanceable
 import app.centsible.core.domain.GlanceableStore
 import app.centsible.core.domain.WidgetSettings
+import app.centsible.core.domain.WidgetTheme
 import app.centsible.core.extensions.DashboardContext
 import app.centsible.core.extensions.DashboardWidget
 import app.centsible.core.extensions.Destination
@@ -38,6 +39,7 @@ class CustomChartsDashboardWidget @Inject constructor(
     @Composable
     override fun Content(context: DashboardContext) {
         val saved by settings.savedCharts.collectAsState(initial = emptyList())
+        val widgetTheme by settings.widgetTheme.collectAsState(initial = WidgetTheme.Classic)
         val shown = saved.filter { it.showOnDashboard }
         if (shown.isEmpty()) return
 
@@ -54,6 +56,7 @@ class CustomChartsDashboardWidget @Inject constructor(
                     data = glanceable,
                     today = today,
                     height = 190.dp,
+                    widgetTheme = widgetTheme,
                     onClick = { context.navigate(destinationFor(chart.config, context)) },
                 )
             }

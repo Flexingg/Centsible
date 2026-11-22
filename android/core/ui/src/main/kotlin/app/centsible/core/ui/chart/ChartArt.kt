@@ -21,7 +21,12 @@ import kotlin.math.min
  * the widget's); the palette is the app's, light or dark. Sizes are pixels; [density] turns
  * the dp and sp below into pixels.
  */
-class ChartArt(private val colors: CentsibleColors, private val density: Float) {
+class ChartArt(
+    private val colors: CentsibleColors,
+    private val density: Float,
+    private val expressive: Boolean = false,
+    private val customPalette: List<Color>? = null,
+) {
     private fun dp(v: Float) = v * density
     private fun Color.argb(alpha: Float = 1f) = copy(alpha = alpha * this.alpha).toArgb()
 
@@ -160,8 +165,8 @@ class ChartArt(private val colors: CentsibleColors, private val density: Float) 
         val plotH = height - top - bottomPad
         val maxV = (listOfNotNull(values.maxOrNull(), reference).maxOrNull() ?: 0L).coerceAtLeast(1) * 1.05f
         val slot = width / values.size.toFloat()
-        val barW = min(slot * 0.58f, dp(30f))
-        val r = min(barW / 2.4f, dp(8f))
+        val barW = min(slot * if (expressive) 0.66f else 0.58f, dp(if (expressive) 34f else 30f))
+        val r = if (expressive) min(barW / 2f, dp(12f)) else min(barW / 2.4f, dp(8f))
         values.forEachIndexed { i, v ->
             val cx = slot * i + slot / 2
             val isFuture = i in future
@@ -179,7 +184,7 @@ class ChartArt(private val colors: CentsibleColors, private val density: Float) 
             if (i == highlight && !isFuture) {
                 p.shader = LinearGradient(0f, rect.top, 0f, rect.bottom, color, tone.argb(0.75f), Shader.TileMode.CLAMP).takeIf { !overRef }
             }
-            c.drawPath(topRounded(rect, r), p)
+            c.drawPath(if (expressive) pillRounded(rect, r) else topRounded(rect, r), p)
             if (i == highlight && valueLabel != null && !isFuture) {
                 c.label(valueLabel, cx, rect.top - dp(4f), Paint.Align.CENTER, colors.textPrimary.argb(), bold = true)
             }
@@ -203,13 +208,13 @@ class ChartArt(private val colors: CentsibleColors, private val density: Float) 
         val plotH = height - top - bottomPad
         val maxV = (listOf(income.maxOrNull() ?: 0, spending.maxOrNull() ?: 0).max()).coerceAtLeast(1) * 1.05f
         val slot = width / n.toFloat()
-        val barW = min(slot * 0.3f, dp(14f))
+        val barW = min(slot * if (expressive) 0.34f else 0.3f, dp(if (expressive) 16f else 14f))
         val gap = dp(2.5f)
-        val r = barW / 2.2f
+        val r = if (expressive) barW / 2f else barW / 2.2f
         fun bar(cx: Float, v: Long, color: Int) {
             val h = max(plotH * (v / maxV), dp(3f))
             val rect = RectF(cx - barW / 2, top + plotH - h, cx + barW / 2, top + plotH)
-            c.drawPath(topRounded(rect, r), Paint(Paint.ANTI_ALIAS_FLAG).apply { this.color = color })
+            c.drawPath(if (expressive) pillRounded(rect, r) else topRounded(rect, r), Paint(Paint.ANTI_ALIAS_FLAG).apply { this.color = color })
         }
         for (i in 0 until n) {
             val cx = slot * i + slot / 2
@@ -228,18 +233,30 @@ class ChartArt(private val colors: CentsibleColors, private val density: Float) 
         return Path().apply { addRoundRect(rect, floatArrayOf(r, r, r, r, 0f, 0f, 0f, 0f), Path.Direction.CW) }
     }
 
+    /** Expressive pill bar with full top rounding and soft bottom rounding. */
+    private fun pillRounded(rect: RectF, radius: Float): Path {
+        val topR = min(radius, rect.height() / 2f)
+        val botR = min(radius * 0.45f, rect.height() / 2f)
+        return Path().apply { addRoundRect(rect, floatArrayOf(topR, topR, topR, topR, botR, botR, botR, botR), Path.Direction.CW) }
+    }
+
     /** A ring of [slices] (value, color) with small gaps, [centre] text in the middle. */
     fun donut(size: Int, slices: List<Pair<Long, Color>>, centre: String, caption: String): Bitmap {
         val (bmp, c) = canvas(size, size)
         val total = slices.sumOf { it.first }.coerceAtLeast(1)
-        val thickness = size * 0.13f
+        val thickness = size * if (expressive) 0.155f else 0.13f
         val rect = RectF(thickness / 2 + dp(2f), thickness / 2 + dp(2f), size - thickness / 2 - dp(2f), size - thickness / 2 - dp(2f))
         c.drawArc(rect, 0f, 360f, false, stroke(colors.track.argb(), thickness))
-        val gap = if (slices.size > 1) 4f else 0f
+        val gap = if (slices.size > 1) (if (expressive) 7f else 4f) else 0f
         var start = -90f
         slices.forEach { (v, color) ->
             val sweep = 360f * v / total
-            if (sweep - gap > 0.5f) c.drawArc(rect, start + gap / 2, sweep - gap, false, stroke(color.argb(), thickness).apply { strokeCap = Paint.Cap.BUTT })
+            if (sweep - gap > 0.5f) {
+                val p = stroke(color.argb(), thickness).apply {
+                    strokeCap = if (expressive && sweep - gap > 14f) Paint.Cap.ROUND else Paint.Cap.BUTT
+                }
+                c.drawArc(rect, start + gap / 2, sweep - gap, false, p)
+            }
             start += sweep
         }
         val big = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -259,7 +276,7 @@ class ChartArt(private val colors: CentsibleColors, private val density: Float) 
     fun ring(size: Int, share: Float, centre: String, caption: String, tone: Color = colors.accent): Bitmap {
         val over = share > 1f
         val (bmp, c) = canvas(size, size)
-        val thickness = size * 0.11f
+        val thickness = size * if (expressive) 0.14f else 0.11f
         val rect = RectF(thickness / 2 + dp(2f), thickness / 2 + dp(2f), size - thickness / 2 - dp(2f), size - thickness / 2 - dp(2f))
         c.drawArc(rect, 0f, 360f, false, stroke(colors.track.argb(), thickness))
         val ringTone = if (over) colors.negative else tone
@@ -288,6 +305,7 @@ class ChartArt(private val colors: CentsibleColors, private val density: Float) 
         app.centsible.core.domain.ChartAccent.Amber -> colors.warning
     }
 
-    /** Category colours for the donut and its legend: the app's chart and brand colours. */
-    val palette: List<Color> get() = listOf(colors.accent, colors.series1, colors.positive, colors.warning, Color(0xFF8E6BD8), colors.textTertiary)
+    /** Category colours for the donut and its legend: Material You palette in expressive mode, or the app's brand colours. */
+    val palette: List<Color>
+        get() = customPalette ?: listOf(colors.accent, colors.series1, colors.positive, colors.warning, Color(0xFF8E6BD8), colors.textTertiary)
 }
