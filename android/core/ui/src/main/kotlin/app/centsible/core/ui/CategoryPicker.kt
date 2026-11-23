@@ -24,12 +24,14 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -56,6 +58,7 @@ import app.centsible.core.designsystem.component.CategoryAvatar
 import app.centsible.core.designsystem.component.StatLabel
 import app.centsible.core.designsystem.theme.CentsibleTheme
 import app.centsible.core.domain.BudgetEngine
+import app.centsible.core.domain.PlanAheadGateway
 import app.centsible.core.domain.SelectedBudget
 import app.centsible.core.domain.SessionStore
 import app.centsible.core.domain.userMessage
@@ -79,16 +82,21 @@ data class CategoryPickerState(
     val canEdit: Boolean = false,
     val busy: Boolean = false,
     val error: String? = null,
+    /** Categories marked as Transfer / off the books. */
+    val offBooks: Set<CategoryId> = emptySet(),
+    /** Enables Transfer (off the books) type controls in the picker (kept false in legacy screenshot defaults). */
+    val supportsTransferType: Boolean = false,
 )
 
 /** Loads categories and makes the changes the picker offers (the whole app reloads after). */
 @HiltViewModel
 class CategoryPickerViewModel @Inject constructor(
     private val engine: BudgetEngine,
+    private val planAhead: PlanAheadGateway,
     private val selectedBudget: SelectedBudget,
     private val sessions: SessionStore,
 ) : ViewModel() {
-    private val state = MutableStateFlow(CategoryPickerState())
+    private val state = MutableStateFlow(CategoryPickerState(supportsTransferType = true))
     val uiState: StateFlow<CategoryPickerState> = state.asStateFlow()
 
     fun load() = viewModelScope.launch {
@@ -96,26 +104,38 @@ class CategoryPickerViewModel @Inject constructor(
             val b = selectedBudget()
             val groups = async { engine.categoryGroups(b) }
             val caps = async { engine.capabilities() }
-            groups.await() to (sessions.current()?.member?.role?.canWrite == true && caps.await().has(Feature.CategoriesWrite))
+            val off = async { runCatching { planAhead.offBooks(b) }.getOrDefault(emptySet()) }
+            Triple(
+                groups.await(),
+                sessions.current()?.member?.role?.canWrite == true && caps.await().has(Feature.CategoriesWrite),
+                off.await(),
+            )
         }
-            .onSuccess { (g, canEdit) -> state.update { it.copy(groups = g, canEdit = canEdit, loading = false) } }
+            .onSuccess { (g, canEdit, off) ->
+                state.update { it.copy(groups = g, canEdit = canEdit, offBooks = off, loading = false, supportsTransferType = true) }
+            }
             .onFailure { e -> state.update { it.copy(loading = false, error = e.userMessage()) } }
     }
 
-    /** Creates the category (and its group if new), then hands back its id. */
-    fun create(name: String, group: CategoryGroupId?, newGroupName: String?, onCreated: (CategoryId) -> Unit) {
+    /** Creates the category (and its group if new), optionally marking it as a Transfer (off the books) category, then hands back its id. */
+    fun create(name: String, group: CategoryGroupId?, newGroupName: String?, isTransfer: Boolean = false, onCreated: (CategoryId) -> Unit) {
         state.update { it.copy(busy = true, error = null) }
         viewModelScope.launch {
             runCatching {
                 val b = selectedBudget()
                 val groupId = group ?: engine.createCategoryGroup(b, newGroupName!!.trim()).id
-                engine.createCategory(b, name.trim(), groupId).id
+                val created = engine.createCategory(b, name.trim(), groupId)
+                if (isTransfer && !created.isIncome) {
+                    planAhead.setOffBooks(b, created.id, true)
+                }
+                created.id
             }
                 .onSuccess { id -> state.update { it.copy(busy = false) }; load(); onCreated(id) }
                 .onFailure { e -> state.update { it.copy(busy = false, error = e.userMessage()) } }
         }
     }
 
+    fun setOffBooks(id: CategoryId, offBooks: Boolean) = change { planAhead.setOffBooks(selectedBudget(), id, offBooks) }
     fun rename(id: CategoryId, name: String) = change { engine.updateCategory(selectedBudget(), id, name = name.trim()) }
     fun hide(id: CategoryId) = change { engine.updateCategory(selectedBudget(), id, hidden = true) }
 
@@ -131,8 +151,8 @@ class CategoryPickerViewModel @Inject constructor(
 
 /**
  * Choose a category, and create or tidy categories without leaving: "New category"
- * (in an existing or new group), and rename or hide from each row. A newly created
- * category is chosen straight away.
+ * (in an existing or new group, as an Expense or Transfer off-the-books category),
+ * and rename or hide from each row. A newly created category is chosen straight away.
  */
 @Composable
 fun CategoryPickerSheet(
@@ -167,11 +187,16 @@ fun CategoryPickerSheet(
         onDismiss = onDismiss,
         onCreate = { name, group, newGroup ->
             val groupName = newGroup ?: state.groups.firstOrNull { it.id == group }?.name.orEmpty()
-            viewModel.create(name, group, newGroup) { pick(it, name.trim(), groupName) }
+            viewModel.create(name, group, newGroup, isTransfer = false) { pick(it, name.trim(), groupName) }
         },
         onRename = viewModel::rename,
         onHide = viewModel::hide,
         startCreating = startCreating,
+        onCreateTransfer = { name, group, newGroup, isTransfer ->
+            val groupName = newGroup ?: state.groups.firstOrNull { it.id == group }?.name.orEmpty()
+            viewModel.create(name, group, newGroup, isTransfer = isTransfer) { pick(it, name.trim(), groupName) }
+        },
+        onSetOffBooks = viewModel::setOffBooks,
     )
 }
 
@@ -190,6 +215,8 @@ fun CategoryPickerContent(
     onRename: (CategoryId, String) -> Unit,
     onHide: (CategoryId) -> Unit,
     startCreating: Boolean = false,
+    onCreateTransfer: ((String, CategoryGroupId?, String?, Boolean) -> Unit)? = null,
+    onSetOffBooks: ((CategoryId, Boolean) -> Unit)? = null,
 ) {
     val colors = CentsibleTheme.colors
     var query by remember { mutableStateOf("") }
@@ -197,8 +224,9 @@ fun CategoryPickerContent(
     var editing by remember { mutableStateOf<CategoryId?>(null) }
     val groups = state.groups.filter { !it.hidden && (includeIncome || !it.isIncome) }
     val q = query.trim()
-    val matches = groups.map { g -> g to g.categories.filter { !it.hidden && it.id !in exclude && (q.isEmpty() || it.name.contains(q, ignoreCase = true)) } }
-        .filter { it.second.isNotEmpty() }
+    val allMatches = groups.map { g -> g to g.categories.filter { !it.hidden && it.id !in exclude && (q.isEmpty() || it.name.contains(q, ignoreCase = true)) } }
+    val transferMatches = allMatches.flatMap { (_, cats) -> cats.filter { it.id in state.offBooks } }
+    val matches = allMatches.map { (g, cats) -> g to cats.filter { it.id !in state.offBooks } }.filter { it.second.isNotEmpty() }
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true), containerColor = colors.card) {
         Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp).navigationBarsPadding().animateContentSize()) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -218,8 +246,12 @@ fun CategoryPickerContent(
                     groups = groups,
                     preferredGroup = groups.firstOrNull { g -> g.categories.any { it.id == selected } }?.id,
                     busy = state.busy,
+                    supportsTransferType = state.supportsTransferType,
                     onCancel = { creating = false },
-                    onCreate = { name, group, newGroup -> onCreate(name, group, newGroup) },
+                    onCreate = { name, group, newGroup, isTransfer ->
+                        if (onCreateTransfer != null) onCreateTransfer(name, group, newGroup, isTransfer)
+                        else onCreate(name, group, newGroup)
+                    },
                 )
                 Spacer(Modifier.width(8.dp))
             } else {
@@ -238,12 +270,49 @@ fun CategoryPickerContent(
                 if (allowNone && q.isEmpty()) {
                     item(key = "none") { PickRow("No category", null, selected == null, onClick = { onPick(null) }) }
                 }
+                if (transferMatches.isNotEmpty()) {
+                    item(key = "g-transfers-off-books") { StatLabel("Transfers · off the books", Modifier.padding(top = 14.dp, bottom = 4.dp)) }
+                    transferMatches.forEach { c ->
+                        item(key = "t-${c.id.raw}") {
+                            if (editing == c.id) {
+                                EditRow(
+                                    name = c.name,
+                                    busy = state.busy,
+                                    isIncome = c.isIncome,
+                                    isTransfer = true,
+                                    onSetOffBooks = onSetOffBooks?.let { cb -> { on -> cb(c.id, on) } },
+                                    onSave = { onRename(c.id, it); editing = null },
+                                    onHide = { onHide(c.id); editing = null },
+                                    onCancel = { editing = null },
+                                )
+                            } else {
+                                PickRow(
+                                    label = c.name,
+                                    avatarName = c.name,
+                                    isSelected = c.id == selected,
+                                    subtitle = "Off the books",
+                                    onClick = { onPick(c.id) },
+                                    onEdit = if (state.canEdit) ({ editing = c.id; creating = false }) else null,
+                                )
+                            }
+                        }
+                    }
+                }
                 matches.forEach { (g, cats) ->
                     item(key = "g-${g.id.raw}") { StatLabel(g.name, Modifier.padding(top = 14.dp, bottom = 4.dp)) }
                     cats.forEach { c ->
                         item(key = c.id.raw) {
                             if (editing == c.id) {
-                                EditRow(c.name, state.busy, onSave = { onRename(c.id, it); editing = null }, onHide = { onHide(c.id); editing = null }, onCancel = { editing = null })
+                                EditRow(
+                                    name = c.name,
+                                    busy = state.busy,
+                                    isIncome = c.isIncome,
+                                    isTransfer = false,
+                                    onSetOffBooks = onSetOffBooks?.let { cb -> { on -> cb(c.id, on) } },
+                                    onSave = { onRename(c.id, it); editing = null },
+                                    onHide = { onHide(c.id); editing = null },
+                                    onCancel = { editing = null },
+                                )
                             } else {
                                 PickRow(
                                     c.name, c.name, c.id == selected,
@@ -255,7 +324,7 @@ fun CategoryPickerContent(
                     }
                 }
                 // Nothing matches: offer to make it.
-                if (!state.loading && q.isNotEmpty() && matches.isEmpty() && state.canEdit && !creating) {
+                if (!state.loading && q.isNotEmpty() && matches.isEmpty() && transferMatches.isEmpty() && state.canEdit && !creating) {
                     item(key = "create") {
                         Row(
                             Modifier.fillMaxWidth().clickable { creating = true }.padding(vertical = 14.dp),
@@ -274,7 +343,14 @@ fun CategoryPickerContent(
 }
 
 @Composable
-private fun PickRow(label: String, avatarName: String?, isSelected: Boolean, onClick: () -> Unit, onEdit: (() -> Unit)? = null) {
+private fun PickRow(
+    label: String,
+    avatarName: String?,
+    isSelected: Boolean,
+    subtitle: String? = null,
+    onClick: () -> Unit,
+    onEdit: (() -> Unit)? = null,
+) {
     val colors = CentsibleTheme.colors
     Row(
         Modifier.fillMaxWidth().clickable(role = Role.RadioButton, onClick = onClick).semantics { selected = isSelected }.padding(vertical = 6.dp),
@@ -282,14 +358,28 @@ private fun PickRow(label: String, avatarName: String?, isSelected: Boolean, onC
     ) {
         if (avatarName != null) CategoryAvatar(avatarName, size = 32.dp) else Box(Modifier.width(32.dp))
         Spacer(Modifier.width(12.dp))
-        Text(label, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+        Column(Modifier.weight(1f)) {
+            Text(label, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            if (subtitle != null) {
+                Text(subtitle, style = MaterialTheme.typography.labelSmall, color = colors.accent, maxLines = 1)
+            }
+        }
         if (isSelected) Icon(Icons.Rounded.Check, contentDescription = null, tint = colors.accent)
         onEdit?.let { IconButton(onClick = it) { Icon(Icons.Rounded.Edit, contentDescription = "Rename or hide $label", tint = colors.textTertiary) } }
     }
 }
 
 @Composable
-private fun EditRow(name: String, busy: Boolean, onSave: (String) -> Unit, onHide: () -> Unit, onCancel: () -> Unit) {
+private fun EditRow(
+    name: String,
+    busy: Boolean,
+    isIncome: Boolean = false,
+    isTransfer: Boolean = false,
+    onSetOffBooks: ((Boolean) -> Unit)? = null,
+    onSave: (String) -> Unit,
+    onHide: () -> Unit,
+    onCancel: () -> Unit,
+) {
     var text by remember { mutableStateOf(name) }
     Column(Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
         OutlinedTextField(
@@ -300,6 +390,19 @@ private fun EditRow(name: String, busy: Boolean, onSave: (String) -> Unit, onHid
             keyboardActions = KeyboardActions(onDone = { if (text.isNotBlank() && text != name) onSave(text) }),
             modifier = Modifier.fillMaxWidth(),
         )
+        if (!isIncome && onSetOffBooks != null) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f).padding(end = 12.dp)) {
+                    Text("Transfer (off the books)", style = MaterialTheme.typography.bodyMedium)
+                    Text(
+                        "Keep out of budget totals, widgets, reports, and reviews",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = CentsibleTheme.colors.textSecondary,
+                    )
+                }
+                Switch(checked = isTransfer, onCheckedChange = onSetOffBooks, enabled = !busy)
+            }
+        }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             TextButton(onClick = onHide, enabled = !busy) { Text("Hide", color = CentsibleTheme.colors.negative) }
             Spacer(Modifier.weight(1f))
@@ -315,31 +418,59 @@ private fun NewCategory(
     groups: List<CategoryGroup>,
     preferredGroup: CategoryGroupId?,
     busy: Boolean,
+    supportsTransferType: Boolean = false,
     onCancel: () -> Unit,
-    onCreate: (String, CategoryGroupId?, String?) -> Unit,
+    onCreate: (String, CategoryGroupId?, String?, Boolean) -> Unit,
 ) {
+    val colors = CentsibleTheme.colors
     var name by remember { mutableStateOf(initialName) }
     // Where it goes: an existing group, or (null) a new one named below.
     var group by remember { mutableStateOf(preferredGroup ?: groups.firstOrNull { !it.isIncome }?.id ?: groups.firstOrNull()?.id) }
     var newGroup by remember { mutableStateOf("") }
+    var isTransfer by remember { mutableStateOf(false) }
     var menu by remember { mutableStateOf(false) }
-    val groupLabel = group?.let { id -> groups.firstOrNull { it.id == id }?.name } ?: "New group"
+    val selectedGroup = group?.let { id -> groups.firstOrNull { it.id == id } }
+    val canBeTransfer = supportsTransferType && selectedGroup?.isIncome != true
+    val groupLabel = selectedGroup?.name ?: "New group"
     val ready = name.isNotBlank() && (group != null || newGroup.isNotBlank())
     Column(Modifier.fillMaxWidth().padding(bottom = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         OutlinedTextField(
             name, { name = it },
             label = { Text("New category") },
+            placeholder = if (isTransfer) ({ Text("e.g. Credit Card Payments") }) else null,
             singleLine = true,
             keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words, imeAction = ImeAction.Done),
-            keyboardActions = KeyboardActions(onDone = { if (ready) onCreate(name, group, newGroup.takeIf { group == null }) }),
+            keyboardActions = KeyboardActions(onDone = { if (ready) onCreate(name, group, newGroup.takeIf { group == null }, isTransfer && canBeTransfer) }),
             modifier = Modifier.fillMaxWidth(),
         )
+        if (canBeTransfer) {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FilterChip(selected = !isTransfer, onClick = { isTransfer = false }, label = { Text("Expense") })
+                FilterChip(selected = isTransfer, onClick = { isTransfer = true }, label = { Text("Transfer (off the books)") })
+            }
+            if (isTransfer) {
+                Text(
+                    "For credit card payments & unmatched transfers. Left out of budget totals, widgets, reports, and reviews.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = colors.textSecondary,
+                )
+            }
+        }
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text("In", style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
             Box {
                 OutlinedButton(onClick = { menu = true }) { Text(groupLabel, maxLines = 1, overflow = TextOverflow.Ellipsis) }
                 DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-                    groups.forEach { g -> DropdownMenuItem(text = { Text(g.name) }, onClick = { group = g.id; menu = false }) }
+                    groups.forEach { g ->
+                        DropdownMenuItem(
+                            text = { Text(g.name) },
+                            onClick = {
+                                group = g.id
+                                if (g.isIncome) isTransfer = false
+                                menu = false
+                            },
+                        )
+                    }
                     DropdownMenuItem(text = { Text("New group…") }, leadingIcon = { Icon(Icons.Rounded.Add, contentDescription = null) }, onClick = { group = null; menu = false })
                 }
             }
@@ -356,7 +487,7 @@ private fun NewCategory(
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Spacer(Modifier.weight(1f))
             TextButton(onClick = onCancel) { Text("Cancel") }
-            Button(onClick = { onCreate(name, group, newGroup.takeIf { group == null }) }, enabled = ready && !busy) {
+            Button(onClick = { onCreate(name, group, newGroup.takeIf { group == null }, isTransfer && canBeTransfer) }, enabled = ready && !busy) {
                 Text(if (busy) "Creating…" else "Create and choose")
             }
         }

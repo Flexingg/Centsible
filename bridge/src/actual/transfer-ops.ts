@@ -372,17 +372,24 @@ async function one(id: string): Promise<Raw | undefined> {
 
 /** The same change Actual's web app makes for "Make transfer". */
 async function linkPair(lib: Lib, a: Raw, b: Raw) {
-  const payees = (await api.getPayees()) as { id: string; transfer_acct?: string | null }[];
+  const [payees, accounts] = await Promise.all([
+    api.getPayees() as Promise<{ id: string; transfer_acct?: string | null }[]>,
+    api.getAccounts() as Promise<{ id: string; offbudget?: boolean }[]>,
+  ]);
   const payeeFor = (account: unknown) => payees.find((p) => p.transfer_acct === account)?.id;
   const toB = payeeFor(b.account);
   const toA = payeeFor(a.account);
   if (!toA || !toB) throw ApiError.validation("One of the accounts can't take transfers.");
+  const aOff = accounts.find((acc) => acc.id === a.account)?.offbudget === true;
+  const bOff = accounts.find((acc) => acc.id === b.account)?.offbudget === true;
+  // On-budget ↔ on-budget transfers don't take a category; clear any temporary transfer/off-books category.
+  const clearCat = !aOff && !bOff ? { category: null } : {};
   // Actual copies one side's notes onto the other; keep whichever has some.
   const notes = (a.notes as string | null) || (b.notes as string | null) || null;
   await (lib.send as Send)('transactions-batch-update', {
     updated: [
-      { id: a.id, payee: toB, transfer_id: b.id, notes },
-      { id: b.id, payee: toA, transfer_id: a.id, notes },
+      { id: a.id, payee: toB, transfer_id: b.id, notes, ...clearCat },
+      { id: b.id, payee: toA, transfer_id: a.id, notes, ...clearCat },
     ],
   });
   await new Promise<void>((r) => setTimeout(r, 0));
