@@ -40,6 +40,7 @@ import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -72,6 +73,7 @@ import app.centsible.core.designsystem.component.PickerSheet
 import app.centsible.core.designsystem.theme.CentsibleTheme
 import app.centsible.core.domain.BudgetChanges
 import app.centsible.core.domain.BudgetEngine
+import app.centsible.core.domain.PlanAheadGateway
 import app.centsible.core.domain.SelectedBudget
 import app.centsible.core.domain.userMessage
 import app.centsible.core.model.Category
@@ -92,6 +94,8 @@ data class CategoryManagerUiState(
     val looks: Map<String, Appearance> = emptyMap(),
     val canEdit: Boolean = true,
     val message: String? = null,
+    /** Categories marked as Transfer / off the books (left out of totals, widgets, reports, and reviews). */
+    val offBooks: Set<CategoryId> = emptySet(),
 )
 
 @HiltViewModel
@@ -99,6 +103,7 @@ class CategoryManagerViewModel @Inject constructor(
     private val engine: BudgetEngine,
     private val selectedBudget: SelectedBudget,
     private val personal: PersonalGateway,
+    private val planAhead: PlanAheadGateway,
     private val sessions: SessionStore,
     changes: BudgetChanges,
 ) : ViewModel() {
@@ -116,10 +121,11 @@ class CategoryManagerViewModel @Inject constructor(
                 val b = selectedBudget()
                 val groups = async { engine.categoryGroups(b) }
                 val looks = async { runCatching { personal.appearance(b) }.getOrDefault(emptyMap()) }
-                groups.await() to looks.await()
+                val off = async { runCatching { planAhead.offBooks(b) }.getOrDefault(emptySet()) }
+                Triple(groups.await(), looks.await(), off.await())
             }
         }
-            .onSuccess { (g, l) -> state.update { it.copy(groups = Loadable.Ready(g), looks = l, canEdit = sessions.current()?.member?.role?.canWrite != false) } }
+            .onSuccess { (g, l, o) -> state.update { it.copy(groups = Loadable.Ready(g), looks = l, offBooks = o, canEdit = sessions.current()?.member?.role?.canWrite != false) } }
             .onFailure { e -> state.update { it.copy(groups = Loadable.Failed(e.userMessage())) } }
     }
 
@@ -136,7 +142,28 @@ class CategoryManagerViewModel @Inject constructor(
     fun renameGroup(id: CategoryGroupId, name: String) = act { engine.updateCategoryGroup(selectedBudget(), id, name = name.trim()) }
     fun setGroupHidden(id: CategoryGroupId, hidden: Boolean) = act { engine.updateCategoryGroup(selectedBudget(), id, hidden = hidden) }
     fun deleteGroup(id: CategoryGroupId, moveTo: CategoryId?) = act { engine.deleteCategoryGroup(selectedBudget(), id, moveTo) }
-    fun addCategory(group: CategoryGroupId, name: String) = act { engine.createCategory(selectedBudget(), name.trim(), group) }
+    fun addCategory(group: CategoryGroupId, name: String, isTransfer: Boolean = false) = act {
+        val b = selectedBudget()
+        val created = engine.createCategory(b, name.trim(), group)
+        if (isTransfer && !created.isIncome) {
+            planAhead.setOffBooks(b, created.id, true)
+            state.update { it.copy(offBooks = it.offBooks + created.id, message = "Created transfer category (off the books)") }
+        }
+    }
+    fun setOffBooks(id: CategoryId, offBooks: Boolean) {
+        state.update { it.copy(offBooks = if (offBooks) it.offBooks + id else it.offBooks - id) }
+        viewModelScope.launch {
+            runCatching { planAhead.setOffBooks(selectedBudget(), id, offBooks) }
+                .onSuccess {
+                    state.update {
+                        it.copy(message = if (offBooks) "Marked as transfer (off the books)" else "Moved back to budgeted expenses")
+                    }
+                }
+                .onFailure { e ->
+                    state.update { it.copy(offBooks = if (offBooks) it.offBooks - id else it.offBooks + id, message = e.userMessage()) }
+                }
+        }
+    }
     fun renameCategory(id: CategoryId, name: String) = act { engine.updateCategory(selectedBudget(), id, name = name.trim()) }
     fun setCategoryHidden(id: CategoryId, hidden: Boolean) = act { engine.updateCategory(selectedBudget(), id, hidden = hidden) }
     fun deleteCategory(id: CategoryId, moveTo: CategoryId?) = act { engine.deleteCategory(selectedBudget(), id, moveTo) }
@@ -165,9 +192,10 @@ data class CategoryManagerActions(
     val renameGroup: (CategoryGroupId, String) -> Unit = { _, _ -> },
     val setGroupHidden: (CategoryGroupId, Boolean) -> Unit = { _, _ -> },
     val deleteGroup: (CategoryGroupId, CategoryId?) -> Unit = { _, _ -> },
-    val addCategory: (CategoryGroupId, String) -> Unit = { _, _ -> },
+    val addCategory: (CategoryGroupId, String, Boolean) -> Unit = { _, _, _ -> },
     val renameCategory: (CategoryId, String) -> Unit = { _, _ -> },
     val setCategoryHidden: (CategoryId, Boolean) -> Unit = { _, _ -> },
+    val setOffBooks: (CategoryId, Boolean) -> Unit = { _, _ -> },
     val deleteCategory: (CategoryId, CategoryId?) -> Unit = { _, _ -> },
     val saveLook: (String, Appearance) -> Unit = { _, _ -> },
     val messageShown: () -> Unit = {},
@@ -188,6 +216,7 @@ fun CategoryManagerRoute(onBack: () -> Unit, viewModel: CategoryManagerViewModel
             addCategory = viewModel::addCategory,
             renameCategory = viewModel::renameCategory,
             setCategoryHidden = viewModel::setCategoryHidden,
+            setOffBooks = viewModel::setOffBooks,
             deleteCategory = viewModel::deleteCategory,
             saveLook = viewModel::saveLook,
             messageShown = viewModel::messageShown,
@@ -271,21 +300,39 @@ fun CategoryManagerScreen(state: CategoryManagerUiState, actions: CategoryManage
                         }
                         group.categories.forEach { c ->
                             val look = Lookable(c.id.raw, c.name, isGroup = false)
+                            val isTransfer = c.id in state.offBooks
                             HorizontalDivider(color = colors.border)
                             Row(Modifier.fillMaxWidth().padding(start = 12.dp), verticalAlignment = Alignment.CenterVertically) {
                                 LookIcon(look, state.looks[c.id.raw], enabled = edit) { dialog = Dialog.Look(look) }
                                 Spacer(Modifier.width(10.dp))
-                                Text(
-                                    c.name + if (c.hidden) " · hidden" else "",
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    color = if (c.hidden) colors.textTertiary else colors.textPrimary,
-                                    modifier = Modifier.weight(1f).clickable(enabled = edit) { dialog = Dialog.RenameCategory(c) }.padding(vertical = 12.dp),
-                                )
+                                Column(
+                                    Modifier.weight(1f).clickable(enabled = edit) { dialog = Dialog.RenameCategory(c) }.padding(vertical = 12.dp),
+                                ) {
+                                    Text(
+                                        c.name + if (c.hidden) " · hidden" else "",
+                                        style = MaterialTheme.typography.bodyLarge,
+                                        color = if (c.hidden) colors.textTertiary else colors.textPrimary,
+                                    )
+                                    if (isTransfer) {
+                                        Text(
+                                            "Transfer · off the books",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = colors.accent,
+                                        )
+                                    }
+                                }
                                 if (edit) {
                                     RowMenu(
-                                        listOf(
+                                        listOfNotNull(
                                             "Rename" to { dialog = Dialog.RenameCategory(c) },
                                             "Color & emoji" to { dialog = Dialog.Look(look) },
+                                            if (!group.isIncome) {
+                                                (if (isTransfer) "Move back to budget (Expense)" else "Mark as transfer (off the books)") to {
+                                                    actions.setOffBooks(c.id, !isTransfer)
+                                                }
+                                            } else {
+                                                null
+                                            },
                                             (if (c.hidden) "Show" else "Hide") to { actions.setCategoryHidden(c.id, !c.hidden) },
                                             "Delete" to { dialog = Dialog.DeleteCategory(c) },
                                         ),
@@ -313,7 +360,10 @@ fun CategoryManagerScreen(state: CategoryManagerUiState, actions: CategoryManage
         Dialog.NewGroup -> NameDialog("New category group", "", onDismiss = { dialog = null }) { actions.addGroup(it); dialog = null }
         is Dialog.NewCategory -> {
             val groups = state.groups.valueOrNull.orEmpty().filter { !it.hidden }
-            NewCategoryDialog(groups, d.group, onDismiss = { dialog = null }) { group, name -> actions.addCategory(group, name); dialog = null }
+            NewCategoryDialog(groups, d.group, onDismiss = { dialog = null }) { group, name, isTransfer ->
+                actions.addCategory(group, name, isTransfer)
+                dialog = null
+            }
         }
         is Dialog.RenameGroup -> NameDialog("Rename group", d.group.name, onDismiss = { dialog = null }) { actions.renameGroup(d.group.id, it); dialog = null }
         is Dialog.RenameCategory -> NameDialog("Rename category", d.category.name, onDismiss = { dialog = null }) { actions.renameCategory(d.category.id, it); dialog = null }
@@ -362,16 +412,31 @@ private fun LookIcon(item: Lookable, look: Appearance?, enabled: Boolean, onClic
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun NewCategoryDialog(groups: List<CategoryGroup>, initial: CategoryGroup?, onDismiss: () -> Unit, onSave: (CategoryGroupId, String) -> Unit) {
+private fun NewCategoryDialog(
+    groups: List<CategoryGroup>,
+    initial: CategoryGroup?,
+    onDismiss: () -> Unit,
+    onSave: (CategoryGroupId, String, Boolean) -> Unit,
+) {
+    val colors = CentsibleTheme.colors
     var name by remember { mutableStateOf("") }
     var group by remember { mutableStateOf(initial ?: groups.firstOrNull { !it.isIncome } ?: groups.firstOrNull()) }
+    var isTransfer by remember { mutableStateOf(false) }
     var open by remember { mutableStateOf(false) }
+    val canBeTransfer = group?.isIncome != true
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("New category") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                OutlinedTextField(name, { name = it }, label = { Text("Name") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(
+                    name,
+                    { name = it },
+                    label = { Text("Name") },
+                    placeholder = { Text(if (isTransfer) "e.g. Credit Card Payments" else "e.g. Groceries") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
                 ExposedDropdownMenuBox(expanded = open, onExpandedChange = { open = it }) {
                     OutlinedTextField(
                         group?.name.orEmpty(), {},
@@ -381,12 +446,37 @@ private fun NewCategoryDialog(groups: List<CategoryGroup>, initial: CategoryGrou
                         modifier = Modifier.fillMaxWidth().menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable),
                     )
                     ExposedDropdownMenu(expanded = open, onDismissRequest = { open = false }) {
-                        groups.forEach { g -> DropdownMenuItem(text = { Text(g.name) }, onClick = { group = g; open = false }) }
+                        groups.forEach { g ->
+                            DropdownMenuItem(
+                                text = { Text(g.name) },
+                                onClick = {
+                                    group = g
+                                    if (g.isIncome) isTransfer = false
+                                    open = false
+                                },
+                            )
+                        }
+                    }
+                }
+                if (canBeTransfer) {
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text("Category type", style = MaterialTheme.typography.labelLarge, color = colors.textSecondary)
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            FilterChip(selected = !isTransfer, onClick = { isTransfer = false }, label = { Text("Expense") })
+                            FilterChip(selected = isTransfer, onClick = { isTransfer = true }, label = { Text("Transfer (off the books)") })
+                        }
+                        if (isTransfer) {
+                            Text(
+                                "For credit card payments & unmatched transfers. Left out of budget totals, widgets, reviews, reports, and insights.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = colors.textSecondary,
+                            )
+                        }
                     }
                 }
             }
         },
-        confirmButton = { TextButton(onClick = { group?.let { onSave(it.id, name) } }, enabled = name.isNotBlank() && group != null) { Text("Create") } },
+        confirmButton = { TextButton(onClick = { group?.let { onSave(it.id, name, isTransfer && canBeTransfer) } }, enabled = name.isNotBlank() && group != null) { Text("Create") } },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
     )
 }

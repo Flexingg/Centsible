@@ -18,11 +18,13 @@ import app.centsible.core.domain.AppLockSettings
 import app.centsible.core.domain.BudgetEngine
 import app.centsible.core.domain.Glanceable
 import app.centsible.core.domain.GlanceableStore
+import app.centsible.core.domain.PlanAheadGateway
 import app.centsible.core.domain.PlanningGateway
 import app.centsible.core.domain.SessionStore
 import app.centsible.core.domain.TransactionTools
 import app.centsible.core.model.JobStatus
 import app.centsible.core.model.YearMonth
+import app.centsible.core.model.withoutCategories
 import dagger.hilt.EntryPoint
 import dagger.hilt.InstallIn
 import dagger.hilt.android.EntryPointAccessors
@@ -45,6 +47,7 @@ class GlanceRefresher @Inject constructor(
     private val engine: BudgetEngine,
     private val tools: TransactionTools,
     private val planning: PlanningGateway,
+    private val planAhead: PlanAheadGateway,
     private val reports: app.centsible.core.domain.ReportsGateway,
     private val appLock: AppLockSettings,
     private val store: GlanceableStore,
@@ -61,7 +64,8 @@ class GlanceRefresher @Inject constructor(
         val result = runCatching {
             val today = LocalDate.now()
             val ym = YearMonth(today.toString().take(7))
-            val month = engine.budgetMonth(budget, ym)
+            val offBooks = runCatching { planAhead.offBooks(budget) }.getOrDefault(emptySet())
+            val month = engine.budgetMonth(budget, ym).withoutCategories(offBooks)
             val review = runCatching { tools.inbox(budget, limit = 1).total }.getOrDefault(0)
             val payees = runCatching { engine.payees(budget) }.getOrDefault(emptyList()).associate { it.id to it.name }
             val bills = runCatching { Glanceable.bills(planning.schedules(budget, upcoming = 3), today, { s -> s.payeeId?.let(payees::get) }) }.getOrDefault(emptyList())
