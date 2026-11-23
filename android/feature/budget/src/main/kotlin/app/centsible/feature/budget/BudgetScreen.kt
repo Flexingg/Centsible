@@ -208,17 +208,18 @@ fun BudgetScreen(
     val month = state.data.valueOrNull
     if (holding && month != null) HoldDialog(month.toBudget, onDismiss = { holding = false }, onHold = { holding = false; onHold(it) })
     val selected = month?.groups?.flatMap { it.categories }?.firstOrNull { it.id == state.selectedCategory }
+    val haptics = app.centsible.core.designsystem.motion.rememberHaptics()
     if (month != null && selected != null) {
         CategorySheet(
             category = selected,
             month = month,
             state = state,
             onDismiss = { onOpenCategory(null) },
-            onAssign = { onAssign(selected.id, it) },
-            onMove = onMove,
+            onAssign = { haptics.confirm(); onAssign(selected.id, it) },
+            onMove = { from, to, amt -> haptics.confirm(); onMove(from, to, amt) },
             onRollover = { onRollover(selected.id, it) },
             onSaveNote = { onSaveNote(selected.id, it) },
-            onAnnual = { amount, start -> plan.setAnnual(selected.id, amount, start) },
+            onAnnual = { amount, start -> haptics.confirm(); plan.setAnnual(selected.id, amount, start) },
             onOffBooks = { plan.setOffBooks(selected.id, it) },
             onAutomations = { onOpenCategory(null); plan.openAutomations(selected.id, month.month) }.takeIf { state.canApplyGoals },
             onSeeTransactions = {
@@ -240,6 +241,7 @@ private fun BudgetContent(
     onCover: () -> Unit,
     modifier: Modifier,
 ) {
+    val haptics = app.centsible.core.designsystem.motion.rememberHaptics()
     val collapsed = remember { mutableStateMapOf<CategoryGroupId, Boolean>() }
     // Off-the-books categories get their own card and stay out of the totals and groups.
     val setAside = month.groups.flatMap { it.categories }.filter { it.id in state.offBooks && !it.hidden }
@@ -258,8 +260,8 @@ private fun BudgetContent(
             GroupCard(
                 group = group,
                 collapsed = collapsed[group.id] == true,
-                onToggle = { collapsed[group.id] = collapsed[group.id] != true },
-                onOpenCategory = onOpenCategory,
+                onToggle = { haptics.tick(); collapsed[group.id] = collapsed[group.id] != true },
+                onOpenCategory = { haptics.tap(); onOpenCategory(it) },
             )
         }
         if (setAside.isNotEmpty()) {

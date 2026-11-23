@@ -34,9 +34,11 @@ fun AnimatedCheck(
     description: String? = "Done",
     /** A confirm buzz as it lands (for one-off confirmations, not lists of checks). */
     haptic: Boolean = false,
+    /** Uses the richer celebratory chime & ascending haptic when true (e.g. inbox zero). */
+    celebrate: Boolean = false,
 ) {
     val haptics = app.centsible.core.designsystem.motion.rememberHaptics()
-    if (haptic) androidx.compose.runtime.LaunchedEffect(key) { haptics.confirm() }
+    if (haptic) androidx.compose.runtime.LaunchedEffect(key) { if (celebrate) haptics.celebrate() else haptics.confirm() }
     val pop = rememberEntrance(key, delayMillis = delayMillis, durationMillis = Motion.MEDIUM, easing = Motion.Spring)
     val stroke = rememberEntrance(key, delayMillis = delayMillis + Motion.SHORT, durationMillis = Motion.MEDIUM, easing = Motion.EaseOut)
     Canvas(

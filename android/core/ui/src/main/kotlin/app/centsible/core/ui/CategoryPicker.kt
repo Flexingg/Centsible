@@ -352,8 +352,9 @@ private fun PickRow(
     onEdit: (() -> Unit)? = null,
 ) {
     val colors = CentsibleTheme.colors
+    val haptics = app.centsible.core.designsystem.motion.rememberHaptics()
     Row(
-        Modifier.fillMaxWidth().clickable(role = Role.RadioButton, onClick = onClick).semantics { selected = isSelected }.padding(vertical = 6.dp),
+        Modifier.fillMaxWidth().clickable(role = Role.RadioButton) { haptics.tap(); onClick() }.semantics { selected = isSelected }.padding(vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (avatarName != null) CategoryAvatar(avatarName, size = 32.dp) else Box(Modifier.width(32.dp))

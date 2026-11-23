@@ -45,7 +45,7 @@ data class ServerUiState(
     /** Set for a few seconds after a manual backup succeeds (the button shows a checkmark). */
     val backedUp: Long? = null,
 ) {
-    val appUpdate get() = (status as? Loadable.Ready)?.value?.app?.takeIf { (it.versionCode ?: 0) > installedCode && it.apkUrl != null }
+    val appUpdate get() = (status as? Loadable.Ready)?.value?.app?.takeIf { AppUpdater.isUpdateAvailable(it, installedCode, installedVersion) }
 }
 
 @HiltViewModel
@@ -69,7 +69,13 @@ class ServerViewModel @Inject constructor(
 
     fun load(refresh: Boolean = true) = viewModelScope.launch {
         val status = runCatching { server.status(refresh) }
-        state.update { it.copy(status = status.fold({ s -> Loadable.Ready(s) }, { e -> Loadable.Failed(e.userMessage()) })) }
+        val githubRelease = runCatching { AppUpdater.fetchLatestGitHubRelease() }.getOrNull()
+        val merged = status.map { s ->
+            val bestApp = listOfNotNull(s.app, githubRelease)
+                .maxWithOrNull { a, b -> AppUpdater.compareSemver(a.version, b.version) }
+            s.copy(app = bestApp)
+        }
+        state.update { it.copy(status = merged.fold({ s -> Loadable.Ready(s) }, { e -> Loadable.Failed(e.userMessage()) })) }
         if (state.value.isOwner) loadBackups()
     }
 

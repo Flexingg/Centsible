@@ -34,13 +34,18 @@ class UpdateWidget @Inject constructor(private val server: ServerGateway) : Dash
     override fun Content(context: DashboardContext) {
         val android = LocalContext.current
         val text by produceState<String?>(null, context.budget) {
-            val s = runCatching { server.status() }.getOrNull() ?: return@produceState
-            val app = s.app?.takeIf { (it.versionCode ?: 0) > AppUpdater.installedVersionCode(android) && it.apkUrl != null }
+            val s = runCatching { server.status() }.getOrNull()
+            val installedCode = AppUpdater.installedVersionCode(android)
+            val installedName = AppUpdater.installedVersionName(android)
+            val githubRelease = runCatching { AppUpdater.fetchLatestGitHubRelease() }.getOrNull()
+            val candidate = listOfNotNull(s?.app, githubRelease)
+                .filter { AppUpdater.isUpdateAvailable(it, installedCode, installedName) }
+                .maxWithOrNull { a, b -> AppUpdater.compareSemver(a.version, b.version) }
             val owner = context.member?.role == Role.Owner
             value = when {
-                app != null && owner && s.bridgeUpdateAvailable -> "Centsible ${app.version} is out, for the app and the server."
-                app != null -> "Centsible ${app.version} is out. Tap to update the app."
-                owner && s.bridgeUpdateAvailable -> "A server update (${s.bridgeLatest}) is ready."
+                candidate != null && owner && s?.bridgeUpdateAvailable == true -> "Centsible ${candidate.version} is out, for the app and the server."
+                candidate != null -> "Centsible ${candidate.version} is out. Tap to update the app."
+                owner && s?.bridgeUpdateAvailable == true -> "A server update (${s.bridgeLatest}) is ready."
                 else -> null
             }
         }
