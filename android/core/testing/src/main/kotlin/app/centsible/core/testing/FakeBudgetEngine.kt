@@ -57,7 +57,7 @@ class FakeBudgetEngine(
     override suspend fun accounts(budget: BudgetId): List<Account> = accounts.toList().also { check() }
 
     override suspend fun categoryGroups(budget: BudgetId): List<CategoryGroup> = month.groups.map { g ->
-        CategoryGroup(g.id, g.name, g.isIncome, g.hidden, g.categories.map { Category(it.id, it.name, g.id, g.isIncome, it.hidden) })
+        CategoryGroup(g.id, g.name, g.isIncome, g.hidden, g.categories.map { Category(it.id, it.name, g.id, g.isIncome, it.hidden, it.parentId) })
     }
 
     override suspend fun payees(budget: BudgetId): List<Payee> = emptyList()
@@ -66,7 +66,7 @@ class FakeBudgetEngine(
         check()
         val filtered = transactions.filter { t ->
             (query.accountId == null || t.accountId == query.accountId) &&
-                (query.categoryId == null || t.categoryId == query.categoryId) &&
+                (query.categoryId == null || t.categoryId == query.categoryId || (query.withSubcategories && t.categoryId in subtree(query.categoryId!!))) &&
                 (!query.uncategorized || (t.categoryId == null && !t.isTransfer && !t.isParent)) &&
                 (query.search.isNullOrBlank() || listOfNotNull(t.payeeName, t.notes).any { it.contains(query.search!!, ignoreCase = true) })
         }
@@ -157,6 +157,27 @@ class FakeBudgetEngine(
         month = updateCategory(id) { it.copy(name = name ?: it.name, hidden = hidden ?: it.hidden) }
         val c = category(id)
         return Category(c.id, c.name, group ?: month.groups.first { g -> g.categories.any { it.id == id } }.id, false, c.hidden)
+    }
+
+    override suspend fun createSubcategory(budget: BudgetId, name: String, parent: CategoryId): Category {
+        val group = month.groups.first { g -> g.categories.any { it.id == parent } }
+        val id = CategoryId("cat-${extraCategories.size}")
+        val created = BudgetCategory(id, name, false, Money.Zero, Money.Zero, Money.Zero, Money.Zero, false, parentId = parent)
+        month = month.copy(groups = month.groups.map { if (it.id == group.id) it.copy(categories = it.categories + created) else it })
+        return Category(id, name, group.id, group.isIncome, false, parent).also { extraCategories += it }
+    }
+
+    override suspend fun setCategoryParent(budget: BudgetId, id: CategoryId, parent: CategoryId?): Category {
+        month = updateCategory(id) { it.copy(parentId = parent) }
+        return categoryGroups(budget).flatMap { it.categories }.first { it.id == id }
+    }
+
+    private fun subtree(root: CategoryId): Set<CategoryId> {
+        val all = month.groups.flatMap { it.categories }
+        val out = mutableSetOf(root)
+        var grew = true
+        while (grew) grew = out.addAll(all.filter { it.parentId in out }.map { it.id })
+        return out
     }
 
     override suspend fun deleteCategory(budget: BudgetId, id: CategoryId, moveTo: CategoryId?) {

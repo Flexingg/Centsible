@@ -77,7 +77,9 @@ class BridgeApi(private val client: BridgeClient, private val outbox: Outbox? = 
         uncategorized: Boolean = false,
         payeeId: String? = null,
         groupId: String? = null,
+        subcategories: Boolean = false,
     ): TransactionPageDto = client.get("/v1/budgets/$budgetId/transactions") {
+        if (subcategories && categoryId != null) parameter("subcategories", true)
         payeeId?.let { parameter("payeeId", it) }
         groupId?.let { parameter("groupId", it) }
         search?.takeIf { it.isNotBlank() }?.let { parameter("q", it.trim()) }
@@ -160,6 +162,8 @@ class BridgeApi(private val client: BridgeClient, private val outbox: Outbox? = 
 
     suspend fun createCategory(budgetId: String, body: NewCategoryDto): CategoryDto = client.send(HttpMethod.Post, "/v1/budgets/$budgetId/categories", body)
     suspend fun updateCategory(budgetId: String, id: String, body: CategoryPatchDto): CategoryDto =
+        client.send(HttpMethod.Patch, "/v1/budgets/$budgetId/categories/$id", body)
+    suspend fun setCategoryParent(budgetId: String, id: String, body: CategoryParentPatchDto): CategoryDto =
         client.send(HttpMethod.Patch, "/v1/budgets/$budgetId/categories/$id", body)
     suspend fun deleteCategory(budgetId: String, id: String, transferCategoryId: String?) {
         client.execute(HttpMethod.Delete, "/v1/budgets/$budgetId/categories/$id") { transferCategoryId?.let { parameter("transferCategoryId", it) } }

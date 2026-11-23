@@ -29,6 +29,8 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.unit.Dp
@@ -67,15 +69,24 @@ fun BrandDial(
     halo: Color = Motion.Forest,
     key: Any? = Unit,
     description: String,
+    /** Tapping a segment (its index); null when the ring isn't tappable. */
+    onSegmentTap: ((Int) -> Unit)? = null,
+    /** False skips the turn on entrance: segments only sweep in (a drill-down's new level). */
+    spin: Boolean = true,
 ) {
     val reduced = reducedMotion
-    val turn = remember(key) { Animatable(if (reduced) 0f else -150f) }
+    val turn = remember(key) { Animatable(if (reduced || !spin) 0f else -150f) }
     val sweep = remember(key) { Animatable(if (reduced) 1f else 0f) }
     val needleAt = remember(key) { Animatable(if (reduced) (needle ?: 0f) else 0f) }
     val haptics = app.centsible.core.designsystem.motion.rememberHaptics()
     LaunchedEffect(key) {
         if (reduced) return@LaunchedEffect
         coroutineScope {
+            if (!spin) {
+                launch { sweep.animateTo(1f, tween(650, easing = Motion.EaseOut)) }
+                launch { needleAt.snapTo(needle ?: 0f) }
+                return@coroutineScope
+            }
             launch {
                 turn.animateTo(
                     0f,
@@ -99,7 +110,12 @@ fun BrandDial(
     LaunchedEffect(needle) {
         if (needle != null && !needleAt.isRunning && sweep.value >= 1f) needleAt.animateTo(needle, tween(Motion.MEDIUM, easing = Motion.Spring))
     }
-    Canvas(modifier.size(size).clearAndSetSemantics { contentDescription = description }) {
+    val tap = onSegmentTap?.let { cb ->
+        Modifier.pointerInput(segments) {
+            detectTapGestures { p -> segmentAt(segments, p.x / this.size.width * 1024f, p.y / this.size.height * 1024f)?.let(cb) }
+        }
+    } ?: Modifier
+    Canvas(modifier.size(size).then(tap).clearAndSetSemantics { contentDescription = description }) {
         val unit = this.size.minDimension / 1024f
         scale(unit, pivot = Offset.Zero) {
             rotate(turn.value, Offset(512f, 512f)) {
@@ -117,6 +133,25 @@ fun BrandDial(
             if (needle != null && sweep.value > 0.6f) drawNeedle(needleAt.value, needleColor, halo)
         }
     }
+}
+
+/** The segment under a point in the dial's 1024-unit artwork, if any. */
+internal fun segmentAt(segments: List<DialSegment>, x: Float, y: Float): Int? {
+    val dx = x - 512f
+    val dy = y - 512f
+    val r = kotlin.math.sqrt(dx * dx + dy * dy)
+    if (kotlin.math.abs(r - R) > STROKE / 2 + 40f) return null
+    // Compose angles: 0 at 3 o'clock, clockwise (y points down).
+    val angle = (Math.toDegrees(kotlin.math.atan2(dy, dx).toDouble()).toFloat() + 360f) % 360f
+    val along = ((angle - START) + 360f) % 360f
+    if (along > SWEEP) return null
+    val at = along / SWEEP
+    var from = 0f
+    segments.forEachIndexed { i, s ->
+        if (at >= from && at <= from + s.fraction) return i
+        from += s.fraction
+    }
+    return null
 }
 
 /** A stretch of the ring from [from] to [from] + [length] (shares of the 270-degree arc). */

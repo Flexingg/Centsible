@@ -70,6 +70,18 @@ Set up the mortgage in **More → Mortgage** for its terms (rate, schedule, payo
 
 Actual has no account types, so Centsible keeps them on the bridge: **Cash, Savings, Credit card, Investment, Mortgage, Loan**. They decide how the Accounts page groups accounts. On **Accounts → Edit types**, tap an account's type to change it, or choose **Automatic** to go back to guessing from the name and balance. Linking an account through Plaid sets its type from what the bank reports, and **Add account** asks for one.
 
+## Categories in up to five levels
+
+Groups are the top level and their categories the second; any category can hold sub-categories, down to level 5 (say **Needs › Food › Groceries › Costco › Bulk snacks**). Every level from 2 down holds its own transactions and its own envelope, so a transaction can stay on **Food** while others go on **Groceries**. A transaction with no category at all is uncategorized.
+
+- **Budget → Edit categories**: ⋮ on a category offers **Add sub-category** and **Move…** (under another category, or to the top of a group, with its own sub-categories along). Deleting a category moves its sub-categories up a level.
+- **The budget** lists sub-categories under their parent, whose figures include theirs. A category's transactions include its sub-categories'.
+- **Picking a category** shows the tree, folded; search finds any level by its path, like "food groc".
+- **Home's dial** zooms in: tap a group (on the ring or in the list) and its categories sweep in, measured against its own budget; tap again to go down a level. Back, or the breadcrumb, zooms out. The parent's own spending shows as "Food (general)". The **Where it went** chart on Home zooms the same way.
+- **Reports → Money flow**: a Sankey of where the money went, from each income category through each group and down the levels, with what was saved (or drawn from savings). Pick this month or 3, 6 or 12 months and how many levels to show; tap a box for its share and transactions.
+
+Actual itself has two levels, so the bridge keeps the parent links (in its own store, per budget). In Actual's own app, sub-categories show as ordinary categories in their group: budgets, rules and sync are untouched.
+
 ## Widgets and Quick Settings tiles
 
 **Settings → Widgets & tiles** shows every chart widget on your home screen and both figure tiles, with live previews, and lets you change what each one shows.
@@ -82,6 +94,7 @@ Actual has no account types, so Centsible keeps them on the bridge: **Cash, Savi
   - **Monthly spending**: six months with the average.
   - **Income vs spending**: six months of money in and out.
   - **Net worth**: twelve months.
+  - **Money flow**: this month's Sankey, income into groups and down each level (choose how deep).
 
   Charts use Centsible's colours, light or dark with the phone. Tapping a chart opens that screen in the app; ↻ refreshes it.
 - **Budget** and **Upcoming bills** widgets: this month's to-budget and spending with **+ Add** and **Review**, and the next bills.
@@ -102,7 +115,7 @@ Other apps (Home Assistant dashboards and notifications, launcher shortcuts) can
 | Link | Opens |
 |---|---|
 | `centsible://open/review` | your review inbox |
-| `centsible://open/transactions`, `/accounts`, `/budget`, `/net-worth`, `/recurring`, `/trends`, `/bank-sync`, `/plaid`, `/new-transaction`, `/widgets`, `/duplicates`, `/mortgage` | that screen |
+| `centsible://open/transactions`, `/accounts`, `/budget`, `/net-worth`, `/recurring`, `/trends`, `/money-flow`, `/bank-sync`, `/plaid`, `/new-transaction`, `/widgets`, `/duplicates`, `/mortgage` | that screen |
 | `centsible://open/account/<account id>` | one account |
 | `centsible://open/category/<category id>?name=Groceries[&month=2026-11]` | a category's transactions |
 

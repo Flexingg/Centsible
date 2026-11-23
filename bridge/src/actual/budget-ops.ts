@@ -10,6 +10,7 @@ import {
 } from '../mappers/index.js';
 import { AccountOps } from './account-ops.js';
 import type { ActualHost } from './host.js';
+import type { CategoryTree, TreeCategory } from './category-tree.js';
 
 /**
  * Budget operations over @actual-app/api. Tier 1 = public API methods, tier 2 = AQL
@@ -22,6 +23,14 @@ export class BudgetOps {
   syncOverlay?: (budgetId: string) => Map<string, { syncSource: string | null; lastSync: string | null; bankSyncStatus: string | null }>;
   /** Account types set in Centsible (Actual has none). */
   kinds?: (budgetId: string) => Map<string, string>;
+  /** Sub-categories (Actual has two levels). */
+  tree?: CategoryTree;
+
+  /** child id -> parent id; call inside withBudget. */
+  async parents(budgetId: string): Promise<Map<string, string>> {
+    if (!this.tree) return new Map();
+    return this.tree.parents(budgetId, (await api.getCategories()) as TreeCategory[]);
+  }
 
   accounts(budgetId: string) {
     return this.host.withBudget(budgetId, 'read', async () => {
@@ -34,7 +43,10 @@ export class BudgetOps {
   }
 
   categoryGroups(budgetId: string) {
-    return this.host.withBudget(budgetId, 'read', async () => (await api.getCategoryGroups()).map(toCategoryGroup));
+    return this.host.withBudget(budgetId, 'read', async () => {
+      const parents = await this.parents(budgetId);
+      return (await api.getCategoryGroups()).map((g) => toCategoryGroup(g as Record<string, unknown>, parents));
+    });
   }
 
   payees(budgetId: string) {
@@ -50,7 +62,7 @@ export class BudgetOps {
   }
 
   month(budgetId: string, month: string) {
-    return this.host.withBudget(budgetId, 'read', () => this.readMonth(month));
+    return this.host.withBudget(budgetId, 'read', () => this.readMonth(month, budgetId));
   }
 
   updateCategoryBudget(budgetId: string, month: string, categoryId: string, patch: { budgeted?: number; carryover?: boolean }) {
@@ -58,7 +70,7 @@ export class BudgetOps {
       await this.assertExpenseCategory(categoryId);
       if (patch.budgeted !== undefined) await api.setBudgetAmount(month, categoryId, patch.budgeted);
       if (patch.carryover !== undefined) await api.setBudgetCarryover(month, categoryId, patch.carryover);
-      return this.readMonth(month);
+      return this.readMonth(month, budgetId);
     });
   }
 
@@ -74,7 +86,7 @@ export class BudgetOps {
         to: t.to,
         currencyCode: typeof prefs.defaultCurrencyCode === 'string' ? prefs.defaultCurrencyCode : '',
       });
-      return this.readMonth(month);
+      return this.readMonth(month, budgetId);
     });
   }
 
@@ -82,7 +94,7 @@ export class BudgetOps {
     return this.host.withBudget(budgetId, 'write', async () => {
       if (amount === null) await api.resetBudgetHold(month);
       else await api.holdBudgetForNextMonth(month, amount);
-      return this.readMonth(month);
+      return this.readMonth(month, budgetId);
     });
   }
 
@@ -98,7 +110,7 @@ export class BudgetOps {
         overwrite ? 'budget/overwrite-goal-template' : 'budget/apply-goal-template',
         { month },
       );
-      const monthDto = await this.readMonth(month);
+      const monthDto = await this.readMonth(month, budgetId);
       return { month: monthDto, message: templateMessage(result) };
     });
   }
@@ -112,11 +124,15 @@ export class BudgetOps {
   }
 
   /** The month as the app sees it. Other ops return it after changing budget amounts. */
-  async readMonth(month: string) {
+  async readMonth(month: string, budgetId: string) {
     const months = await api.getBudgetMonths();
     if (!months.includes(month)) throw ApiError.notFound(`No budget data for ${month}`);
-    const [raw, prefs] = await Promise.all([api.getBudgetMonth(month), api.getPreferences()]);
-    return toBudgetMonth(raw as Record<string, unknown>, budgetTypeFromPrefs(prefs as Record<string, unknown>));
+    const [raw, prefs, parents] = await Promise.all([
+      api.getBudgetMonth(month),
+      api.getPreferences(),
+      this.parents(budgetId),
+    ]);
+    return toBudgetMonth(raw as Record<string, unknown>, budgetTypeFromPrefs(prefs as Record<string, unknown>), parents);
   }
 
   private async assertExpenseCategory(categoryId: string) {

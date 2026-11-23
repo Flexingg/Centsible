@@ -45,6 +45,7 @@ export const transactionRoutes =
       Querystring: {
         accountId?: string;
         categoryId?: string;
+        subcategories?: boolean;
         payeeId?: string;
         groupId?: string;
         since?: string;
@@ -63,6 +64,7 @@ export const transactionRoutes =
             properties: {
               accountId: { type: 'string' },
               categoryId: { type: 'string' },
+              subcategories: { type: 'boolean' },
               payeeId: { type: 'string' },
               groupId: { type: 'string' },
               since: DATE,

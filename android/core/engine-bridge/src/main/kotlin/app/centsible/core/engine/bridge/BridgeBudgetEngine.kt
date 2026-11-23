@@ -40,7 +40,7 @@ class BridgeBudgetEngine @Inject constructor(private val api: BridgeApi) : Budge
     override suspend fun payees(budget: BudgetId) = api.payees(budget.raw).map { it.toModel() }
 
     override suspend fun transactions(budget: BudgetId, query: TransactionQuery, cursor: String?) =
-        api.transactions(budget.raw, query.accountId?.raw, query.categoryId?.raw, query.since, query.until, query.limit, cursor, query.search, query.uncategorized, query.payeeId?.raw, query.groupId?.raw)
+        api.transactions(budget.raw, query.accountId?.raw, query.categoryId?.raw, query.since, query.until, query.limit, cursor, query.search, query.uncategorized, query.payeeId?.raw, query.groupId?.raw, query.withSubcategories)
             .let { page -> Page(page.items.map { it.toModel() }, page.nextCursor, page.runningBalances?.map(::Money)) }
 
     override suspend fun createTransaction(budget: BudgetId, transaction: NewTransaction) = api.createTransaction(
@@ -80,7 +80,13 @@ class BridgeBudgetEngine @Inject constructor(private val api: BridgeApi) : Budge
 
     override suspend fun reopenAccount(budget: BudgetId, id: AccountId) = api.reopenAccount(budget.raw, id.raw).toModel()
 
-    override suspend fun createCategory(budget: BudgetId, name: String, group: CategoryGroupId) = api.createCategory(budget.raw, NewCategoryDto(name, group.raw)).toModel()
+    override suspend fun createCategory(budget: BudgetId, name: String, group: CategoryGroupId) = api.createCategory(budget.raw, NewCategoryDto(name, groupId = group.raw)).toModel()
+
+    override suspend fun createSubcategory(budget: BudgetId, name: String, parent: CategoryId) =
+        api.createCategory(budget.raw, NewCategoryDto(name, parentId = parent.raw)).toModel()
+
+    override suspend fun setCategoryParent(budget: BudgetId, id: CategoryId, parent: CategoryId?) =
+        api.setCategoryParent(budget.raw, id.raw, app.centsible.core.network.CategoryParentPatchDto(parent?.let { kotlinx.serialization.json.JsonPrimitive(it.raw) } ?: kotlinx.serialization.json.JsonNull)).toModel()
 
     override suspend fun updateCategory(budget: BudgetId, id: CategoryId, name: String?, hidden: Boolean?, group: CategoryGroupId?) =
         api.updateCategory(budget.raw, id.raw, CategoryPatchDto(name, hidden, group?.raw)).toModel()

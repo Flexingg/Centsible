@@ -35,24 +35,30 @@ export function toAccount(raw: Raw, balance: number, sync?: { syncSource: string
   };
 }
 
-export function toCategory(raw: Raw) {
+/** Sub-category links (child id -> parent id), kept by the bridge; see CategoryTree. */
+export type Parents = ReadonlyMap<string, string>;
+const NO_PARENTS: Parents = new Map();
+
+export function toCategory(raw: Raw, parents: Parents = NO_PARENTS) {
+  const id = String(raw.id);
   return {
-    id: String(raw.id),
+    id,
     name: String(raw.name ?? ''),
     groupId: String(raw.group_id ?? ''),
     isIncome: bool(raw.is_income),
     hidden: bool(raw.hidden),
+    parentId: parents.get(id) ?? null,
   };
 }
 
-export function toCategoryGroup(raw: Raw) {
+export function toCategoryGroup(raw: Raw, parents: Parents = NO_PARENTS) {
   const cats = Array.isArray(raw.categories) ? (raw.categories as Raw[]) : [];
   return {
     id: String(raw.id),
     name: String(raw.name ?? ''),
     isIncome: bool(raw.is_income),
     hidden: bool(raw.hidden),
-    categories: cats.map(toCategory),
+    categories: cats.map((c) => toCategory(c, parents)),
   };
 }
 
@@ -64,10 +70,12 @@ export function toPayee(raw: Raw) {
   };
 }
 
-function toBudgetCategory(raw: Raw) {
+function toBudgetCategory(raw: Raw, parents: Parents) {
+  const id = String(raw.id);
   return {
-    id: String(raw.id),
+    id,
     name: String(raw.name ?? ''),
+    parentId: parents.get(id) ?? null,
     hidden: bool(raw.hidden),
     budgeted: num(raw.budgeted),
     spent: num(raw.spent),
@@ -77,7 +85,7 @@ function toBudgetCategory(raw: Raw) {
   };
 }
 
-export function toBudgetMonth(raw: Raw, budgetType: BudgetType) {
+export function toBudgetMonth(raw: Raw, budgetType: BudgetType, parents: Parents = NO_PARENTS) {
   const groups = Array.isArray(raw.categoryGroups) ? (raw.categoryGroups as Raw[]) : [];
   return {
     month: String(raw.month),
@@ -103,7 +111,7 @@ export function toBudgetMonth(raw: Raw, budgetType: BudgetType) {
         spent: num(g.spent),
         balance: num(g.balance),
         received: num(g.received),
-        categories: cats.map(toBudgetCategory),
+        categories: cats.map((c) => toBudgetCategory(c, parents)),
       };
     }),
   };

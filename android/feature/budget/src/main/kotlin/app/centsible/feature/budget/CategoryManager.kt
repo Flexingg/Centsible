@@ -80,6 +80,8 @@ import app.centsible.core.model.Category
 import app.centsible.core.model.CategoryGroup
 import app.centsible.core.model.CategoryGroupId
 import app.centsible.core.model.CategoryId
+import app.centsible.core.model.CategoryTree
+import app.centsible.core.model.TOP_CATEGORY_LEVEL
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -164,9 +166,27 @@ class CategoryManagerViewModel @Inject constructor(
                 }
         }
     }
+    fun addSubcategory(parent: CategoryId, name: String) = act { engine.createSubcategory(selectedBudget(), name.trim(), parent) }
+
+    /**
+     * Moves a category (and its sub-categories) under [parent], or to the top of [group]
+     * when [parent] is null.
+     */
+    fun moveCategory(id: CategoryId, parent: CategoryId?, group: CategoryGroupId?) = act {
+        val b = selectedBudget()
+        val current = state.value.groups.valueOrNull.orEmpty().firstOrNull { g -> g.categories.any { it.id == id } }
+        when {
+            parent != null -> engine.setCategoryParent(b, id, parent)
+            group != null && group != current?.id -> engine.updateCategory(b, id, group = group)
+            else -> engine.setCategoryParent(b, id, null)
+        }
+        state.update { it.copy(message = "Moved") }
+        refresh()
+    }
+
     fun renameCategory(id: CategoryId, name: String) = act { engine.updateCategory(selectedBudget(), id, name = name.trim()) }
     fun setCategoryHidden(id: CategoryId, hidden: Boolean) = act { engine.updateCategory(selectedBudget(), id, hidden = hidden) }
-    fun deleteCategory(id: CategoryId, moveTo: CategoryId?) = act { engine.deleteCategory(selectedBudget(), id, moveTo) }
+    fun deleteCategory(id: CategoryId, moveTo: CategoryId?) = act { engine.deleteCategory(selectedBudget(), id, moveTo); refresh() }
     fun messageShown() = state.update { it.copy(message = null) }
 
     private fun act(block: suspend () -> Unit) = viewModelScope.launch {
@@ -174,9 +194,14 @@ class CategoryManagerViewModel @Inject constructor(
     }
 }
 
+/** How far each level of sub-category is indented. */
+private val SUB_INDENT = 20.dp
+
 private sealed interface Dialog {
     data object NewGroup : Dialog
     data class NewCategory(val group: CategoryGroup?) : Dialog
+    data class NewSubcategory(val parent: Category) : Dialog
+    data class Move(val category: Category) : Dialog
     data class RenameGroup(val group: CategoryGroup) : Dialog
     data class RenameCategory(val category: Category) : Dialog
     data class DeleteCategory(val category: Category) : Dialog
@@ -193,6 +218,8 @@ data class CategoryManagerActions(
     val setGroupHidden: (CategoryGroupId, Boolean) -> Unit = { _, _ -> },
     val deleteGroup: (CategoryGroupId, CategoryId?) -> Unit = { _, _ -> },
     val addCategory: (CategoryGroupId, String, Boolean) -> Unit = { _, _, _ -> },
+    val addSubcategory: (CategoryId, String) -> Unit = { _, _ -> },
+    val moveCategory: (CategoryId, CategoryId?, CategoryGroupId?) -> Unit = { _, _, _ -> },
     val renameCategory: (CategoryId, String) -> Unit = { _, _ -> },
     val setCategoryHidden: (CategoryId, Boolean) -> Unit = { _, _ -> },
     val setOffBooks: (CategoryId, Boolean) -> Unit = { _, _ -> },
@@ -214,6 +241,8 @@ fun CategoryManagerRoute(onBack: () -> Unit, viewModel: CategoryManagerViewModel
             setGroupHidden = viewModel::setGroupHidden,
             deleteGroup = viewModel::deleteGroup,
             addCategory = viewModel::addCategory,
+            addSubcategory = viewModel::addSubcategory,
+            moveCategory = { id, parent, group -> viewModel.moveCategory(id, parent, group) },
             renameCategory = viewModel::renameCategory,
             setCategoryHidden = viewModel::setCategoryHidden,
             setOffBooks = viewModel::setOffBooks,
@@ -225,8 +254,10 @@ fun CategoryManagerRoute(onBack: () -> Unit, viewModel: CategoryManagerViewModel
 }
 
 /**
- * Categories: everything about them in one place. Create, rename, hide and delete (moving
- * what was in it), and each one's color and emoji, which the whole household sees.
+ * Categories: everything about them in one place. Groups are the top level; their
+ * categories are level 2, and each can hold sub-categories down to level 5. Create, nest,
+ * move, rename, hide and delete (moving what was in it), and each one's color and emoji,
+ * which the whole household sees.
  */
 @Composable
 fun CategoryManagerScreen(state: CategoryManagerUiState, actions: CategoryManagerActions) {
@@ -235,6 +266,7 @@ fun CategoryManagerScreen(state: CategoryManagerUiState, actions: CategoryManage
     var dialog by remember { mutableStateOf<Dialog?>(null) }
     LaunchedEffect(state.message) { state.message?.let { snackbar.showSnackbar(it); actions.messageShown() } }
     val allCategories = state.groups.valueOrNull.orEmpty().flatMap { g -> g.categories.map { g to it } }
+    val tree = remember(state.groups) { CategoryTree.of(state.groups.valueOrNull.orEmpty()) }
     val edit = state.canEdit
 
     Scaffold(
@@ -268,7 +300,7 @@ fun CategoryManagerScreen(state: CategoryManagerUiState, actions: CategoryManage
             ) {
                 item {
                     Text(
-                        "Tap one to rename it, its icon to pick a color and emoji. Colors show on Home's dial (groups), in reports and next to every transaction, for everyone in the household.",
+                        "Groups are the top level. Their categories can hold sub-categories, up to 5 levels deep: use ⋮ to add one or move a category. Tap one to rename it, its icon to pick a color and emoji, which everyone in the household sees.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = colors.textSecondary,
                         modifier = Modifier.padding(horizontal = 4.dp),
@@ -298,11 +330,20 @@ fun CategoryManagerScreen(state: CategoryManagerUiState, actions: CategoryManage
                                 )
                             }
                         }
-                        group.categories.forEach { c ->
+                        val byId = group.categories.associateBy { it.id }
+                        tree.flatten(group.id).forEach { (entry, level) ->
+                            val c = byId[entry.id] ?: return@forEach
                             val look = Lookable(c.id.raw, c.name, isGroup = false)
                             val isTransfer = c.id in state.offBooks
                             HorizontalDivider(color = colors.border)
-                            Row(Modifier.fillMaxWidth().padding(start = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Row(
+                                Modifier.fillMaxWidth().padding(start = 12.dp + SUB_INDENT * (level - TOP_CATEGORY_LEVEL)),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                if (level > TOP_CATEGORY_LEVEL) {
+                                    Box(Modifier.width(2.dp).height(28.dp).background(colors.border, CircleShape))
+                                    Spacer(Modifier.width(6.dp))
+                                }
                                 LookIcon(look, state.looks[c.id.raw], enabled = edit) { dialog = Dialog.Look(look) }
                                 Spacer(Modifier.width(10.dp))
                                 Column(
@@ -313,6 +354,13 @@ fun CategoryManagerScreen(state: CategoryManagerUiState, actions: CategoryManage
                                         style = MaterialTheme.typography.bodyLarge,
                                         color = if (c.hidden) colors.textTertiary else colors.textPrimary,
                                     )
+                                    if (level > TOP_CATEGORY_LEVEL) {
+                                        Text(
+                                            "Level $level · in ${tree.parentOf(c.id)?.let { tree[it]?.name }.orEmpty()}",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = colors.textTertiary,
+                                        )
+                                    }
                                     if (isTransfer) {
                                         Text(
                                             "Transfer · off the books",
@@ -325,6 +373,8 @@ fun CategoryManagerScreen(state: CategoryManagerUiState, actions: CategoryManage
                                     RowMenu(
                                         listOfNotNull(
                                             "Rename" to { dialog = Dialog.RenameCategory(c) },
+                                            if (tree.canAddChild(c.id)) "Add sub-category" to { dialog = Dialog.NewSubcategory(c) } else null,
+                                            "Move…" to { dialog = Dialog.Move(c) },
                                             "Color & emoji" to { dialog = Dialog.Look(look) },
                                             if (!group.isIncome) {
                                                 (if (isTransfer) "Move back to budget (Expense)" else "Mark as transfer (off the books)") to {
@@ -365,14 +415,39 @@ fun CategoryManagerScreen(state: CategoryManagerUiState, actions: CategoryManage
                 dialog = null
             }
         }
+        is Dialog.NewSubcategory -> NameDialog("New sub-category in ${tree.pathLabel(d.parent.id)}", "", onDismiss = { dialog = null }) {
+            actions.addSubcategory(d.parent.id, it)
+            dialog = null
+        }
+        is Dialog.Move -> {
+            val groups = state.groups.valueOrNull.orEmpty().filter { it.isIncome == d.category.isIncome }
+            val items = groups.flatMap { g ->
+                listOf(PickerItem("group:${g.id.raw}", "Top of ${g.name}", section = g.name, supporting = "Level 2")) +
+                    tree.flatten(g.id)
+                        .filter { (e, _) -> !e.hidden && tree.canMove(d.category.id, e.id) && e.id != tree.parentOf(d.category.id) }
+                        .map { (e, level) -> PickerItem(e.id.raw, "Under ${tree.pathLabel(e.id)}", section = g.name, supporting = "Becomes level ${level + 1}") }
+            }
+            PickerSheet(
+                title = "Move ${d.category.name}" + if (tree.hasChildren(d.category.id)) " and its sub-categories" else "",
+                items = items,
+                selectedKey = null,
+                onDismiss = { dialog = null },
+                onPick = { item ->
+                    if (item.key.startsWith("group:")) actions.moveCategory(d.category.id, null, CategoryGroupId(item.key.removePrefix("group:")))
+                    else actions.moveCategory(d.category.id, CategoryId(item.key), null)
+                    dialog = null
+                },
+            )
+        }
         is Dialog.RenameGroup -> NameDialog("Rename group", d.group.name, onDismiss = { dialog = null }) { actions.renameGroup(d.group.id, it); dialog = null }
         is Dialog.RenameCategory -> NameDialog("Rename category", d.category.name, onDismiss = { dialog = null }) { actions.renameCategory(d.category.id, it); dialog = null }
         is Dialog.Look -> LookDialog(d.item, state.looks[d.item.id], onDismiss = { dialog = null }, onSave = { actions.saveLook(d.item.id, it); dialog = null })
         is Dialog.DeleteCategory -> {
             val targets = allCategories.filter { (g, c) -> c.id != d.category.id && g.isIncome == d.category.isIncome && !c.hidden }
             PickerSheet(
-                title = "Delete ${d.category.name}: move its transactions and budget to…",
-                items = targets.map { (g, c) -> PickerItem(c.id.raw, c.name, section = g.name, emoji = true) },
+                title = "Delete ${d.category.name}: move its transactions and budget to…" +
+                    if (tree.hasChildren(d.category.id)) " (its sub-categories move up a level)" else "",
+                items = targets.map { (g, c) -> PickerItem(c.id.raw, tree.pathLabel(c.id).ifEmpty { c.name }, section = g.name, emoji = true) },
                 selectedKey = null,
                 onDismiss = { dialog = null },
                 onPick = { actions.deleteCategory(d.category.id, CategoryId(it.key)); dialog = null },

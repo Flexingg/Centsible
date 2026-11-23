@@ -3,6 +3,7 @@ import * as api from '@actual-app/api';
 import { ApiError } from '../errors.js';
 import { toTransaction, type TransactionDto } from '../mappers/index.js';
 import type { ActualHost } from './host.js';
+import type { CategoryTree, TreeCategory } from './category-tree.js';
 
 export type SplitInput = { id?: string; amount: number; categoryId?: string | null; notes?: string | null };
 
@@ -35,6 +36,8 @@ export type TransactionPatch = {
 export type TransactionFilter = {
   accountId?: string;
   categoryId?: string;
+  /** With [categoryId]: its sub-categories' transactions too. */
+  subcategories?: boolean;
   payeeId?: string;
   groupId?: string;
   since?: string;
@@ -79,13 +82,20 @@ async function findTransaction(id: string): Promise<TransactionDto | null> {
 const likeTerm = (q: string) => `%${q.replace(/[%_]/g, ' ').trim()}%`;
 
 export class TransactionOps {
-  constructor(private readonly host: ActualHost) {}
+  constructor(
+    private readonly host: ActualHost,
+    /** Sub-categories (Actual has two levels). */
+    private readonly tree?: CategoryTree,
+  ) {}
 
   list(budgetId: string, f: TransactionFilter) {
     return this.host.withBudget(budgetId, 'read', async () => {
       const filter: Record<string, unknown> = {};
       if (f.accountId) filter.account = f.accountId;
-      if (f.categoryId) filter.category = f.categoryId;
+      if (f.categoryId) {
+        const ids = f.subcategories && this.tree ? this.tree.subtree(budgetId, (await api.getCategories()) as TreeCategory[], f.categoryId) : [f.categoryId];
+        filter.category = ids.length > 1 ? { $oneof: ids } : f.categoryId;
+      }
       if (f.payeeId) filter.payee = f.payeeId;
       if (f.groupId) filter['category.group'] = f.groupId;
       // One condition per bound: Actual's AQL applies only the first operator in `date: { $gte, $lte }`.

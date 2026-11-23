@@ -209,4 +209,15 @@ internal fun SpendingDto.toModel() = SpendingReport(
     Money(total),
     categories.map { SpendingCategory(it.categoryId?.let(::CategoryId), it.name, it.groupName, Money(it.amount)) },
 )
+internal fun app.centsible.core.network.FlowCategoryDto.toModel() = app.centsible.core.model.FlowCategory(
+    categoryId?.let(::CategoryId),
+    name,
+    groupId?.let { app.centsible.core.model.CategoryGroupId(it) },
+    groupName,
+    parentId?.let(::CategoryId),
+    Money(amount),
+)
+internal fun app.centsible.core.network.FlowsDto.toModel() = app.centsible.core.model.FlowsReport(
+    YearMonth(start), YearMonth(end), Money(totalIncome), Money(totalSpending), income.map { it.toModel() }, spending.map { it.toModel() },
+)
 internal fun NetWorthPointDto.toModel() = NetWorthPoint(YearMonth(month), Money(assets), Money(liabilities), Money(netWorth))

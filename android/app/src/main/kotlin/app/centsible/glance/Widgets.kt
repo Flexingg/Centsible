@@ -307,6 +307,8 @@ class ChartWidgetReceiver : ChartReceiver(ChartKind.Pace)
 class PaceWidgetReceiver : ChartReceiver(ChartKind.Pace)
 class WeekWidgetReceiver : ChartReceiver(ChartKind.Week)
 class CategoriesWidgetReceiver : ChartReceiver(ChartKind.Categories)
+/** "Money flow": this month's Sankey, from income down through each level of categories. */
+class MoneyFlowWidgetReceiver : ChartReceiver(ChartKind.Sankey)
 
 @Composable
 internal fun ChartContent(

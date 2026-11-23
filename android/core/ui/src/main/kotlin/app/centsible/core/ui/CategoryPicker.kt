@@ -19,6 +19,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Edit
+import androidx.compose.material.icons.rounded.ExpandLess
+import androidx.compose.material.icons.rounded.ExpandMore
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
@@ -49,6 +51,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
@@ -65,6 +68,8 @@ import app.centsible.core.domain.userMessage
 import app.centsible.core.model.CategoryGroup
 import app.centsible.core.model.CategoryGroupId
 import app.centsible.core.model.CategoryId
+import app.centsible.core.model.CategoryTree
+import app.centsible.core.model.TOP_CATEGORY_LEVEL
 import app.centsible.core.model.Feature
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
@@ -223,10 +228,21 @@ fun CategoryPickerContent(
     var creating by remember { mutableStateOf(startCreating) }
     var editing by remember { mutableStateOf<CategoryId?>(null) }
     val groups = state.groups.filter { !it.hidden && (includeIncome || !it.isIncome) }
+    val tree = remember(state.groups) { CategoryTree.of(state.groups) }
+    // Sub-categories fold under their parent; the chosen one's parents start open.
+    var expanded by remember(selected, state.groups) { mutableStateOf(selected?.let { tree.ancestors(it).toSet() }.orEmpty()) }
     val q = query.trim()
-    val allMatches = groups.map { g -> g to g.categories.filter { !it.hidden && it.id !in exclude && (q.isEmpty() || it.name.contains(q, ignoreCase = true)) } }
-    val transferMatches = allMatches.flatMap { (_, cats) -> cats.filter { it.id in state.offBooks } }
-    val matches = allMatches.map { (g, cats) -> g to cats.filter { it.id !in state.offBooks } }.filter { it.second.isNotEmpty() }
+    // "food groc" finds Food › Groceries: every word somewhere in the path.
+    val words = q.split(Regex("\\s+")).filter { it.isNotEmpty() }
+    // Browsing shows the tree (folded); searching matches names and paths at every level, flat.
+    fun visible(c: app.centsible.core.model.Category) = !c.hidden && c.id !in exclude &&
+        (if (q.isEmpty()) tree.ancestors(c.id).all { it in expanded } else tree.pathLabel(c.id).let { path -> words.all { path.contains(it, ignoreCase = true) } })
+    val allMatches = groups.map { g ->
+        val byId = g.categories.associateBy { it.id }
+        g to tree.flatten(g.id).mapNotNull { (e, level) -> byId[e.id]?.takeIf(::visible)?.let { it to level } }
+    }
+    val transferMatches = allMatches.flatMap { (_, cats) -> cats.filter { it.first.id in state.offBooks } }.map { it.first }
+    val matches = allMatches.map { (g, cats) -> g to cats.filter { it.first.id !in state.offBooks } }.filter { it.second.isNotEmpty() }
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true), containerColor = colors.card) {
         Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp).navigationBarsPadding().animateContentSize()) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -300,7 +316,7 @@ fun CategoryPickerContent(
                 }
                 matches.forEach { (g, cats) ->
                     item(key = "g-${g.id.raw}") { StatLabel(g.name, Modifier.padding(top = 14.dp, bottom = 4.dp)) }
-                    cats.forEach { c ->
+                    cats.forEach { (c, level) ->
                         item(key = c.id.raw) {
                             if (editing == c.id) {
                                 EditRow(
@@ -314,8 +330,15 @@ fun CategoryPickerContent(
                                     onCancel = { editing = null },
                                 )
                             } else {
+                                val parentPath = tree.parentOf(c.id)?.let(tree::pathLabel)
+                                val hasKids = tree.childrenOf(c.id).any { k -> groups.any { g -> g.categories.any { it.id == k && !it.hidden } } }
                                 PickRow(
                                     c.name, c.name, c.id == selected,
+                                    subtitle = if (q.isNotEmpty() && parentPath != null) "in $parentPath" else null,
+                                    subtitleMuted = true,
+                                    indent = if (q.isEmpty()) SUB_INDENT * (level - TOP_CATEGORY_LEVEL) else 0.dp,
+                                    open = if (q.isEmpty() && hasKids) c.id in expanded else null,
+                                    onToggle = { expanded = if (c.id in expanded) expanded - tree.subtree(c.id).toSet() else expanded + c.id },
                                     onClick = { onPick(c.id) },
                                     onEdit = if (state.canEdit) ({ editing = c.id; creating = false }) else null,
                                 )
@@ -342,6 +365,9 @@ fun CategoryPickerContent(
     }
 }
 
+/** How far each level of sub-category is indented. */
+private val SUB_INDENT = 20.dp
+
 @Composable
 private fun PickRow(
     label: String,
@@ -350,11 +376,17 @@ private fun PickRow(
     subtitle: String? = null,
     onClick: () -> Unit,
     onEdit: (() -> Unit)? = null,
+    subtitleMuted: Boolean = false,
+    indent: Dp = 0.dp,
+    /** Has sub-categories: whether they're showing (null when it has none). */
+    open: Boolean? = null,
+    onToggle: () -> Unit = {},
 ) {
     val colors = CentsibleTheme.colors
     val haptics = app.centsible.core.designsystem.motion.rememberHaptics()
     Row(
-        Modifier.fillMaxWidth().clickable(role = Role.RadioButton) { haptics.tap(); onClick() }.semantics { selected = isSelected }.padding(vertical = 6.dp),
+        Modifier.fillMaxWidth().clickable(role = Role.RadioButton) { haptics.tap(); onClick() }.semantics { selected = isSelected }
+            .padding(start = indent).padding(vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (avatarName != null) CategoryAvatar(avatarName, size = 32.dp) else Box(Modifier.width(32.dp))
@@ -362,7 +394,16 @@ private fun PickRow(
         Column(Modifier.weight(1f)) {
             Text(label, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
             if (subtitle != null) {
-                Text(subtitle, style = MaterialTheme.typography.labelSmall, color = colors.accent, maxLines = 1)
+                Text(subtitle, style = MaterialTheme.typography.labelSmall, color = if (subtitleMuted) colors.textTertiary else colors.accent, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+        }
+        if (open != null) {
+            IconButton(onClick = { haptics.tap(); onToggle() }) {
+                Icon(
+                    if (open) Icons.Rounded.ExpandLess else Icons.Rounded.ExpandMore,
+                    contentDescription = if (open) "Hide $label's sub-categories" else "Show $label's sub-categories",
+                    tint = colors.textSecondary,
+                )
             }
         }
         if (isSelected) Icon(Icons.Rounded.Check, contentDescription = null, tint = colors.accent)

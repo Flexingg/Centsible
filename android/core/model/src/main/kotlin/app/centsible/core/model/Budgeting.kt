@@ -45,6 +45,8 @@ data class BudgetCategory(
     val balance: Money,
     val received: Money,
     val carryover: Boolean,
+    /** Parent category (see [Category.parentId]). Amounts here are this category's own. */
+    val parentId: CategoryId? = null,
 ) {
     /**
      * Share of the envelope used, for progress bars. In Actual, balance = budgeted +

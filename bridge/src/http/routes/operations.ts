@@ -126,6 +126,15 @@ export const operationRoutes =
         return reports.spending(req.params.budgetId, req.query.start, req.query.end);
       },
     );
+    app.get<{ Params: BudgetParams; Querystring: { start: string; end: string } }>(
+      '/v1/budgets/:budgetId/reports/flows',
+      { schema: { querystring: RANGE } },
+      async (req) => {
+        requireBudget(deps, req, req.params.budgetId);
+        if (req.query.start > req.query.end) throw ApiError.validation('start must not be after end');
+        return reports.flows(req.params.budgetId, req.query.start, req.query.end);
+      },
+    );
     app.get<{ Params: BudgetParams; Querystring: { from: string; to: string } }>(
       '/v1/budgets/:budgetId/reports/daily-spending',
       { schema: { querystring: { type: 'object', required: ['from', 'to'], properties: { from: DATE, to: DATE } } } },

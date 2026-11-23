@@ -37,6 +37,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -52,6 +53,9 @@ import app.centsible.core.designsystem.component.MonthSwitcher
 import app.centsible.core.designsystem.component.StatLabel
 import app.centsible.core.designsystem.theme.CentsibleTheme
 import app.centsible.core.model.BudgetCategory
+import app.centsible.core.model.BudgetRollup
+import app.centsible.core.model.TOP_CATEGORY_LEVEL
+import app.centsible.core.model.rollups
 import app.centsible.core.model.BudgetGroup
 import app.centsible.core.model.BudgetMonth
 import app.centsible.core.model.withoutCategories
@@ -391,23 +395,39 @@ private fun GroupCard(group: BudgetGroup, collapsed: Boolean, onToggle: () -> Un
             }
         }
         if (!collapsed) {
-            group.categories.filter { !it.hidden }.forEachIndexed { i, category ->
-                if (i > 0) HorizontalDivider(Modifier.padding(start = 64.dp), color = colors.border)
-                CategoryRow(category, onClick = { onOpenCategory(category.id) })
+            // Sub-categories sit under their parent, whose figures include theirs.
+            val hidden = group.categories.filter { it.hidden }.map { it.id }.toSet()
+            val parents = group.categories.associate { it.id to it.parentId }
+            fun hiddenBranch(id: CategoryId?): Boolean = id != null && (id in hidden || hiddenBranch(parents[id]))
+            group.rollups().filter { !hiddenBranch(it.id) }.forEachIndexed { i, row ->
+                val indent = SUB_INDENT * (row.level - TOP_CATEGORY_LEVEL)
+                if (i > 0) HorizontalDivider(Modifier.padding(start = 64.dp + indent), color = colors.border)
+                CategoryRow(row, indent, onClick = { onOpenCategory(row.id) })
             }
             Spacer(Modifier.height(4.dp))
         }
     }
 }
 
+/** How far each level of sub-category is indented. */
+private val SUB_INDENT = 20.dp
+
 @Composable
-private fun CategoryRow(category: BudgetCategory, onClick: () -> Unit) {
+private fun CategoryRow(category: BudgetCategory, onClick: () -> Unit) = CategoryRow(
+    BudgetRollup(category, TOP_CATEGORY_LEVEL, category.budgeted, category.spent, category.balance, category.received, hasChildren = false),
+    0.dp,
+    onClick,
+)
+
+@Composable
+private fun CategoryRow(row: BudgetRollup, indent: Dp, onClick: () -> Unit) {
     val colors = CentsibleTheme.colors
+    val category = row.own.copy(budgeted = row.budgeted, spent = row.spent, balance = row.balance)
     Row(
-        Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 16.dp, vertical = 12.dp),
+        Modifier.fillMaxWidth().clickable(onClick = onClick).padding(start = 16.dp + indent, end = 16.dp, top = 12.dp, bottom = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        CategoryAvatar(category.name)
+        if (row.level > TOP_CATEGORY_LEVEL) CategoryAvatar(category.name, size = 32.dp) else CategoryAvatar(category.name)
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -422,11 +442,12 @@ private fun CategoryRow(category: BudgetCategory, onClick: () -> Unit) {
                 RemainingLabel(category)
             }
             Spacer(Modifier.height(6.dp))
-            BudgetProgressBar(progress = category.progress, overspent = category.isOverspent)
+            BudgetProgressBar(progress = row.progress, overspent = row.isOverspent)
             Spacer(Modifier.height(4.dp))
             Row {
                 Text(
-                    "${MoneyFormat.format(category.spent.abs(), showCents = false)} spent of ${MoneyFormat.format(category.budgeted, showCents = false)}",
+                    "${MoneyFormat.format(category.spent.abs(), showCents = false)} spent of ${MoneyFormat.format(category.budgeted, showCents = false)}" +
+                        if (row.hasChildren) " · with sub-categories" else "",
                     style = MaterialTheme.typography.labelSmall,
                     color = colors.textTertiary,
                     modifier = Modifier.weight(1f),

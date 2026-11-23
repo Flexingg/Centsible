@@ -1226,6 +1226,7 @@ paths:
         - $ref: '#/components/parameters/BudgetId'
         - { name: accountId, in: query, schema: { type: string } }
         - { name: categoryId, in: query, schema: { type: string } }
+        - { name: subcategories, in: query, description: "With categoryId: also its sub-categories' transactions", schema: { type: boolean } }
         - { name: payeeId, in: query, schema: { type: string } }
         - { name: groupId, in: query, description: Transactions in any category of this group, schema: { type: string } }
         - { name: since, in: query, schema: { type: string, format: date } }
@@ -1412,10 +1413,12 @@ paths:
           application/json:
             schema:
               type: object
-              required: [name, groupId]
+              required: [name]
+              description: Give groupId for a top-level category, or parentId for a sub-category (it goes in the parent's group). At most level 5.
               properties:
                 name: { type: string, minLength: 1, maxLength: 100 }
                 groupId: { type: string }
+                parentId: { type: [string, 'null'] }
       responses:
         '201':
           description: Created category
@@ -1423,6 +1426,7 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Category' }
         '400': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
         '423': { $ref: '#/components/responses/Problem' }
 
   /v1/budgets/{budgetId}/categories/{id}:
@@ -1442,13 +1446,20 @@ paths:
               properties:
                 name: { type: string, minLength: 1, maxLength: 100 }
                 hidden: { type: boolean }
-                groupId: { type: string }
+                groupId:
+                  type: string
+                  description: Moves the category and its sub-categories to the top of this group.
+                parentId:
+                  type: [string, 'null']
+                  description: Moves the category and its sub-categories under this category (into its group), or to the top of the group with null. Fails with 400 when it would loop or go deeper than level 5.
       responses:
         '200':
           description: Updated category
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Category' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
         '423': { $ref: '#/components/responses/Problem' }
     delete:
@@ -2811,6 +2822,24 @@ paths:
         '400': { $ref: '#/components/responses/Problem' }
         '423': { $ref: '#/components/responses/Problem' }
 
+  /v1/budgets/{budgetId}/reports/flows:
+    get:
+      tags: [budgets]
+      operationId: flowsReport
+      description: Income by income category and spending by category for a month range (the money the cash-flow report counts), each with its group and parent category, for a Sankey. Uncategorized money is spending.
+      parameters:
+        - $ref: '#/components/parameters/BudgetId'
+        - { name: start, in: query, required: true, schema: { $ref: '#/components/schemas/Month' } }
+        - { name: end, in: query, required: true, schema: { $ref: '#/components/schemas/Month' } }
+      responses:
+        '200':
+          description: Flows
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FlowsReport' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '423': { $ref: '#/components/responses/Problem' }
+
   /v1/budgets/{budgetId}/reports/daily-spending:
     get:
       tags: [budgets]
@@ -3807,6 +3836,9 @@ components:
         groupId: { type: string }
         isIncome: { type: boolean }
         hidden: { type: boolean }
+        parentId:
+          type: [string, 'null']
+          description: "The category this one sits under (same group), kept by the bridge since Actual has two levels. The group is level 1, its own categories level 2, and sub-categories go down to level 5. Null for a top-level category."
 
     CategoryGroup:
       type: object
@@ -4520,6 +4552,9 @@ components:
       properties:
         id: { type: string }
         name: { type: string }
+        parentId:
+          type: [string, 'null']
+          description: The parent category (see Category.parentId). Amounts are this category's own; the app adds sub-categories up.
         hidden: { type: boolean }
         budgeted: { $ref: '#/components/schemas/Money' }
         spent: { $ref: '#/components/schemas/Money' }
@@ -4788,6 +4823,34 @@ components:
               groupId: { type: [string, 'null'] }
               groupName: { type: [string, 'null'] }
               amount: { $ref: '#/components/schemas/Money' }
+
+    FlowsReport:
+      type: object
+      required: [start, end, totalIncome, totalSpending, income, spending]
+      properties:
+        start: { $ref: '#/components/schemas/Month' }
+        end: { $ref: '#/components/schemas/Month' }
+        totalIncome: { $ref: '#/components/schemas/Money' }
+        totalSpending:
+          $ref: '#/components/schemas/Money'
+          description: Negative when money went out
+        income:
+          type: array
+          items: { $ref: '#/components/schemas/FlowCategory' }
+        spending:
+          type: array
+          items: { $ref: '#/components/schemas/FlowCategory' }
+
+    FlowCategory:
+      type: object
+      required: [categoryId, name, groupId, groupName, parentId, amount]
+      properties:
+        categoryId: { type: [string, 'null'] }
+        name: { type: string }
+        groupId: { type: [string, 'null'] }
+        groupName: { type: [string, 'null'] }
+        parentId: { type: [string, 'null'] }
+        amount: { $ref: '#/components/schemas/Money' }
 
     NetWorthReport:
       type: object

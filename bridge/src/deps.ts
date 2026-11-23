@@ -15,6 +15,7 @@ import { RuleTools } from './actual/rule-tools.js';
 import { AutomationOps } from './actual/automation-ops.js';
 import { ReviewOps } from './actual/review-ops.js';
 import { AnnualOps } from './actual/annual-ops.js';
+import { CategoryTree } from './actual/category-tree.js';
 import { OffBooks } from './actual/off-books.js';
 import { MortgageOps } from './actual/mortgage-ops.js';
 import { IncomeOps } from './actual/income-ops.js';
@@ -52,6 +53,8 @@ export function createDeps(config: BridgeConfig, store: HouseholdStore, host: Ac
   const transfers = new TransferOps(host, store);
   const annual = new AnnualOps(host, store);
   const offBooks = new OffBooks(store);
+  const categoryTree = new CategoryTree(store);
+  budgetOps.tree = categoryTree;
   bankSync.afterSync = async (budgetId, lib) => {
     // New transactions may be a yearly bill: cover it from the year's amount.
     await annual.applyIn(budgetId, new Date().toISOString().slice(0, 7)).catch(() => undefined);
@@ -75,7 +78,7 @@ export function createDeps(config: BridgeConfig, store: HouseholdStore, host: Ac
     plan: new PlanOps(host, budgetOps, offBooks),
     offBooks,
     insights: new InsightsOps(host, store),
-    transactions: new TransactionOps(host),
+    transactions: new TransactionOps(host, categoryTree),
     review: new ReviewOps(host, store),
     transfers,
     duplicates: new DuplicateOps(host, store),
@@ -85,9 +88,9 @@ export function createDeps(config: BridgeConfig, store: HouseholdStore, host: Ac
     annual,
     automations: new AutomationOps(host),
     ruleTools: new RuleTools(host),
-    structure: new StructureOps(host, store),
+    structure: new StructureOps(host, store, categoryTree),
     planning: new PlanningOps(host),
     accountOps: new AccountOps(host),
-    reports: new ReportOps(host, offBooks),
+    reports: new ReportOps(host, offBooks, categoryTree),
   };
 }

@@ -103,7 +103,19 @@ class WidgetContentTest {
             Glanceable.MonthFlow("2026-11", Money(250_000), Money(41_000)),
         ),
         netWorth = listOf(Glanceable.NetWorthPoint("2026-09", Money(10_000_000)), Glanceable.NetWorthPoint("2026-10", Money(10_400_000)), Glanceable.NetWorthPoint("2026-11", Money(10_650_000))),
+        sankey = app.centsible.core.model.Sankey.of(
+            app.centsible.core.testing.SamplePlanning.flows(),
+            app.centsible.core.model.CategoryTree.of(app.centsible.core.testing.SampleHousehold.budgetMonth),
+        ),
     )
+
+    @Test fun `the money flow survives being stored`() {
+        val graph = rich.sankey!!
+        val stored = PrefsGlanceableStoreCodec.decodeSankey(PrefsGlanceableStoreCodec.encodeSankey(graph))
+        org.junit.Assert.assertEquals(graph, stored)
+        // Shown shallower on request.
+        org.junit.Assert.assertTrue(graph.limitDepth(1).nodes.none { it.column > 2 })
+    }
 
     private fun chart(kind: app.centsible.core.domain.ChartKind, data: Glanceable? = rich, cat: String? = null, block: androidx.glance.appwidget.testing.unit.GlanceAppWidgetUnitTest.() -> Unit) =
         runGlanceAppWidgetUnitTest {

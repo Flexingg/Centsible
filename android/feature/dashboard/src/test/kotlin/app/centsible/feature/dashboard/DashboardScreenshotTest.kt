@@ -23,6 +23,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.ui.unit.dp
 import org.junit.Rule
 import org.junit.Test
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.performClick
+import app.centsible.core.model.spendingDrillTree
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
@@ -102,6 +106,40 @@ class DashboardScreenshotTest {
         }
         compose.onRoot().captureRoboImage("screenshots/budget_dial_dark.png")
         app.centsible.core.uitesting.A11y.assertOk(compose)
+    }
+
+    /** Tapping Food zooms the dial into Food's categories, then Groceries into its sub-categories. */
+    @Test fun budget_dial_zoomed() {
+        compose.setContent {
+            CentsibleTheme(darkTheme = false) {
+                androidx.compose.foundation.layout.Box(androidx.compose.ui.Modifier.padding(16.dp)) { BudgetDialWidget().Content(context) }
+            }
+        }
+        compose.onNodeWithText("Food").performClick()
+        compose.waitForIdle()
+        compose.onNodeWithText("Groceries").assertExists()
+        compose.onRoot().captureRoboImage("screenshots/budget_dial_zoomed.png")
+        compose.onNodeWithText("Groceries").performClick()
+        compose.waitForIdle()
+        compose.onNodeWithText("Costco").assertExists()
+        compose.onNodeWithText("Groceries (general)").assertExists()
+        compose.onNodeWithContentDescription("Zoom out").performClick()
+        compose.waitForIdle()
+        compose.onNodeWithText("Dining Out").assertExists()
+        app.centsible.core.uitesting.A11y.assertOk(compose)
+    }
+
+    @Test fun `the dial measures a zoomed-in group against its own budget`() {
+        val month = SampleHousehold.budgetMonth
+        val roots = month.spendingDrillTree()
+        val food = roots.first { it.name == "Food" }
+        val dial = BudgetDial.of(month, java.time.LocalDate.of(2026, 9, 15), listOf(food), roots)
+        org.junit.Assert.assertEquals("Food", dial.title)
+        org.junit.Assert.assertEquals(food.amount, dial.spent.minor)
+        org.junit.Assert.assertEquals(126_000L, dial.budgeted.minor) // 90,000 + 30,000 + 6,000 across the branch
+        org.junit.Assert.assertEquals(listOf("Groceries", "Dining Out", "Coffee"), dial.slices.map { it.name })
+        org.junit.Assert.assertTrue(dial.slices.first().node!!.canDrill)
+        org.junit.Assert.assertEquals(listOf(food), BudgetDial.resolve(roots, listOf(food)))
     }
 
     @Test fun dashboard_arranging() {

@@ -12,6 +12,7 @@ import android.graphics.Typeface
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import app.centsible.core.designsystem.theme.CentsibleColors
+import app.centsible.core.model.layout
 import kotlin.math.max
 import kotlin.math.min
 
@@ -272,6 +273,46 @@ class ChartArt(
         return bmp
     }
 
+    /**
+     * A Sankey of [graph]: income through the month's money into groups and their
+     * categories, as boxes and soft bands, with names on the boxes tall enough to hold one.
+     */
+    fun sankey(width: Int, height: Int, graph: app.centsible.core.model.SankeyGraph, colorOf: Map<String, Color>, money: (Long) -> String): Bitmap {
+        val (bmp, c) = canvas(width, height)
+        if (graph.isEmpty) return bmp
+        val room = dp(72f)
+        val layout = graph.layout(width - room, height.toFloat(), nodeWidth = dp(6f), gap = dp(4f))
+        for (band in layout.links) {
+            val color = colorOf[bandColorKey(band)] ?: colors.accent
+            val mid = (band.x0 + band.x1) / 2
+            val path = Path().apply {
+                moveTo(band.x0, band.y0)
+                cubicTo(mid, band.y0, mid, band.y1, band.x1, band.y1)
+                lineTo(band.x1, band.y1 + band.thickness)
+                cubicTo(mid, band.y1 + band.thickness, mid, band.y0 + band.thickness, band.x0, band.y0 + band.thickness)
+                close()
+            }
+            c.drawPath(path, Paint(Paint.ANTI_ALIAS_FLAG).apply { this.color = color.argb(0.35f) })
+        }
+        val columns = layout.nodes.maxOfOrNull { it.node.column } ?: 0
+        val spacing = if (columns > 0) (layout.width - dp(6f)) / columns else layout.width
+        for (box in layout.nodes) {
+            val color = colorOf[box.node.key] ?: colors.accent
+            c.drawRoundRect(RectF(box.x0, box.y0, box.x1, max(box.y1, box.y0 + 2f)), dp(2f), dp(2f), Paint(Paint.ANTI_ALIAS_FLAG).apply { this.color = color.argb() })
+        }
+        val name = Paint(labelPaint).apply { color = colors.textPrimary.argb(); typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL) }
+        for (box in layout.nodes) {
+            if (box.y1 - box.y0 < dp(11f)) continue
+            val maxW = if (box.node.column == columns) room - dp(6f) else spacing - dp(12f)
+            var text = "${box.node.name} ${money(box.node.value)}"
+            if (name.measureText(text) > maxW) text = box.node.name
+            while (text.length > 3 && name.measureText(text) > maxW) text = text.dropLast(2) + "…"
+            if (name.measureText(text) > maxW) continue
+            c.drawText(text, box.x1 + dp(4f), box.midY + name.textSize * 0.35f, name)
+        }
+        return bmp
+    }
+
     /** One category's budget as a ring: [share] used (0..1+), red past full. */
     fun ring(size: Int, share: Float, centre: String, caption: String, tone: Color = colors.accent): Bitmap {
         val over = share > 1f
@@ -304,6 +345,9 @@ class ChartArt(
         app.centsible.core.domain.ChartAccent.Plum -> Color(0xFF8E6BD8)
         app.centsible.core.domain.ChartAccent.Amber -> colors.warning
     }
+
+    /** Each Sankey node's color, in this palette (see [SankeyColors]). */
+    fun sankeyColors(graph: app.centsible.core.model.SankeyGraph): Map<String, Color> = SankeyColors.of(graph, colors, palette)
 
     /** Category colours for the donut and its legend: Material You palette in expressive mode, or the app's brand colours. */
     val palette: List<Color>

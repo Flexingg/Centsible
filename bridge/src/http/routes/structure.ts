@@ -78,11 +78,16 @@ export const structureRoutes =
       return account;
     });
 
-    app.post<{ Params: BudgetParams; Body: { name: string; groupId: string } }>(
+    app.post<{ Params: BudgetParams; Body: { name: string; groupId?: string; parentId?: string | null } }>(
       '/v1/budgets/:budgetId/categories',
       {
         schema: {
-          body: { type: 'object', required: ['name', 'groupId'], additionalProperties: false, properties: { name: NAME, groupId: { type: 'string' } } },
+          body: {
+            type: 'object',
+            required: ['name'],
+            additionalProperties: false,
+            properties: { name: NAME, groupId: { type: 'string' }, parentId: { type: ['string', 'null'] } },
+          },
         },
       },
       async (req, reply) => {
@@ -93,7 +98,7 @@ export const structureRoutes =
       },
     );
 
-    app.patch<{ Params: IdParams; Body: { name?: string; hidden?: boolean; groupId?: string } }>(
+    app.patch<{ Params: IdParams; Body: { name?: string; hidden?: boolean; groupId?: string; parentId?: string | null } }>(
       '/v1/budgets/:budgetId/categories/:id',
       {
         schema: {
@@ -101,14 +106,14 @@ export const structureRoutes =
             type: 'object',
             minProperties: 1,
             additionalProperties: false,
-            properties: { name: NAME, hidden: { type: 'boolean' }, groupId: { type: 'string' } },
+            properties: { name: NAME, hidden: { type: 'boolean' }, groupId: { type: 'string' }, parentId: { type: ['string', 'null'] } },
           },
         },
       },
       async (req) => {
         requireBudget(deps, req, req.params.budgetId, 'member');
         const category = await structure.updateCategory(req.params.budgetId, req.params.id, req.body);
-        audit(deps, req, req.params.budgetId, 'category.updated', req.params.id);
+        audit(deps, req, req.params.budgetId, 'category.updated', req.params.id, req.body.parentId !== undefined ? { parentId: req.body.parentId } : undefined);
         return category;
       },
     );

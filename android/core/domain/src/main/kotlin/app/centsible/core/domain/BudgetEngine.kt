@@ -56,6 +56,13 @@ interface BudgetEngine {
     suspend fun reopenAccount(budget: BudgetId, id: AccountId): Account
 
     suspend fun createCategory(budget: BudgetId, name: String, group: CategoryGroupId): Category
+    /** A sub-category of [parent] (in the parent's group), at most level 5. */
+    suspend fun createSubcategory(budget: BudgetId, name: String, parent: CategoryId): Category
+    /**
+     * Moves [id] and its sub-categories under [parent] (into its group), or to the top of
+     * its group with null. The bridge refuses loops and anything deeper than level 5.
+     */
+    suspend fun setCategoryParent(budget: BudgetId, id: CategoryId, parent: CategoryId?): Category
     suspend fun updateCategory(budget: BudgetId, id: CategoryId, name: String? = null, hidden: Boolean? = null, group: CategoryGroupId? = null): Category
     suspend fun deleteCategory(budget: BudgetId, id: CategoryId, moveTo: CategoryId?)
     suspend fun createCategoryGroup(budget: BudgetId, name: String): CategoryGroup
@@ -75,6 +82,8 @@ data class TransactionQuery(
     val categoryId: CategoryId? = null,
     val payeeId: app.centsible.core.model.PayeeId? = null,
     val groupId: app.centsible.core.model.CategoryGroupId? = null,
+    /** With [categoryId]: its sub-categories' transactions too. */
+    val withSubcategories: Boolean = false,
     val since: String? = null,
     val until: String? = null,
     /** Matches payee, notes or category name. */

@@ -23,7 +23,7 @@ class CategoriesScreenshotTest {
     @get:Rule val compose = createComposeRule()
 
     private val groups = SampleHousehold.budgetMonth.groups.filter { !it.isIncome }.map { g ->
-        CategoryGroup(g.id, g.name, g.isIncome, g.hidden, g.categories.map { Category(it.id, it.name, g.id, g.isIncome, it.hidden) })
+        CategoryGroup(g.id, g.name, g.isIncome, g.hidden, g.categories.map { Category(it.id, it.name, g.id, g.isIncome, it.hidden, it.parentId) })
     }
     private val looks = mapOf(
         groups[0].id.raw to Appearance(0xFFB79CE8),

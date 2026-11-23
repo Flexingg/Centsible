@@ -35,7 +35,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
-private val CHART_RECEIVERS = listOf(ChartWidgetReceiver::class.java, PaceWidgetReceiver::class.java, WeekWidgetReceiver::class.java, CategoriesWidgetReceiver::class.java)
+private val CHART_RECEIVERS = listOf(ChartWidgetReceiver::class.java, PaceWidgetReceiver::class.java, WeekWidgetReceiver::class.java, CategoriesWidgetReceiver::class.java, MoneyFlowWidgetReceiver::class.java)
 
 @Singleton
 class AndroidPlacedWidgets @Inject constructor(
@@ -46,7 +46,7 @@ class AndroidPlacedWidgets @Inject constructor(
     override suspend fun chartWidgets(): Map<Int, ChartKind> {
         val manager = AppWidgetManager.getInstance(context)
         return CHART_RECEIVERS.flatMap { r ->
-            val preset = when (r) { WeekWidgetReceiver::class.java -> ChartKind.Week; CategoriesWidgetReceiver::class.java -> ChartKind.Categories; else -> ChartKind.Pace }
+            val preset = when (r) { WeekWidgetReceiver::class.java -> ChartKind.Week; CategoriesWidgetReceiver::class.java -> ChartKind.Categories; MoneyFlowWidgetReceiver::class.java -> ChartKind.Sankey; else -> ChartKind.Pace }
             manager.getAppWidgetIds(ComponentName(context, r)).map { it to preset }
         }.toMap()
     }
@@ -169,6 +169,7 @@ class ChartConfigActivity : ComponentActivity() {
             when (provider) {
                 WeekWidgetReceiver::class.java.name -> ChartKind.Week
                 CategoriesWidgetReceiver::class.java.name -> ChartKind.Categories
+                MoneyFlowWidgetReceiver::class.java.name -> ChartKind.Sankey
                 else -> ChartKind.Pace
             },
         )
