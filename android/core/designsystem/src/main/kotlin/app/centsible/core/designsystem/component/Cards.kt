@@ -17,6 +17,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import app.centsible.core.designsystem.motion.rememberHaptics
 import app.centsible.core.designsystem.theme.CentsibleTheme
 
 val CardShape = RoundedCornerShape(18.dp)
@@ -32,7 +33,14 @@ fun CentsibleCard(
     val colors = CentsibleTheme.colors
     val border = BorderStroke(1.dp, colors.border)
     if (onClick != null) {
-        Surface(onClick = onClick, modifier = modifier.fillMaxWidth(), shape = CardShape, color = colors.card, border = border) {
+        val haptics = rememberHaptics()
+        Surface(
+            onClick = { haptics.tap(); onClick() },
+            modifier = modifier.fillMaxWidth(),
+            shape = CardShape,
+            color = colors.card,
+            border = border,
+        ) {
             Column(Modifier.padding(contentPadding), content = content)
         }
     } else {
@@ -52,6 +60,7 @@ fun SectionCard(
     contentPadding: PaddingValues = PaddingValues(start = 16.dp, end = 16.dp, bottom = 12.dp),
     content: @Composable ColumnScope.() -> Unit,
 ) {
+    val haptics = rememberHaptics()
     CentsibleCard(modifier = modifier, contentPadding = PaddingValues(0.dp)) {
         Row(
             Modifier.fillMaxWidth().padding(start = 16.dp, end = 4.dp, top = 6.dp),
@@ -60,7 +69,7 @@ fun SectionCard(
         ) {
             Text(title, style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(vertical = 10.dp))
             if (action != null && onAction != null) {
-                TextButton(onClick = onAction) { Text(action, style = MaterialTheme.typography.labelLarge) }
+                TextButton(onClick = { haptics.tap(); onAction() }) { Text(action, style = MaterialTheme.typography.labelLarge) }
             }
         }
         Column(Modifier.padding(contentPadding), content = content)

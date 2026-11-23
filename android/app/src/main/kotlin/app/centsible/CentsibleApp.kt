@@ -194,15 +194,16 @@ private fun MainScaffold(
     val current = backStack?.destination?.route
     val tab = Tab.entries.firstOrNull { it.route == current }
     val colors = CentsibleTheme.colors
+    val haptics = app.centsible.core.designsystem.motion.rememberHaptics()
     app.centsible.core.designsystem.component.AdaptiveNavScaffold(
         tabs = Tab.entries.map { app.centsible.core.designsystem.component.NavTab(it.route, it.label, it.icon) },
         selected = tab?.route,
-        onSelect = { nav.goToTab(it) },
+        onSelect = { haptics.tap(); nav.goToTab(it) },
         snackbarHost = { androidx.compose.material3.SnackbarHost(snackbar) },
         topBar = { if (offline || pending > 0) OfflineBanner(offline, pending) },
         addButton = if (tab?.canAdd == true) {
             {
-                FloatingActionButton(onClick = { nav.navigate(Routes.transaction(null)) }, containerColor = colors.accent, contentColor = colors.card) {
+                FloatingActionButton(onClick = { haptics.tap(); nav.navigate(Routes.transaction(null)) }, containerColor = colors.accent, contentColor = colors.card) {
                     Icon(Icons.Rounded.Add, contentDescription = "Add transaction")
                 }
             }

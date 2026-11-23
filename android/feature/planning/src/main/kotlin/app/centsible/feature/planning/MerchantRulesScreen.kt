@@ -814,7 +814,7 @@ private fun AllDoneState(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
-        AnimatedCheck(size = 72.dp, description = null, haptic = true)
+        AnimatedCheck(size = 72.dp, description = null, haptic = true, celebrate = true)
         Spacer(Modifier.height(20.dp))
         Text(
             if (doneCount > 0) "Queue complete" else "Every merchant has a rule",

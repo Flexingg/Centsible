@@ -9,12 +9,17 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.lifecycleScope
+import app.centsible.core.designsystem.motion.FeedbackPreferences
+import app.centsible.core.designsystem.motion.LocalFeedbackPreferences
 import app.centsible.core.domain.AppLockPolicy
 import app.centsible.core.domain.AppLockSettings
+import app.centsible.core.domain.FeedbackSettings
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
 import kotlinx.coroutines.flow.first
@@ -23,6 +28,7 @@ import kotlinx.coroutines.launch
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
     @Inject lateinit var appLock: AppLockSettings
+    @Inject lateinit var feedbackSettings: FeedbackSettings
 
     private var pairingLink by mutableStateOf<String?>(null)
     /** Set by a tapped reminder or a centsible://open link; the app opens it once, then clears it. */
@@ -58,13 +64,17 @@ class MainActivity : ComponentActivity() {
             }
         }
         setContent {
-            androidx.compose.foundation.layout.Box {
-                when (locked) {
-                    null -> BlankScreen()
-                    true -> LockScreen(onUnlock = { DeviceUnlock.prompt(this@MainActivity, confirmCredential) { locked = false } })
-                    false -> CentsibleApp(pairingLink = pairingLink, openScreen = openScreen, onOpened = { openScreen = null })
+            val hapticsOn by feedbackSettings.hapticsEnabled.collectAsState(initial = true)
+            val soundsOn by feedbackSettings.soundsEnabled.collectAsState(initial = true)
+            CompositionLocalProvider(LocalFeedbackPreferences provides FeedbackPreferences(haptics = hapticsOn, sounds = soundsOn)) {
+                androidx.compose.foundation.layout.Box {
+                    when (locked) {
+                        null -> BlankScreen()
+                        true -> LockScreen(onUnlock = { DeviceUnlock.prompt(this@MainActivity, confirmCredential) { locked = false } })
+                        false -> CentsibleApp(pairingLink = pairingLink, openScreen = openScreen, onOpened = { openScreen = null })
+                    }
+                    if (splash) app.centsible.feature.onboarding.AnimatedSplash(onFinished = { splash = false })
                 }
-                if (splash) app.centsible.feature.onboarding.AnimatedSplash(onFinished = { splash = false })
             }
         }
     }

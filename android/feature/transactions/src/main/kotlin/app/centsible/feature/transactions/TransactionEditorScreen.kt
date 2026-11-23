@@ -131,12 +131,13 @@ fun TransactionEditorScreen(state: EditorUiState, actions: EditorActions) {
     val categoryNames = remember(state.groups) { state.groups.flatMap { it.categories }.associate { it.id to it.name } }
     val accountNames = remember(state.accounts) { state.accounts.associate { it.id to it.name } }
 
+    val haptics = app.centsible.core.designsystem.motion.rememberHaptics()
     Column(Modifier.fillMaxSize().padding(bottom = 0.dp).statusBarsPadding().imePadding()) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = actions.close) { Icon(Icons.Rounded.Close, contentDescription = "Close") }
+            IconButton(onClick = { haptics.tap(); actions.close() }) { Icon(Icons.Rounded.Close, contentDescription = "Close") }
             Text(state.title, style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
             if (state.canEdit) {
-                TextButton(onClick = actions.save, enabled = !state.saving && !state.loading) { Text(if (state.saving) "Saving…" else "Save") }
+                TextButton(onClick = { haptics.confirm(); actions.save() }, enabled = !state.saving && !state.loading) { Text(if (state.saving) "Saving…" else "Save") }
             }
         }
         when {
@@ -152,7 +153,10 @@ fun TransactionEditorScreen(state: EditorUiState, actions: EditorActions) {
                     kinds.forEachIndexed { i, k ->
                         SegmentedButton(
                             selected = form.kind == k,
-                            onClick = { actions.edit { it.copy(kind = k, splits = if (k == TxKind.Transfer) emptyList() else it.splits) } },
+                            onClick = {
+                                haptics.tap()
+                                actions.edit { it.copy(kind = k, splits = if (k == TxKind.Transfer) emptyList() else it.splits) }
+                            },
                             shape = SegmentedButtonDefaults.itemShape(i, kinds.size),
                             enabled = enabled,
                         ) { Text(k.name) }

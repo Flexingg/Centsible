@@ -389,7 +389,7 @@ private fun Chip(text: String, background: androidx.compose.ui.graphics.Color, c
 private fun CaughtUp(done: Int) {
     val colors = CentsibleTheme.colors
     Column(Modifier.fillMaxSize().padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
-        AnimatedCheck(size = 72.dp, description = null, haptic = true)
+        AnimatedCheck(size = 72.dp, description = null, haptic = true, celebrate = true)
         Spacer(Modifier.height(20.dp))
         Text("All caught up", style = MaterialTheme.typography.headlineSmall)
         Spacer(Modifier.height(6.dp))

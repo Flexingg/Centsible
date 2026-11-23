@@ -35,6 +35,7 @@ abstract class DataModule {
     @Binds abstract fun appLock(impl: DataStoreAppLockSettings): app.centsible.core.domain.AppLockSettings
     @Binds abstract fun reminders(impl: DataStoreReminderSettings): app.centsible.core.domain.ReminderSettings
     @Binds abstract fun widgetSettings(impl: DataStoreWidgetSettings): app.centsible.core.domain.WidgetSettings
+    @Binds abstract fun feedbackSettings(impl: DataStoreFeedbackSettings): app.centsible.core.domain.FeedbackSettings
 
     // The engine seam: swap this binding for an on-device engine later.
     @Binds abstract fun budgetEngine(impl: NotifyingBudgetEngine): BudgetEngine

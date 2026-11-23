@@ -72,6 +72,14 @@ fun SettingsRoute(onOpenBankSync: () -> Unit = {}, onOpenWidgets: () -> Unit = {
             then()
         }
     }
+    val installApk = { uri: android.net.Uri ->
+        if (AppUpdater.canInstall(context)) context.startActivity(AppUpdater.installIntent(uri))
+        else context.startActivity(AppUpdater.allowInstallsIntent(context))
+    }
+    LaunchedEffect(state.appDownload) {
+        val ready = state.appDownload as? AppDownload.Ready ?: return@LaunchedEffect
+        installApk(ready.uri)
+    }
     SettingsScreen(
         state = state,
         actions = SettingsActions(
@@ -91,6 +99,16 @@ fun SettingsRoute(onOpenBankSync: () -> Unit = {}, onOpenWidgets: () -> Unit = {
             setReminderDays = viewModel::setReminderDays,
             openBankSync = onOpenBankSync,
             openWidgets = onOpenWidgets,
+            setHapticsEnabled = viewModel::setHapticsEnabled,
+            setSoundsEnabled = viewModel::setSoundsEnabled,
+            checkForUpdate = { viewModel.checkForAppUpdate(silent = false) },
+            downloadUpdate = viewModel::downloadAppUpdate,
+            installUpdate = installApk,
+            openReleases = {
+                runCatching {
+                    context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(AppUpdater.RELEASES_URL)))
+                }
+            },
         ),
         deviceSecure = run {
             val context = androidx.compose.ui.platform.LocalContext.current
@@ -116,6 +134,12 @@ data class SettingsActions(
     val toggleReview: (String) -> Unit = {},
     val openBankSync: () -> Unit = {},
     val openWidgets: () -> Unit = {},
+    val setHapticsEnabled: (Boolean) -> Unit = {},
+    val setSoundsEnabled: (Boolean) -> Unit = {},
+    val checkForUpdate: () -> Unit = {},
+    val downloadUpdate: () -> Unit = {},
+    val installUpdate: (android.net.Uri) -> Unit = {},
+    val openReleases: () -> Unit = {},
 )
 
 @Composable
@@ -276,6 +300,10 @@ fun SettingsScreen(state: SettingsUiState, actions: SettingsActions, renderQr: B
                             }
                         }
                     }
+                    if (state.showEnhancements) {
+                        item { AppUpdatesCard(state, actions) }
+                        item { HapticsSoundsCard(state, actions) }
+                    }
                     item { ConnectionCard(d) }
                     item {
                         TextButton(onClick = actions.signOut, modifier = Modifier.fillMaxWidth()) {
@@ -289,6 +317,137 @@ fun SettingsScreen(state: SettingsUiState, actions: SettingsActions, renderQr: B
 
     if (adding) AddMemberDialog(onDismiss = { adding = false }, onAdd = { name, role -> adding = false; actions.addMember(name, role) })
     state.invite?.let { (member, invite) -> InviteDialog(member, invite, renderQr, actions.dismissInvite) }
+}
+
+@Composable
+private fun AppUpdatesCard(state: SettingsUiState, actions: SettingsActions) {
+    val colors = CentsibleTheme.colors
+    val haptics = app.centsible.core.designsystem.motion.rememberHaptics()
+    SectionCard(
+        title = "App updates",
+        action = if (state.checkingUpdate) "Checking…" else "Check now",
+        onAction = { if (!state.checkingUpdate) actions.checkForUpdate() },
+    ) {
+        val versionLine = buildString {
+            append("Installed: v")
+            append(state.installedVersion.ifBlank { "?" })
+            if (state.installedCode > 0) append(" (build ${state.installedCode})")
+        }
+        Text(versionLine, style = MaterialTheme.typography.bodyMedium, color = colors.textSecondary)
+        Spacer(Modifier.height(6.dp))
+        when {
+            state.checkingUpdate -> {
+                Text("Checking GitHub releases…", style = MaterialTheme.typography.bodySmall, color = colors.textTertiary)
+            }
+            state.updateAvailable && state.latestRelease != null -> {
+                val rel = state.latestRelease
+                Text(
+                    "✨ Centsible v${rel.version} is available",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = colors.accent,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                rel.notes?.takeIf { it.isNotBlank() }?.let { notes ->
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        notes.take(280),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = colors.textSecondary,
+                        maxLines = 4,
+                    )
+                }
+                Spacer(Modifier.height(10.dp))
+                when (val dl = state.appDownload) {
+                    AppDownload.Idle -> {
+                        androidx.compose.material3.Button(
+                            onClick = { haptics.confirm(); actions.downloadUpdate() },
+                            modifier = Modifier.fillMaxWidth(),
+                        ) { Text("Download & install v${rel.version}") }
+                    }
+                    is AppDownload.Running -> {
+                        if (dl.progress != null) {
+                            androidx.compose.material3.LinearProgressIndicator(
+                                progress = { dl.progress },
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                            Spacer(Modifier.height(4.dp))
+                            Text("Downloading… ${(dl.progress * 100).toInt()}%", style = MaterialTheme.typography.bodySmall, color = colors.textSecondary)
+                        } else {
+                            androidx.compose.material3.LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                            Spacer(Modifier.height(4.dp))
+                            Text("Downloading APK…", style = MaterialTheme.typography.bodySmall, color = colors.textSecondary)
+                        }
+                    }
+                    is AppDownload.Ready -> {
+                        androidx.compose.material3.Button(
+                            onClick = { haptics.confirm(); actions.installUpdate(dl.uri) },
+                            modifier = Modifier.fillMaxWidth(),
+                        ) { Text("Install v${rel.version}") }
+                    }
+                    is AppDownload.Failed -> {
+                        Text(dl.message, style = MaterialTheme.typography.bodySmall, color = colors.negative)
+                        Spacer(Modifier.height(6.dp))
+                        androidx.compose.material3.OutlinedButton(
+                            onClick = { haptics.tap(); actions.downloadUpdate() },
+                            modifier = Modifier.fillMaxWidth(),
+                        ) { Text("Try download again") }
+                    }
+                }
+            }
+            state.updateError != null -> {
+                Text(state.updateError, style = MaterialTheme.typography.bodySmall, color = colors.negative)
+            }
+            state.updateChecked -> {
+                Text("You're on the latest GitHub release.", style = MaterialTheme.typography.bodySmall, color = colors.positive)
+            }
+        }
+        Spacer(Modifier.height(4.dp))
+        TextButton(onClick = { haptics.tap(); actions.openReleases() }) {
+            Text("View releases on GitHub")
+        }
+    }
+}
+
+@Composable
+private fun HapticsSoundsCard(state: SettingsUiState, actions: SettingsActions) {
+    val colors = CentsibleTheme.colors
+    val haptics = app.centsible.core.designsystem.motion.rememberHaptics()
+    SectionCard("Haptics & sounds") {
+        Row(
+            Modifier.fillMaxWidth().toggleRow(state.hapticsEnabled, onChange = actions.setHapticsEnabled).padding(vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(Modifier.weight(1f).padding(end = 12.dp)) {
+                Text("Expressive haptics", style = MaterialTheme.typography.bodyLarge)
+                Text(
+                    "Crisp tactile bumps for taps, switches, swipes, saves, and inbox zero.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = colors.textSecondary,
+                )
+            }
+            androidx.compose.material3.Switch(checked = state.hapticsEnabled, onCheckedChange = null)
+        }
+        Row(
+            Modifier.fillMaxWidth().toggleRow(state.soundsEnabled, onChange = actions.setSoundsEnabled).padding(vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(Modifier.weight(1f).padding(end = 12.dp)) {
+                Text("Tactile sounds", style = MaterialTheme.typography.bodyLarge)
+                Text(
+                    "Soft, subtle clicks and chimes for actions. Automatically silent when your phone is on Vibrate or Silent.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = colors.textSecondary,
+                )
+            }
+            androidx.compose.material3.Switch(checked = state.soundsEnabled, onCheckedChange = null)
+        }
+        Spacer(Modifier.height(6.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            FilterChip(selected = false, onClick = { haptics.tap() }, label = { Text("Test tap") })
+            FilterChip(selected = false, onClick = { haptics.confirm() }, label = { Text("Test save") })
+            FilterChip(selected = false, onClick = { haptics.celebrate() }, label = { Text("Test celebrate") })
+        }
+    }
 }
 
 private fun Role.label() = when (this) {
