@@ -515,6 +515,7 @@ fun ChartPickerContent(
     var showLegend by remember(initial) { mutableStateOf(initial.showLegend) }
     var categoryIds by remember(initial) { mutableStateOf(initial.categoryIds) }
     var cardTheme by remember(initial) { mutableStateOf(initial.theme) }
+    var depth by remember(initial) { mutableStateOf(initial.depth) }
 
     val categories = data?.categories.orEmpty().filter { it.id != null }
     val config = ChartWidgetConfig(
@@ -531,6 +532,7 @@ fun ChartPickerContent(
         showLegend = showLegend,
         categoryIds = if (kind == ChartKind.Categories) categoryIds else emptyList(),
         theme = cardTheme,
+        depth = depth.takeIf { kind == ChartKind.Sankey },
     )
     Column(Modifier.fillMaxSize().background(colors.canvas).statusBarsPadding().navigationBarsPadding()) {
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -608,6 +610,15 @@ fun ChartPickerContent(
                     }
                 }
 
+                if (kind == ChartKind.Sankey) {
+                    Text("How deep it goes", style = MaterialTheme.typography.labelLarge, color = colors.textSecondary)
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        listOf(1 to "Groups", 2 to "Categories", 3 to "3 levels", 4 to "4 levels", null to "Every level").forEach { (d, label) ->
+                            FilterChip(selected = depth == d, onClick = { depth = d }, label = { Text(label) })
+                        }
+                    }
+                }
+
                 if (kind == ChartKind.Categories && categories.isNotEmpty()) {
                     Text("Filter categories (leave empty for all)", style = MaterialTheme.typography.labelLarge, color = colors.textSecondary)
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -623,7 +634,7 @@ fun ChartPickerContent(
                     }
                 }
 
-                if (kind != ChartKind.Categories && kind != ChartKind.CashFlow) {
+                if (kind != ChartKind.Categories && kind != ChartKind.CashFlow && kind != ChartKind.Sankey) {
                     Text("Color accent", style = MaterialTheme.typography.labelLarge, color = colors.textSecondary)
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         ChartAccent.entries.forEach { a ->
@@ -638,8 +649,8 @@ fun ChartPickerContent(
                 if (kind == ChartKind.Pace) {
                     ToggleRow("Compare to last month", showComparison) { showComparison = it }
                 }
-                if (kind == ChartKind.Categories || kind == ChartKind.Category || kind == ChartKind.CashFlow) {
-                    ToggleRow("Show legend", showLegend) { showLegend = it }
+                if (kind == ChartKind.Categories || kind == ChartKind.Category || kind == ChartKind.CashFlow || kind == ChartKind.Sankey) {
+                    ToggleRow(if (kind == ChartKind.Sankey) "Show names and amounts" else "Show legend", showLegend) { showLegend = it }
                 }
 
                 extraFooter?.invoke()

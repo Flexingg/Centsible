@@ -36,6 +36,8 @@ data class TransactionScope(
     val payeeId: PayeeId? = null,
     val since: String? = null,
     val until: String? = null,
+    /** With [categoryId]: only that category; otherwise its sub-categories are included too. */
+    val ownOnly: Boolean = false,
 )
 
 data class TransactionFilters(
@@ -49,6 +51,7 @@ data class TransactionFilters(
     fun toQuery(limit: Int) = TransactionQuery(
         accountId = account,
         categoryId = scope?.categoryId,
+        withSubcategories = scope?.categoryId != null && !scope.ownOnly,
         groupId = scope?.groupId,
         payeeId = scope?.payeeId,
         since = scope?.since,
@@ -292,6 +295,7 @@ class TransactionsViewModel @Inject constructor(
         const val ARG_PAYEE = "payee"
         const val ARG_SINCE = "since"
         const val ARG_UNTIL = "until"
+        const val ARG_OWN = "own"
 
         fun scopeFrom(saved: androidx.lifecycle.SavedStateHandle): TransactionScope? {
             fun arg(k: String) = saved.get<String>(k)?.takeIf { it.isNotBlank() }
@@ -303,6 +307,7 @@ class TransactionsViewModel @Inject constructor(
                 arg(ARG_PAYEE)?.let(::PayeeId),
                 arg(ARG_SINCE),
                 arg(ARG_UNTIL),
+                ownOnly = arg(ARG_OWN) == "1",
             )
         }
     }

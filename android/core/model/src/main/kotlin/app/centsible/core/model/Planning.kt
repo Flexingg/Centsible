@@ -137,6 +137,27 @@ data class SpendingCategory(val categoryId: CategoryId?, val name: String, val g
 
 data class SpendingReport(val total: Money, val categories: List<SpendingCategory>)
 
+/** One category's money in a [FlowsReport]: positive income, negative spending. */
+data class FlowCategory(
+    val categoryId: CategoryId?,
+    val name: String,
+    val groupId: CategoryGroupId?,
+    val groupName: String?,
+    val parentId: CategoryId?,
+    val amount: Money,
+)
+
+/** Where the money came from and went over a range: what a Sankey draws. */
+data class FlowsReport(
+    val start: YearMonth,
+    val end: YearMonth,
+    val totalIncome: Money,
+    /** Negative when money went out. */
+    val totalSpending: Money,
+    val income: List<FlowCategory>,
+    val spending: List<FlowCategory>,
+)
+
 /** Spending on one day (positive, refunds netted). */
 data class DaySpending(val date: String, val amount: Money)
 

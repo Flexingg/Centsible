@@ -13,6 +13,7 @@ sealed interface AppLink {
         NetWorth("net-worth"),
         Recurring("recurring"),
         Trends("trends"),
+        MoneyFlow("money-flow"),
         BankSync("bank-sync"),
         Plaid("plaid"),
         Duplicates("duplicates"),
@@ -32,7 +33,7 @@ sealed interface AppLink {
  *
  *     centsible://open/review                       the review inbox
  *     centsible://open/<screen>                     transactions, accounts, budget, net-worth,
- *                                                   recurring, trends, bank-sync, plaid, new-transaction, widgets,
+ *                                                   recurring, trends, money-flow, bank-sync, plaid, new-transaction, widgets,
  *                                                   duplicates, mortgage
  *     centsible://open/account/<id>                 one account
  *     centsible://open/category/<id>?name=Groceries[&month=2026-11]

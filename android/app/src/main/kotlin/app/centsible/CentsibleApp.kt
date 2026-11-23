@@ -95,6 +95,7 @@ private object Routes {
     const val PLAID = "bank-sync/plaid"
     const val WIDGETS = "settings/widgets"
     const val REPORTS = "reports"
+    const val MONEY_FLOW = "reports/money-flow"
     const val MERCHANTS = "merchants"
     const val MERCHANT_RULES = "merchants/rules"
     const val RULES = "rules"
@@ -124,12 +125,13 @@ private object Routes {
     const val TRANSACTIONS_FOR = "transactions/for?${TransactionsViewModel.ARG_TITLE}={${TransactionsViewModel.ARG_TITLE}}" +
         "&${TransactionsViewModel.ARG_CATEGORY}={${TransactionsViewModel.ARG_CATEGORY}}&${TransactionsViewModel.ARG_GROUP}={${TransactionsViewModel.ARG_GROUP}}" +
         "&${TransactionsViewModel.ARG_PAYEE}={${TransactionsViewModel.ARG_PAYEE}}&${TransactionsViewModel.ARG_SINCE}={${TransactionsViewModel.ARG_SINCE}}" +
-        "&${TransactionsViewModel.ARG_UNTIL}={${TransactionsViewModel.ARG_UNTIL}}"
+        "&${TransactionsViewModel.ARG_UNTIL}={${TransactionsViewModel.ARG_UNTIL}}&${TransactionsViewModel.ARG_OWN}={${TransactionsViewModel.ARG_OWN}}"
     fun transactionsFor(d: Destination.TransactionsFor): String {
         fun enc(v: String?) = java.net.URLEncoder.encode(v.orEmpty(), "UTF-8")
         return "transactions/for?${TransactionsViewModel.ARG_TITLE}=${enc(d.title)}&${TransactionsViewModel.ARG_CATEGORY}=${enc(d.categoryId?.raw)}" +
             "&${TransactionsViewModel.ARG_GROUP}=${enc(d.groupId?.raw)}&${TransactionsViewModel.ARG_PAYEE}=${enc(d.payeeId?.raw)}" +
-            "&${TransactionsViewModel.ARG_SINCE}=${enc(d.since)}&${TransactionsViewModel.ARG_UNTIL}=${enc(d.until)}"
+            "&${TransactionsViewModel.ARG_SINCE}=${enc(d.since)}&${TransactionsViewModel.ARG_UNTIL}=${enc(d.until)}" +
+            "&${TransactionsViewModel.ARG_OWN}=${if (d.ownOnly) "1" else ""}"
     }
     fun search(q: String) = "transactions/search?${TransactionsViewModel.ARG_QUERY}=" + java.net.URLEncoder.encode(q, "UTF-8")
 
@@ -318,6 +320,9 @@ private fun MainScaffold(
                 app.centsible.feature.planning.ForecastRoute(onBack = { nav.popBackStack() }, onOpenCalendar = { nav.navigate(Routes.CALENDAR) { launchSingleTop = true } })
             }
             composable(Routes.REPORTS) { ReportsRoute(onBack = { nav.popBackStack() }, onOpenTransactions = { nav.go(it) }) }
+            composable(Routes.MONEY_FLOW) {
+                ReportsRoute(onBack = { nav.popBackStack() }, onOpenTransactions = { nav.go(it) }, initialTab = app.centsible.feature.reports.ReportTab.MoneyFlow)
+            }
             composable(Routes.MERCHANTS) {
                 MerchantsRoute(
                     onBack = { nav.popBackStack() },
@@ -371,7 +376,7 @@ private fun MainScaffold(
                 Routes.TRANSACTIONS_FOR,
                 arguments = listOf(
                     TransactionsViewModel.ARG_TITLE, TransactionsViewModel.ARG_CATEGORY, TransactionsViewModel.ARG_GROUP,
-                    TransactionsViewModel.ARG_PAYEE, TransactionsViewModel.ARG_SINCE, TransactionsViewModel.ARG_UNTIL,
+                    TransactionsViewModel.ARG_PAYEE, TransactionsViewModel.ARG_SINCE, TransactionsViewModel.ARG_UNTIL, TransactionsViewModel.ARG_OWN,
                 ).map { name -> navArgument(name) { type = NavType.StringType; defaultValue = "" } },
             ) {
                 TransactionsRoute(
@@ -440,6 +445,7 @@ private fun NavHostController.open(link: app.centsible.core.domain.AppLink) {
             LinkScreen.NetWorth -> go(Destination.NetWorth)
             LinkScreen.Recurring -> go(Destination.Recurring)
             LinkScreen.Trends -> go(Destination.Trends)
+            LinkScreen.MoneyFlow -> go(Destination.MoneyFlow)
             LinkScreen.BankSync -> navigate(Routes.BANK_SYNC) { launchSingleTop = true }
             LinkScreen.Plaid -> navigate(Routes.PLAID) { launchSingleTop = true }
             LinkScreen.Duplicates -> navigate(Routes.DUPLICATES) { launchSingleTop = true }
@@ -465,6 +471,7 @@ private fun NavHostController.go(d: Destination) = when (d) {
     Destination.Settings -> navigate(Routes.SETTINGS)
     Destination.Recurring -> navigate(Routes.RECURRING)
     Destination.Reports -> navigate(Routes.REPORTS)
+    Destination.MoneyFlow -> navigate(Routes.MONEY_FLOW)
     Destination.NetWorth -> navigate(Routes.NET_WORTH)
     Destination.Trends -> navigate(Routes.TRENDS)
     Destination.YearInReview -> navigate(Routes.review())

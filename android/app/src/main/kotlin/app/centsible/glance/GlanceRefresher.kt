@@ -84,6 +84,10 @@ class GlanceRefresher @Inject constructor(
                             .map { Glanceable.MonthFlow(it.month.raw, it.income.abs(), it.expenses.abs()) }
                     }.getOrDefault(emptyList()),
                     netWorth = runCatching { reports.netWorth(budget, 12).map { Glanceable.NetWorthPoint(it.month.raw, it.netWorth) } }.getOrDefault(emptyList()),
+                    sankey = runCatching {
+                        val tree = app.centsible.core.model.CategoryTree.of(engine.categoryGroups(budget))
+                        app.centsible.core.model.Sankey.of(reports.flows(budget, ym, ym), tree)
+                    }.getOrNull(),
                 )
         }
         result.onSuccess { store.write(it) }

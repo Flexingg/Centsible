@@ -114,7 +114,7 @@ export class PlanOps {
       const chosen = plan.suggestions.filter((s) => (categoryIds ? categoryIds.includes(s.categoryId) : s.suggested[`avg${basis}`] !== s.budgeted));
       for (const s of chosen) await api.setBudgetAmount(month, s.categoryId, s.suggested[`avg${basis}`]);
       await settle();
-      return { month: await this.budgets.readMonth(month), changed: chosen.length };
+      return { month: await this.budgets.readMonth(month, budgetId), changed: chosen.length };
     });
   }
 
@@ -128,7 +128,7 @@ export class PlanOps {
         await this.host.internal('budget.moveMoney', lib, 'budget/cover-overspending', { month, to: m.to, from: m.from, amount: m.amount, currencyCode });
       }
       await settle();
-      return { month: await this.budgets.readMonth(month), moves: plan.cover.moves, uncovered: plan.cover.uncovered };
+      return { month: await this.budgets.readMonth(month, budgetId), moves: plan.cover.moves, uncovered: plan.cover.uncovered };
     });
   }
 

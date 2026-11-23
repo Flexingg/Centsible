@@ -276,6 +276,31 @@ object ChartFaces {
                     },
                 )
             }
+            ChartKind.Sankey -> {
+                val full = g.sankey ?: return needsBridge(config.kind, customTitle)
+                if (full.isEmpty) return empty(config.kind, customTitle ?: "Money flow · ${g.month}", "Nothing came in or went out yet this month.")
+                val graph = full.limitDepth(config.depth ?: app.centsible.core.model.MAX_CATEGORY_LEVEL)
+                val income = graph.nodes.filter { it.column == 0 && it.kind == app.centsible.core.model.SankeyNode.Kind.Income }.sumOf { it.value }
+                val saved = graph.nodes.firstOrNull { it.kind == app.centsible.core.model.SankeyNode.Kind.Saved }?.value
+                val drawn = graph.nodes.firstOrNull { it.kind == app.centsible.core.model.SankeyNode.Kind.FromSavings }?.value
+                val groups = graph.nodes.filter { it.column == 2 && it.kind == app.centsible.core.model.SankeyNode.Kind.Group }
+                val colorOf = art.sankeyColors(graph)
+                ChartFace(
+                    title = customTitle ?: "Money flow · ${g.month}",
+                    headline = money(income),
+                    subtitle = when {
+                        saved != null -> "came in · ${money(saved)} saved"
+                        drawn != null -> "came in · ${money(drawn)} from savings"
+                        else -> "came in, all spent"
+                    },
+                    tone = if (drawn != null) ChartFace.Tone.Bad else ChartFace.Tone.Good,
+                    link = config.kind.link,
+                    legend = if (!config.showLegend) emptyList() else groups.take(3).map { n ->
+                        ChartFace.LegendItem(n.name, compact(n.value), colorOf[n.key] ?: art.palette[0], null)
+                    },
+                    draw = { a, w, h -> a.sankey(w, h, graph, a.sankeyColors(graph)) { compact(it) } },
+                )
+            }
         }
         return base
     }

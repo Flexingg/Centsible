@@ -25,6 +25,12 @@ class ReportsScreenshotTest {
         spending = Loadable.Ready(SamplePlanning.spending),
         spendingMonth = YearMonth("2026-09"),
         netWorth = Loadable.Ready(SamplePlanning.netWorth),
+        flow = Loadable.Ready(
+            MoneyFlow(
+                SamplePlanning.flows(),
+                app.centsible.core.model.CategoryTree.of(app.centsible.core.testing.SampleHousehold.budgetMonth),
+            ),
+        ),
     )
 
     private fun shot(state: ReportsUiState, name: String, dark: Boolean = false) {
@@ -36,6 +42,8 @@ class ReportsScreenshotTest {
     @Test fun cash_flow_light() = shot(base, "reports_cash_flow_light")
     @Test fun cash_flow_selected_dark() = shot(base.copy(selectedMonth = 2), "reports_cash_flow_selected_dark", dark = true)
     @Test fun spending_light() = shot(base.copy(tab = ReportTab.Spending), "reports_spending_light")
+    @Test fun money_flow_light() = shot(base.copy(tab = ReportTab.MoneyFlow), "reports_money_flow_light")
+    @Test fun money_flow_selected_dark() = shot(base.copy(tab = ReportTab.MoneyFlow, flowSelected = "c:c-groceries", flowDepth = 3), "reports_money_flow_selected_dark", dark = true)
     @Test fun net_worth_light() = shot(base.copy(tab = ReportTab.NetWorth), "reports_net_worth_light")
 
     @Test fun `axis maximum rounds to a clean number`() {

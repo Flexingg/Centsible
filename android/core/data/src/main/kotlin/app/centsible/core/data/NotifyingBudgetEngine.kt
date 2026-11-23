@@ -59,6 +59,10 @@ class NotifyingBudgetEngine @Inject constructor(
         write { inner.reopenAccount(budget, id) }
     override suspend fun createCategory(budget: app.centsible.core.model.BudgetId, name: String, group: app.centsible.core.model.CategoryGroupId) =
         write { inner.createCategory(budget, name, group) }
+    override suspend fun createSubcategory(budget: app.centsible.core.model.BudgetId, name: String, parent: app.centsible.core.model.CategoryId) =
+        write { inner.createSubcategory(budget, name, parent) }
+    override suspend fun setCategoryParent(budget: app.centsible.core.model.BudgetId, id: app.centsible.core.model.CategoryId, parent: app.centsible.core.model.CategoryId?) =
+        write { inner.setCategoryParent(budget, id, parent) }
     override suspend fun updateCategory(budget: app.centsible.core.model.BudgetId, id: app.centsible.core.model.CategoryId, name: String?, hidden: Boolean?, group: app.centsible.core.model.CategoryGroupId?) =
         write { inner.updateCategory(budget, id, name, hidden, group) }
     override suspend fun deleteCategory(budget: app.centsible.core.model.BudgetId, id: app.centsible.core.model.CategoryId, moveTo: app.centsible.core.model.CategoryId?) =

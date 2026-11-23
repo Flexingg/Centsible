@@ -70,6 +70,8 @@ sealed interface Destination {
     data object Reports : Destination
     data object NetWorth : Destination
     data object Trends : Destination
+    /** Reports' Money flow tab: the Sankey of where this month's money went. */
+    data object MoneyFlow : Destination
     data object YearInReview : Destination
     data object Server : Destination
     /** This person's review inbox. */
@@ -85,12 +87,20 @@ sealed interface Destination {
         val payeeId: app.centsible.core.model.PayeeId? = null,
         val since: String? = null,
         val until: String? = null,
+        /** With [categoryId]: only that category, not its sub-categories (a parent's "general" slice). */
+        val ownOnly: Boolean = false,
     ) : Destination {
         companion object {
             /** A calendar month, e.g. "Food · September". */
-            fun month(title: String, month: app.centsible.core.model.YearMonth, categoryId: app.centsible.core.model.CategoryId? = null, groupId: app.centsible.core.model.CategoryGroupId? = null): TransactionsFor {
+            fun month(
+                title: String,
+                month: app.centsible.core.model.YearMonth,
+                categoryId: app.centsible.core.model.CategoryId? = null,
+                groupId: app.centsible.core.model.CategoryGroupId? = null,
+                ownOnly: Boolean = false,
+            ): TransactionsFor {
                 val first = java.time.LocalDate.of(month.year, month.month, 1)
-                return TransactionsFor(title, categoryId, groupId, since = first.toString(), until = first.plusMonths(1).minusDays(1).toString())
+                return TransactionsFor(title, categoryId, groupId, since = first.toString(), until = first.plusMonths(1).minusDays(1).toString(), ownOnly = ownOnly)
             }
         }
     }

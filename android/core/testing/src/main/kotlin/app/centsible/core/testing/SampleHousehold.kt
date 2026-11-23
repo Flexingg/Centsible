@@ -32,7 +32,7 @@ object SampleHousehold {
         Account(AccountId("acc-mortgage"), "Mortgage", offBudget = true, closed = false, balance = Money(-31_240_000)),
     )
 
-    private fun cat(id: String, name: String, budgeted: Long, spent: Long, rollover: Long = 0, carryover: Boolean = false) =
+    private fun cat(id: String, name: String, budgeted: Long, spent: Long, rollover: Long = 0, carryover: Boolean = false, parent: String? = null) =
         BudgetCategory(
             id = CategoryId(id),
             name = name,
@@ -42,6 +42,7 @@ object SampleHousehold {
             balance = Money(budgeted - spent + rollover),
             received = Money.Zero,
             carryover = carryover,
+            parentId = parent?.let(::CategoryId),
         )
 
     private fun group(id: String, name: String, vararg cats: BudgetCategory) = BudgetGroup(
@@ -65,8 +66,13 @@ object SampleHousehold {
         ),
         group(
             "g-food", "Food",
-            cat("c-groceries", "Groceries", 90_000, 61_220, rollover = 4_300, carryover = true),
-            cat("c-dining", "Dining Out", 30_000, 34_580),
+            cat("c-groceries", "Groceries", 50_000, 28_620, rollover = 4_300, carryover = true),
+            // Sub-categories: Groceries > Costco > Bulk snacks, Groceries > Farmers market, Dining Out > Takeout.
+            cat("c-costco", "Costco", 30_000, 24_100, parent = "c-groceries"),
+            cat("c-bulk", "Bulk snacks", 0, 3_400, parent = "c-costco"),
+            cat("c-market", "Farmers market", 10_000, 5_100, parent = "c-groceries"),
+            cat("c-dining", "Dining Out", 20_000, 21_380),
+            cat("c-takeout", "Takeout", 10_000, 13_200, parent = "c-dining"),
             cat("c-coffee", "Coffee", 6_000, 2_150),
         ),
         group(

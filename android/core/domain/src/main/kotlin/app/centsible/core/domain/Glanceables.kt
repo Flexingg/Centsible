@@ -35,6 +35,8 @@ data class Glanceable(
     val months: List<MonthFlow> = emptyList(),
     /** Net worth at the end of each of the last twelve months, oldest first. */
     val netWorth: List<NetWorthPoint> = emptyList(),
+    /** This month's money flow, every level (the Sankey chart shows it shallower if asked); null on an older bridge. */
+    val sankey: app.centsible.core.model.SankeyGraph? = null,
 ) {
     data class Bill(val title: String, val amount: Money, val date: String, val whenText: String)
 

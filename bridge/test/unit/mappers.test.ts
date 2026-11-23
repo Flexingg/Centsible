@@ -27,6 +27,7 @@ describe('toBudgetMonth', () => {
     expect(m.groups[0]!.categories[0]).toEqual({
       id: 'c',
       name: 'Pay',
+      parentId: null,
       hidden: false,
       budgeted: 0,
       spent: 0,

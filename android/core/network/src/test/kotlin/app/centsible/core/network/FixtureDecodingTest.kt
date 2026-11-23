@@ -22,6 +22,7 @@ class FixtureDecodingTest {
         "budgets" to ItemsDto.serializer(BudgetDto.serializer()),
         "accounts" to ItemsDto.serializer(AccountDto.serializer()),
         "category-groups" to ItemsDto.serializer(CategoryGroupDto.serializer()),
+        "category-groups-nested" to ItemsDto.serializer(CategoryGroupDto.serializer()),
         "transactions-page" to TransactionPageDto.serializer(),
         "transfer-matches" to TransferMatchesDto.serializer(),
         "transfer-candidates" to TransferCandidatesDto.serializer(),
@@ -74,6 +75,7 @@ class FixtureDecodingTest {
         "reconcile-status" to ReconcileStatusDto.serializer(),
         "report-cash-flow" to CashFlowDto.serializer(),
         "report-spending" to SpendingDto.serializer(),
+        "report-flows" to FlowsDto.serializer(),
         "report-net-worth" to NetWorthDto.serializer(),
     )
 
@@ -98,6 +100,18 @@ class FixtureDecodingTest {
         assertEquals("envelope", m.budgetType)
         assertTrue("totalBudgeted is normalized to positive", m.totalBudgeted >= 0)
         assertTrue(m.groups.any { it.isIncome })
+    }
+
+    @Test
+    fun `nested categories carry their parent`() {
+        val groups = json.decodeFromString(ItemsDto.serializer(CategoryGroupDto.serializer()), File(dir, "category-groups-nested.json").readText()).items
+        val cats = groups.flatMap { it.categories }
+        val ids = cats.map { it.id }.toSet()
+        val nested = cats.filter { it.parentId != null }
+        assertTrue("some categories are nested", nested.isNotEmpty())
+        assertTrue("parents exist in the same group", nested.all { c -> c.parentId in ids && groups.first { g -> g.categories.contains(c) }.categories.any { it.id == c.parentId } })
+        val flows = json.decodeFromString(FlowsDto.serializer(), File(dir, "report-flows.json").readText())
+        assertTrue(flows.totalIncome > 0 && flows.totalSpending < 0)
     }
 
     @Test

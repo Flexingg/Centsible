@@ -1,6 +1,7 @@
 package app.centsible.core.engine.bridge
 
 import app.centsible.core.domain.PairingLinks
+import app.centsible.core.domain.TransactionQuery
 import app.centsible.core.domain.recreate
 import app.centsible.core.model.AccountId
 import app.centsible.core.model.AmountOp
@@ -141,6 +142,12 @@ class EndToEndTest {
         val groupId = groups.firstOrNull { !it.isIncome }?.id
         val newCategory = groupId?.let { g -> step("create category") { engine.createCategory(budget, "E2E Pets", g) } }
         newCategory?.let { c -> step("update category") { engine.updateCategory(budget, c.id, name = "E2E Pet Care") } }
+        // Sub-categories: Pet Care > Vet > Checkups, then Vet back to the top.
+        val vet = newCategory?.let { c -> step("create sub-category") { engine.createSubcategory(budget, "E2E Vet", c.id) } }
+        vet?.let { v -> step("create level 4") { engine.createSubcategory(budget, "E2E Checkups", v.id) } }
+        vet?.let { v -> step("move sub-category to the top") { engine.setCategoryParent(budget, v.id, null) } }
+        if (vet != null && newCategory != null) step("nest it again") { engine.setCategoryParent(budget, vet.id, newCategory.id) }
+        newCategory?.let { c -> step("category with sub-categories' transactions") { engine.transactions(budget, TransactionQuery(categoryId = c.id, withSubcategories = true, limit = 5)) } }
 
         // Recurring.
         val schedule = step("create schedule") {
@@ -198,6 +205,7 @@ class EndToEndTest {
         val start = months.minOrNull() ?: month
         step("cash flow") { reports.cashFlow(budget, start, month) }
         step("spending") { reports.spending(budget, start, month) }
+        step("money flow") { reports.flows(budget, start, month) }
         step("net worth") { reports.netWorth(budget, 6) }
 
         // Bank sync with SimpleFIN (a stand-in SimpleFIN Bridge on the test server).

@@ -1,5 +1,10 @@
 package app.centsible.glance
 
+import app.centsible.core.model.CategoryGroupId
+import app.centsible.core.model.CategoryId
+import app.centsible.core.model.SankeyGraph
+import app.centsible.core.model.SankeyLink
+import app.centsible.core.model.SankeyNode
 import android.content.Context
 import app.centsible.core.domain.Glanceable
 import app.centsible.core.domain.GlanceableStore
@@ -61,6 +66,7 @@ class PrefsGlanceableStore @Inject constructor(@ApplicationContext context: Cont
             .put("leftInBudget", g.leftInBudget.minor)
             .put("months", JSONArray(g.months.map { JSONObject().put("month", it.month).put("income", it.income.minor).put("spending", it.spending.minor) }))
             .put("netWorth", JSONArray(g.netWorth.map { JSONObject().put("month", it.month).put("value", it.value.minor) }))
+            .put("sankey", g.sankey?.let(PrefsGlanceableStoreCodec::encodeSankey) ?: JSONObject.NULL)
             .put("trend", g.trend?.let { t ->
                 JSONObject()
                     .put("monthToDate", JSONArray(t.monthToDate))
@@ -114,8 +120,42 @@ class PrefsGlanceableStore @Inject constructor(@ApplicationContext context: Cont
                 netWorth = (o.optJSONArray("netWorth") ?: JSONArray()).let { a ->
                     (0 until a.length()).map { i -> a.getJSONObject(i).let { p -> Glanceable.NetWorthPoint(p.getString("month"), Money(p.getLong("value"))) } }
                 },
+                sankey = o.optJSONObject("sankey")?.let { runCatching { PrefsGlanceableStoreCodec.decodeSankey(it) }.getOrNull() },
             )
         }
+    }
+}
+
+/** The money-flow graph as JSON, for the widget cache. */
+internal object PrefsGlanceableStoreCodec {
+    fun encodeSankey(g: SankeyGraph) = JSONObject()
+        .put(
+            "nodes",
+            JSONArray(
+                g.nodes.map { n ->
+                    JSONObject().put("key", n.key).put("name", n.name).put("column", n.column).put("value", n.value).put("kind", n.kind.name)
+                        .put("groupId", n.groupId?.raw ?: JSONObject.NULL).put("categoryId", n.categoryId?.raw ?: JSONObject.NULL)
+                        .put("colorKey", n.colorKey ?: JSONObject.NULL)
+                },
+            ),
+        )
+        .put("links", JSONArray(g.links.map { JSONObject().put("from", it.from).put("to", it.to).put("value", it.value) }))
+
+    fun decodeSankey(o: JSONObject): SankeyGraph {
+        fun JSONObject.str(k: String) = if (isNull(k)) null else optString(k)
+        val nodes = o.getJSONArray("nodes").let { a ->
+            (0 until a.length()).map { i ->
+                a.getJSONObject(i).let { n ->
+                    SankeyNode(
+                        n.getString("key"), n.getString("name"), n.getInt("column"), n.getLong("value"),
+                        SankeyNode.Kind.valueOf(n.getString("kind")),
+                        n.str("groupId")?.let(::CategoryGroupId), n.str("categoryId")?.let(::CategoryId), n.str("colorKey"),
+                    )
+                }
+            }
+        }
+        val links = o.getJSONArray("links").let { a -> (0 until a.length()).map { i -> a.getJSONObject(i).let { l -> SankeyLink(l.getString("from"), l.getString("to"), l.getLong("value")) } } }
+        return SankeyGraph(nodes, links)
     }
 }
 

@@ -125,6 +125,8 @@ import kotlinx.serialization.json.JsonObject
 @Serializable data class CashFlowMonthDto(val month: String, val income: Long, val expenses: Long, val net: Long)
 @Serializable data class CashFlowDto(val months: List<CashFlowMonthDto>)
 @Serializable data class SpendingCategoryDto(val categoryId: String? = null, val name: String, val groupId: String? = null, val groupName: String? = null, val amount: Long)
+@Serializable data class FlowCategoryDto(val categoryId: String? = null, val name: String, val groupId: String? = null, val groupName: String? = null, val parentId: String? = null, val amount: Long)
+@Serializable data class FlowsDto(val start: String, val end: String, val totalIncome: Long, val totalSpending: Long, val income: List<FlowCategoryDto> = emptyList(), val spending: List<FlowCategoryDto> = emptyList())
 @Serializable data class SpendingDto(val start: String, val end: String, val total: Long, val categories: List<SpendingCategoryDto>)
 @Serializable data class NetWorthPointDto(val month: String, val assets: Long, val liabilities: Long, val netWorth: Long)
 @Serializable data class NetWorthDto(val points: List<NetWorthPointDto>)

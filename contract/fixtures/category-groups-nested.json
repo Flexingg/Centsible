@@ -1,0 +1,108 @@
+{
+  "items": [
+    {
+      "id": "fc3825fd-b982-4b72-b768-5b30844cf832",
+      "name": "Usual Expenses",
+      "isIncome": false,
+      "hidden": false,
+      "categories": [
+        {
+          "id": "f49a4354-8231-4ecc-aa6c-c09b6c3068cc",
+          "name": "Bulk",
+          "groupId": "fc3825fd-b982-4b72-b768-5b30844cf832",
+          "isIncome": false,
+          "hidden": false,
+          "parentId": "e4a1a294-e1b0-4a83-a890-72e18be19d3a"
+        },
+        {
+          "id": "e4a1a294-e1b0-4a83-a890-72e18be19d3a",
+          "name": "Costco",
+          "groupId": "fc3825fd-b982-4b72-b768-5b30844cf832",
+          "isIncome": false,
+          "hidden": false,
+          "parentId": "15800388-80c6-4561-bdea-abf5fccbce56"
+        },
+        {
+          "id": "15800388-80c6-4561-bdea-abf5fccbce56",
+          "name": "Groceries",
+          "groupId": "fc3825fd-b982-4b72-b768-5b30844cf832",
+          "isIncome": false,
+          "hidden": false,
+          "parentId": "541836f1-e756-4473-a5d0-6c1d3f06c7fa"
+        },
+        {
+          "id": "541836f1-e756-4473-a5d0-6c1d3f06c7fa",
+          "name": "Food",
+          "groupId": "fc3825fd-b982-4b72-b768-5b30844cf832",
+          "isIncome": false,
+          "hidden": false,
+          "parentId": null
+        },
+        {
+          "id": "af375fd4-d759-46b3-bffe-74a856151d57",
+          "name": "General",
+          "groupId": "fc3825fd-b982-4b72-b768-5b30844cf832",
+          "isIncome": false,
+          "hidden": false,
+          "parentId": null
+        },
+        {
+          "id": "d4b0f075-3343-4408-91ed-fae94f74e5bf",
+          "name": "Bills",
+          "groupId": "fc3825fd-b982-4b72-b768-5b30844cf832",
+          "isIncome": false,
+          "hidden": false,
+          "parentId": null
+        },
+        {
+          "id": "29ec2c58-8cd3-42fe-9187-7b5dfe0f70a6",
+          "name": "Bills (Flexible)",
+          "groupId": "fc3825fd-b982-4b72-b768-5b30844cf832",
+          "isIncome": false,
+          "hidden": false,
+          "parentId": null
+        }
+      ]
+    },
+    {
+      "id": "a137772f-cf2f-4089-9432-822d2ddc1466",
+      "name": "Investments and Savings",
+      "isIncome": false,
+      "hidden": false,
+      "categories": [
+        {
+          "id": "6bbd8472-25d4-4cee-8a11-5bd9f7e83d61",
+          "name": "Savings",
+          "groupId": "a137772f-cf2f-4089-9432-822d2ddc1466",
+          "isIncome": false,
+          "hidden": false,
+          "parentId": null
+        }
+      ]
+    },
+    {
+      "id": "2E1F5BDB-209B-43F9-AF2C-3CE28E380C00",
+      "name": "Income",
+      "isIncome": true,
+      "hidden": false,
+      "categories": [
+        {
+          "id": "3c1699a5-522a-435e-86dc-93d900a14f0e",
+          "name": "Income",
+          "groupId": "2E1F5BDB-209B-43F9-AF2C-3CE28E380C00",
+          "isIncome": true,
+          "hidden": false,
+          "parentId": null
+        },
+        {
+          "id": "506e8d9d-7ed0-4397-84e4-07a9185dc6b2",
+          "name": "Starting Balances",
+          "groupId": "2E1F5BDB-209B-43F9-AF2C-3CE28E380C00",
+          "isIncome": true,
+          "hidden": false,
+          "parentId": null
+        }
+      ]
+    }
+  ]
+}

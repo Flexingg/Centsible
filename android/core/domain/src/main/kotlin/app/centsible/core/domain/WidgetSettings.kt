@@ -12,6 +12,7 @@ enum class ChartKind(val id: String, val title: String, val description: String,
     Monthly("monthly", "Monthly spending", "The last six months of spending, with the average", "trends"),
     CashFlow("cashflow", "Income vs spending", "Money in and out for the last six months", "trends"),
     NetWorth("networth", "Net worth", "The last twelve months", "net-worth"),
+    Sankey("sankey", "Money flow", "Where this month's income went, group by group and down each level", "money-flow"),
     ;
 
     companion object {
@@ -98,6 +99,8 @@ data class ChartWidgetConfig(
     val categoryIds: List<String> = emptyList(),
     /** Optional per-chart theme override; null follows the global [WidgetSettings.widgetTheme]. */
     val theme: WidgetTheme? = null,
+    /** [ChartKind.Sankey]: the deepest level shown (1 = groups only, up to 5); null shows them all. */
+    val depth: Int? = null,
 )
 
 /** A user-created custom chart that can be shown on the Home dashboard, pinned as a widget, or both. */

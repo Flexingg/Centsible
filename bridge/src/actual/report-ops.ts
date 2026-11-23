@@ -2,6 +2,7 @@ import * as api from '@actual-app/api';
 import { ApiError } from '../errors.js';
 import type { OffBooks } from './off-books.js';
 import type { ActualHost } from './host.js';
+import type { CategoryTree, TreeCategory } from './category-tree.js';
 
 type Row = Record<string, unknown>;
 
@@ -40,6 +41,8 @@ export class ReportOps {
   constructor(
     private readonly host: ActualHost,
     private readonly offBooks?: OffBooks,
+    /** Sub-categories (Actual has two levels). */
+    private readonly tree?: CategoryTree,
   ) {}
 
   /** [range] plus "not off the books" (both are $and lists, so they're joined, not overwritten). */
@@ -91,6 +94,58 @@ export class ReportOps {
         .filter((c) => c.amount !== 0)
         .sort((a, b) => a.amount - b.amount);
       return { start, end, total: categories.reduce((s, c) => s + c.amount, 0), categories };
+    });
+  }
+
+  /**
+   * Where the money came from and went, for a Sankey: every income category's income and
+   * every spending category's spending over the range (the same money as the cash-flow
+   * report), each with its group and parent category, so the app can roll sub-categories
+   * up. Uncategorized money counts as spending, as in the cash-flow report.
+   */
+  flows(budgetId: string, start: string, end: string) {
+    return this.host.withBudget(budgetId, 'read', async () => {
+      const [{ data }, groups, cats] = await Promise.all([
+        api.aqlQuery(
+          api
+            .q('transactions')
+            .filter({ ...BUDGET_FLOW, ...this.scoped(budgetId, dateRange(`${start}-01`, lastDay(end))) })
+            .groupBy(['category'])
+            .select(['category', { amount: { $sum: '$amount' } }]),
+        ) as Promise<{ data: Row[] }>,
+        api.getCategoryGroups(),
+        api.getCategories(),
+      ]);
+      const parents = this.tree?.parents(budgetId, cats as TreeCategory[]) ?? new Map<string, string>();
+      const meta = new Map(
+        groups.flatMap((g) => (g.categories ?? []).map((c) => [c.id, { name: c.name, group: g.name, groupId: g.id, isIncome: !!g.is_income }] as const)),
+      );
+      const rows = data
+        .map((r) => {
+          const id = (r.category as string | null) ?? null;
+          const m = id ? meta.get(id) : undefined;
+          return {
+            categoryId: id,
+            name: m?.name ?? 'Uncategorized',
+            groupId: m?.groupId ?? null,
+            groupName: m?.group ?? null,
+            parentId: id ? (parents.get(id) ?? null) : null,
+            isIncome: m?.isIncome ?? false,
+            amount: Number(r.amount),
+          };
+        })
+        .filter((c) => c.amount !== 0);
+      const strip = ({ isIncome: _, ...rest }: (typeof rows)[number]) => rest;
+      const income = rows.filter((r) => r.isIncome).sort((a, b) => b.amount - a.amount).map(strip);
+      const spending = rows.filter((r) => !r.isIncome).sort((a, b) => a.amount - b.amount).map(strip);
+      return {
+        start,
+        end,
+        totalIncome: income.reduce((s, c) => s + c.amount, 0),
+        totalSpending: spending.reduce((s, c) => s + c.amount, 0),
+        income,
+        spending,
+      };
     });
   }
 

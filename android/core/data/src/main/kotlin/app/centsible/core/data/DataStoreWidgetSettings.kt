@@ -48,6 +48,7 @@ private data class ChartConfigWire(
     val showLegend: Boolean = true,
     val categoryIds: List<String> = emptyList(),
     val theme: String? = null,
+    val depth: Int? = null,
 ) {
     fun toModel(): ChartWidgetConfig? = ChartKind.of(kind)?.let { k ->
         ChartWidgetConfig(
@@ -64,6 +65,7 @@ private data class ChartConfigWire(
             showLegend = showLegend,
             categoryIds = categoryIds,
             theme = theme?.let(WidgetTheme::of),
+            depth = depth,
         )
     }
 
@@ -82,6 +84,7 @@ private data class ChartConfigWire(
             showLegend = c.showLegend,
             categoryIds = c.categoryIds,
             theme = c.theme?.id,
+            depth = c.depth,
         )
     }
 }

@@ -65,7 +65,7 @@ import kotlinx.serialization.Serializable
     val kind: String? = null,
 )
 
-@Serializable data class CategoryDto(val id: String, val name: String, val groupId: String, val isIncome: Boolean, val hidden: Boolean)
+@Serializable data class CategoryDto(val id: String, val name: String, val groupId: String, val isIncome: Boolean, val hidden: Boolean, val parentId: String? = null)
 @Serializable data class CategoryGroupDto(val id: String, val name: String, val isIncome: Boolean, val hidden: Boolean, val categories: List<CategoryDto> = emptyList())
 @Serializable data class PayeeDto(val id: String, val name: String, val transferAccountId: String? = null)
 
@@ -141,6 +141,7 @@ import kotlinx.serialization.Serializable
     val balance: Long = 0,
     val received: Long = 0,
     val carryover: Boolean = false,
+    val parentId: String? = null,
 )
 
 @Serializable data class CategoryBudgetPatchDto(val budgeted: Long? = null, val carryover: Boolean? = null)
@@ -161,7 +162,10 @@ import kotlinx.serialization.Serializable
 /** Sets an account's type; JsonNull clears it (sent explicitly, unlike other nulls). */
 @Serializable data class AccountKindPatchDto(val kind: kotlinx.serialization.json.JsonElement)
 @Serializable data class CloseAccountDto(val transferAccountId: String? = null, val transferCategoryId: String? = null)
-@Serializable data class NewCategoryDto(val name: String, val groupId: String)
+/** [groupId] for a top-level category, or [parentId] for a sub-category (it joins the parent's group). */
+@Serializable data class NewCategoryDto(val name: String, val groupId: String? = null, val parentId: String? = null)
+/** Moves a category under another; JsonNull brings it to the top of its group (sent explicitly). */
+@Serializable data class CategoryParentPatchDto(val parentId: kotlinx.serialization.json.JsonElement)
 @Serializable data class CategoryPatchDto(val name: String? = null, val hidden: Boolean? = null, val groupId: String? = null)
 @Serializable data class NewGroupDto(val name: String)
 @Serializable data class GroupPatchDto(val name: String? = null, val hidden: Boolean? = null)

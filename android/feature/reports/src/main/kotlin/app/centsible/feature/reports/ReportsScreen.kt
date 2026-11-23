@@ -60,9 +60,24 @@ private fun YearMonth.short() = Month.of(month).getDisplayName(TextStyle.SHORT, 
 private fun YearMonth.long() = Month.of(month).getDisplayName(TextStyle.FULL, Locale.getDefault()) + " " + year
 
 @Composable
-fun ReportsRoute(onBack: () -> Unit, onOpenTransactions: (app.centsible.core.extensions.Destination.TransactionsFor) -> Unit = {}, viewModel: ReportsViewModel = hiltViewModel()) {
+fun ReportsRoute(
+    onBack: () -> Unit,
+    onOpenTransactions: (app.centsible.core.extensions.Destination.TransactionsFor) -> Unit = {},
+    initialTab: ReportTab? = null,
+    viewModel: ReportsViewModel = hiltViewModel(),
+) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    ReportsScreen(state, onBack, ReportsActions(viewModel::tab, viewModel::range, viewModel::selectMonth, viewModel::selectPoint, viewModel::spendingMonth, { viewModel.refresh() }, onOpenTransactions))
+    androidx.compose.runtime.LaunchedEffect(initialTab) { initialTab?.let(viewModel::tab) }
+    ReportsScreen(
+        state,
+        onBack,
+        ReportsActions(
+            viewModel::tab, viewModel::range, viewModel::selectMonth, viewModel::selectPoint, viewModel::spendingMonth, { viewModel.refresh() }, onOpenTransactions,
+            flowMonths = viewModel::flowMonths,
+            flowDepth = viewModel::flowDepth,
+            selectFlow = viewModel::selectFlow,
+        ),
+    )
 }
 
 data class ReportsActions(
@@ -73,6 +88,9 @@ data class ReportsActions(
     val spendingMonth: (Int) -> Unit = {},
     val retry: () -> Unit = {},
     val openTransactions: (app.centsible.core.extensions.Destination.TransactionsFor) -> Unit = {},
+    val flowMonths: (Int) -> Unit = {},
+    val flowDepth: (Int) -> Unit = {},
+    val selectFlow: (String?) -> Unit = {},
 )
 
 @Composable
@@ -86,7 +104,7 @@ fun ReportsScreen(state: ReportsUiState, onBack: () -> Unit, actions: ReportsAct
                     IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Back") }
                     Text("Reports", style = MaterialTheme.typography.titleLarge)
                 }
-                PrimaryTabRow(selectedTabIndex = state.tab.ordinal, containerColor = colors.canvas) {
+                androidx.compose.material3.PrimaryScrollableTabRow(selectedTabIndex = state.tab.ordinal, containerColor = colors.canvas, edgePadding = 8.dp) {
                     ReportTab.entries.forEach { t ->
                         Tab(
                             selected = state.tab == t,
@@ -108,6 +126,7 @@ fun ReportsScreen(state: ReportsUiState, onBack: () -> Unit, actions: ReportsAct
             when (state.tab) {
                 ReportTab.CashFlow -> item { CashFlowTab(state, actions) }
                 ReportTab.Spending -> item { SpendingTab(state, actions) }
+                ReportTab.MoneyFlow -> item { MoneyFlowTab(state, actions) }
                 ReportTab.NetWorth -> item { NetWorthTab(state, actions) }
             }
         }
@@ -115,7 +134,7 @@ fun ReportsScreen(state: ReportsUiState, onBack: () -> Unit, actions: ReportsAct
 }
 
 @Composable
-private fun <T> Loaded(data: Loadable<T>, retry: () -> Unit, content: @Composable (T) -> Unit) = when (data) {
+internal fun <T> Loaded(data: Loadable<T>, retry: () -> Unit, content: @Composable (T) -> Unit) = when (data) {
     Loadable.Loading -> Box(Modifier.fillMaxWidth().height(240.dp)) { LoadingState() }
     is Loadable.Failed -> Box(Modifier.fillMaxWidth().height(320.dp)) { MessageState("Couldn't build this report", data.message, emoji = "📉", actionLabel = "Try again", onAction = retry) }
     is Loadable.Ready -> content(data.value)

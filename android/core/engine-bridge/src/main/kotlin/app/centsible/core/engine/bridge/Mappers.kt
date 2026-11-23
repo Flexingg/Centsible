@@ -144,6 +144,7 @@ internal fun BudgetMonthDto.toModel() = BudgetMonth(
                     balance = Money(c.balance),
                     received = Money(c.received),
                     carryover = c.carryover,
+                    parentId = c.parentId?.let(::CategoryId),
                 )
             },
         )
@@ -163,7 +164,7 @@ internal fun PreferencesDto.toModel() = Preferences(
     hideFraction = hideFraction,
 )
 
-internal fun CategoryDto.toModel() = Category(CategoryId(id), name, CategoryGroupId(groupId), isIncome, hidden)
+internal fun CategoryDto.toModel() = Category(CategoryId(id), name, CategoryGroupId(groupId), isIncome, hidden, parentId?.let(::CategoryId))
 
 /**
  * PATCH body: fields left as [Update.Keep] are omitted, [Update.Set] with null is sent as

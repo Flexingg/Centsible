@@ -38,6 +38,11 @@ data class Category(
     val groupId: CategoryGroupId,
     val isIncome: Boolean,
     val hidden: Boolean,
+    /**
+     * The category this one sits under, in the same group (null = top of the group). The
+     * group is level 1, its own categories level 2, and sub-categories go down to level 5.
+     */
+    val parentId: CategoryId? = null,
 )
 
 data class CategoryGroup(

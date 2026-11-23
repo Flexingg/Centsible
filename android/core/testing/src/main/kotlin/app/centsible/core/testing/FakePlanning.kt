@@ -135,6 +135,19 @@ object SamplePlanning {
         ),
     )
 
+    /** The sample month as flows: income by category, spending by category with parents. */
+    fun flows(start: YearMonth = SampleHousehold.month, end: YearMonth = start): app.centsible.core.model.FlowsReport {
+        val m = SampleHousehold.budgetMonth
+        fun flow(g: app.centsible.core.model.BudgetGroup, c: app.centsible.core.model.BudgetCategory, amount: Money) =
+            app.centsible.core.model.FlowCategory(c.id, c.name, g.id, g.name, c.parentId, amount)
+        val income = m.incomeGroups.flatMap { g -> g.categories.filter { !it.received.isZero }.map { flow(g, it, it.received) } }
+        val spending = m.expenseGroups.flatMap { g -> g.categories.filter { !it.spent.isZero }.map { flow(g, it, it.spent) } } +
+            app.centsible.core.model.FlowCategory(null, "Uncategorized", null, null, null, Money(-6_768))
+        return app.centsible.core.model.FlowsReport(
+            start, end, Money(income.sumOf { it.amount.minor }), Money(spending.sumOf { it.amount.minor }), income, spending.sortedBy { it.amount.minor },
+        )
+    }
+
     val netWorth = listOf(-19_890_000L, -19_620_000L, -19_410_000L, -19_020_000L, -18_710_000L, -18_430_000L, -18_390_000L, -18_120_000L, -18_050_000L, -17_830_000L, -17_990_000L, -17_975_300L)
         .mapIndexed { i, nw -> NetWorthPoint(YearMonth("2025-10").plus(i), Money(13_000_000 + i * 60_000L), Money(nw - 13_000_000 - i * 60_000L), Money(nw)) }
 }
@@ -209,6 +222,7 @@ class FakeAccountServices : AccountServices {
 class FakeReports : ReportsGateway {
     override suspend fun cashFlow(budget: BudgetId, start: YearMonth, end: YearMonth) = SamplePlanning.cashFlow.filter { it.month in start..end }
     override suspend fun spending(budget: BudgetId, start: YearMonth, end: YearMonth) = SamplePlanning.spending
+    override suspend fun flows(budget: BudgetId, start: YearMonth, end: YearMonth) = SamplePlanning.flows(start, end)
     override suspend fun netWorth(budget: BudgetId, months: Int) = SamplePlanning.netWorth.takeLast(months)
     override suspend fun dailySpending(budget: BudgetId, from: String, to: String): List<app.centsible.core.model.DaySpending> {
         val start = java.time.LocalDate.parse(from)
