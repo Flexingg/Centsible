@@ -20,11 +20,14 @@ class CentsibleApplication : Application() {
     @Inject lateinit var changes: app.centsible.core.domain.BudgetChanges
     @Inject lateinit var appLock: app.centsible.core.domain.AppLockSettings
     @Inject lateinit var glanceRefresher: app.centsible.glance.GlanceRefresher
+    @Inject lateinit var assistantBackground: AssistantBackground
     private var lastNight = -1
 
     override fun onCreate() {
         super.onCreate()
         BillReminderWorker.createChannel(this)
+        registerActivityLifecycleCallbacks(AppVisibility)
+        assistantBackground.start(this)
         // Re-register the daily check (a no-op if it's already queued).
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
         scope.launch { reminderScheduler.apply(reminders.enabled.first() || reminders.alerts.first() || reminders.reviews.first().isNotEmpty()) }

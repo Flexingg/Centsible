@@ -646,9 +646,6 @@ internal fun parseRule(a: Args): RuleDraft {
     return RuleDraft(a.optString("stage"), a.optString("conditions_op") ?: "and", conditions, actions)
 }
 
-private fun RuleDraft.describe(): List<String> =
-    listOf("If " + conditions.joinToString(if (conditionsOp == "or") " or " else " and ") { "${it.field} ${it.op} ${it.value.encode()}" }) +
-        actions.map { if (it.op == "delete-transaction") "Then delete the transaction" else "Then set ${it.field} to ${it.value.encode()}" }
 
 private fun app.centsible.core.model.Rule.asInput(): Array<Pair<String, Any?>> =
     arrayOf("stage" to stage, "conditions_op" to conditionsOp, "conditions" to conditions.map { it.encode() }, "actions" to actions.map { it.encode() })
@@ -658,7 +655,7 @@ internal fun ToolsBuilder.ruleWrites(gw: Gateways) {
 
     write(
         G, "create_rule", "Create a rule (try preview_rule first to see what it matches).", ruleSchema(),
-        preview = { a, _ -> Preview("New rule", parseRule(a).describe()) },
+        preview = { a, ctx -> Preview("New rule", Readable.rule(parseRule(a), ctx.names)) },
     ) { a, ctx ->
         val r = gw.planning.createRule(ctx.budget, parseRule(a))
         done("Created the rule", call("delete_rule", "id" to r.id), "rule" to r.encode())
@@ -667,7 +664,7 @@ internal fun ToolsBuilder.ruleWrites(gw: Gateways) {
     write(
         G, "update_rule", "Replace a rule's conditions and actions.",
         JsonObject(ruleSchema().let { s -> s + ("properties" to JsonObject((s["properties"] as JsonObject) + ("id" to j("type" to "string", "description" to "The rule.")))) }),
-        preview = { a, _ -> Preview("Change a rule", parseRule(a).describe()) },
+        preview = { a, ctx -> Preview("Change a rule", Readable.rule(parseRule(a), ctx.names)) },
     ) { a, ctx ->
         val id = a.string("id")
         val before = gw.planning.rules(ctx.budget).firstOrNull { it.id == id } ?: throw ToolInputException("No rule $id")
@@ -680,7 +677,7 @@ internal fun ToolsBuilder.ruleWrites(gw: Gateways) {
         schema { string("id", "The rule.", required = true) },
         preview = { a, ctx ->
             val r = gw.planning.rules(ctx.budget).firstOrNull { it.id == a.string("id") } ?: throw ToolInputException("No rule ${a.string("id")}")
-            Preview("Delete a rule", RuleDraft(r.stage, r.conditionsOp, r.conditions, r.actions).describe())
+            Preview("Delete a rule", Readable.rule(RuleDraft(r.stage, r.conditionsOp, r.conditions, r.actions), ctx.names))
         },
     ) { a, ctx ->
         val r = gw.planning.rules(ctx.budget).firstOrNull { it.id == a.string("id") } ?: throw ToolInputException("No rule ${a.string("id")}")

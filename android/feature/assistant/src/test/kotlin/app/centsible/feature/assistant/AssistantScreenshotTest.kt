@@ -59,6 +59,7 @@ class AssistantScreenshotTest {
     private val chat = ChatUiState(
         conversationId = "c1",
         title = "How's Food going this month?",
+        usage = app.centsible.core.assistant.TokenUsage(input = 2_400, output = 3_100, cacheRead = 61_000, cacheWrite = 18_500, cost = 0.1655),
         items = listOf(
             ChatItem.User("1", "How's Food going this month?"),
             ChatItem.Thinking("2", "Read the month's budget and recent dining spend."),
@@ -86,6 +87,13 @@ class AssistantScreenshotTest {
             chat.copy(items = chat.items.take(1), live = LiveTurn(running = true, activity = "Running reports…", blocks = listOf(LiveBlock(0, StreamUpdate.Kind.Thinking, "Comparing with the last three months.")))),
             ChatActions(),
         )
+    }
+
+    @Test fun assistant_cost_breakdown() {
+        compose.setContent { CentsibleTheme(darkTheme = false) { AssistantChatScreen(chat, ChatActions()) } }
+        compose.onNodeWithText("· ≈ $0.166", useUnmergedTree = true).performClick()
+        compose.waitForIdle()
+        com.github.takahirom.roborazzi.captureScreenRoboImage("screenshots/assistant_cost_breakdown.png")
     }
 
     @Test fun assistant_welcome() = shot("assistant_welcome") { AssistantChatScreen(ChatUiState(hasKey = true), ChatActions()) }

@@ -47,6 +47,16 @@ data class LiveTurn(
     val badKey: Boolean = false,
 )
 
+/** How a turn ended, for a notification when the app is in the background. */
+sealed interface TurnEnded {
+    val conversationId: String
+    val title: String
+
+    data class Replied(override val conversationId: String, override val title: String, val text: String) : TurnEnded
+    data class NeedsApproval(override val conversationId: String, override val title: String, val changes: Int) : TurnEnded
+    data class Failed(override val conversationId: String, override val title: String, val message: String) : TurnEnded
+}
+
 data class LiveBlock(val index: Int, val kind: StreamUpdate.Kind, val text: String, val toolName: String? = null)
 
 /**
@@ -75,6 +85,17 @@ class AssistantAgent @Inject constructor(
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val live = MutableStateFlow<Map<String, LiveTurn>>(emptyMap())
     private val jobs = ConcurrentHashMap<String, Job>()
+    private val busyIds = MutableStateFlow<Set<String>>(emptySet())
+    private val ended = kotlinx.coroutines.flow.MutableSharedFlow<TurnEnded>(extraBufferCapacity = 8)
+
+    /** Conversations with a turn under way (the app keeps itself running while this isn't empty). */
+    val busy: kotlinx.coroutines.flow.StateFlow<Set<String>> = busyIds
+
+    /** Each turn as it ends (not when it's stopped). */
+    val turns: kotlinx.coroutines.flow.SharedFlow<TurnEnded> = ended
+
+    /** The chat's title, for the "working on…" notification. */
+    suspend fun title(conversationId: String): String? = store.get(conversationId)?.title
     private val locks = ConcurrentHashMap<String, Mutex>()
     private val json = Json { ignoreUnknownKeys = true }
 
@@ -97,25 +118,47 @@ class AssistantAgent @Inject constructor(
 
     /** Runs [block] for a conversation, one at a time, keeping it on screen as running. */
     private fun launch(id: String, block: suspend () -> Unit): Job {
+        busyIds.update { it + id }
         val job = scope.launch {
             lock(id).withLock {
                 setLive(id) { LiveTurn(running = true, activity = "Thinking…") }
                 try {
                     block()
                     setLive(id) { LiveTurn() }
+                    report(id, null)
                 } catch (e: CancellationException) {
                     setLive(id) { LiveTurn() }
                     throw e
                 } catch (e: ClaudeException) {
                     setLive(id) { LiveTurn(error = e.message, retryable = e.retryable, badKey = e.badKey) }
+                    report(id, e.message)
                 } catch (e: Exception) {
                     setLive(id) { LiveTurn(error = e.userMessage(), retryable = true) }
+                    report(id, e.userMessage())
                 }
             }
         }
         jobs[id] = job
-        job.invokeOnCompletion { jobs.remove(id, job) }
+        job.invokeOnCompletion {
+            jobs.remove(id, job)
+            if (jobs[id] == null) busyIds.update { it - id }
+        }
         return job
+    }
+
+    /** Says how the turn ended: changes to approve, an error, or the reply's first words. */
+    private suspend fun report(id: String, error: String?) {
+        val conv = runCatching { store.get(id) }.getOrNull() ?: return
+        val event = when {
+            error != null -> TurnEnded.Failed(id, conv.title, error)
+            conv.awaitingApproval -> TurnEnded.NeedsApproval(id, conv.title, conv.changes.values.count { it.status == ChangeStatus.Proposed })
+            else -> {
+                val reply = Transcript.items(conv).lastOrNull() as? ChatItem.Reply ?: return
+                val labels = labels(conv.budgetId)
+                TurnEnded.Replied(id, conv.title, Readable.humanize(reply.markdown, labels))
+            }
+        }
+        ended.tryEmit(event)
     }
 
     // ── What the chat calls ──
@@ -191,6 +234,10 @@ class AssistantAgent @Inject constructor(
 
     fun dismissError(conversationId: String) = setLive(conversationId) { LiveTurn() }
 
+    /** Names for the ids of [budgetId]'s accounts, categories and merchants, to show in place of any id in a reply. */
+    suspend fun labels(budgetId: String?): Map<String, String> =
+        budgetId?.let { b -> runCatching { catalog.names(BudgetId(b)).labels() }.getOrNull() }.orEmpty()
+
     /**
      * Moves this chat to another model from its next turn. Earlier thinking stays in the
      * history as it is: the API skips, unbilled, any thinking the new model can't read.
@@ -254,6 +301,18 @@ class AssistantAgent @Inject constructor(
         return Prompt.state(today(), budgetName, currency, session?.member?.displayName, session?.member?.role?.canWrite != false, s, if (s.memory) memory.all() else emptyList())
     }
 
+    /** Tokens and the estimated cost of one reply, at the model that wrote it. */
+    private fun usageOf(message: Message, asked: AssistantModel): TokenUsage {
+        val u = message.usage()
+        val input = u.inputTokens()
+        val output = u.outputTokens()
+        val read = u.cacheReadInputTokens().orElse(0L)
+        val write = u.cacheCreationInputTokens().orElse(0L)
+        val searches = u.serverToolUse().map { it.webSearchRequests() }.orElse(0L)
+        val served = AssistantModel.served(runCatching { message.model().asString() }.getOrNull()) ?: asked
+        return TokenUsage(input, output, read, write, served.cost(input, output, read, write, searches), searches)
+    }
+
     private fun Conversation.append(role: StoredMessage.Role, param: MessageParam, context: Boolean = false) =
         copy(messages = messages + StoredMessage(role, SdkClaudeClient.paramToJson(param), now(), context), updatedAt = now())
 
@@ -282,7 +341,7 @@ class AssistantAgent @Inject constructor(
                 fallbacks = true,
             )
             val message = claude.stream(key, request) { update -> onStream(conv.id, update) }
-            conv = conv.append(StoredMessage.Role.Assistant, message.toParam()).copy(usage = conv.usage + message.usage().let { u -> TokenUsage(u.inputTokens(), u.outputTokens(), u.cacheReadInputTokens().orElse(0L), u.cacheCreationInputTokens().orElse(0L)) })
+            conv = conv.append(StoredMessage.Role.Assistant, message.toParam()).copy(usage = conv.usage + usageOf(message, model))
             store.save(conv)
             setLive(conv.id) { it.copy(blocks = emptyList()) }
 
@@ -358,7 +417,11 @@ class AssistantAgent @Inject constructor(
                         )
                         else -> try {
                             val p = tool.preview(Args(input), ctx)
-                            Outcome.Proposal(ProposedChange(id, name, group.key, p.title, p.details, input.toString()))
+                            // The card is for the person: any id left in it becomes the name of what it points at.
+                            val labels = runCatching { ctx.names.labels() }.getOrDefault(emptyMap())
+                            Outcome.Proposal(
+                                ProposedChange(id, name, group.key, Readable.humanize(p.title, labels), p.details.map { Readable.humanize(it, labels) }, input.toString()),
+                            )
                         } catch (e: ToolInputException) {
                             Outcome.Result(StoredToolResult(id, e.message.orEmpty(), isError = true))
                         } catch (e: CancellationException) {

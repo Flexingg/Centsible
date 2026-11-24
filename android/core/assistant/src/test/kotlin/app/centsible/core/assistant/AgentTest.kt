@@ -5,6 +5,7 @@ import app.centsible.core.model.Role
 import app.centsible.core.testing.FakeBudgetEngine
 import app.centsible.core.testing.SampleHousehold
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -175,6 +176,24 @@ class AgentTest {
         val other = agent.send(null, "Hi")
         agent.awaitIdle(other)
         assertEquals("claude-opus-5-5", server.takeRequest().json()["model"]!!.jsonPrimitive.content)
+    }
+
+    @Test fun `each reply's cost is priced at the model that answered, and the turn reports how it ended`() = run {
+        val ended = mutableListOf<TurnEnded>()
+        val collector = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Unconfined).launch { agent.turns.collect { ended += it } }
+        reply(sse(Block.Text("Your **Groceries** envelope has $64.30 left."), model = "claude-sonnet-5-5"))
+        val id = agent.send(null, "Groceries?")
+        assertTrue(id in agent.busy.value)
+        agent.awaitIdle(id)
+        val usage = store.get(id)!!.usage
+        assertEquals(0.000628, usage.cost, 1e-9) // Sonnet's prices, though the chat is on Opus
+        assertEquals(usage.cost, usage.estimate(AssistantModel.Opus), 0.0)
+        val done = ended.single() as TurnEnded.Replied
+        assertEquals("Your **Groceries** envelope has $64.30 left.", done.text)
+        assertEquals("Groceries?", done.title)
+        kotlinx.coroutines.delay(50)
+        assertTrue(agent.busy.value.isEmpty())
+        collector.cancel()
     }
 
     private suspend fun budgeted(id: CategoryId) = engine.budgetMonth(SampleHousehold.budget.id, SampleHousehold.month).groups.flatMap { it.categories }.first { it.id == id }.budgeted

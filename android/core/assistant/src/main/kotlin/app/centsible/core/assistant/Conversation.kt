@@ -76,8 +76,18 @@ data class TokenUsage(
     val output: Long = 0,
     val cacheRead: Long = 0,
     val cacheWrite: Long = 0,
+    /** Estimated dollars, priced per request at the model that answered it. */
+    val cost: Double = 0.0,
+    val webSearches: Long = 0,
 ) {
-    operator fun plus(o: TokenUsage) = TokenUsage(input + o.input, output + o.output, cacheRead + o.cacheRead, cacheWrite + o.cacheWrite)
+    operator fun plus(o: TokenUsage) =
+        TokenUsage(input + o.input, output + o.output, cacheRead + o.cacheRead, cacheWrite + o.cacheWrite, cost + o.cost, webSearches + o.webSearches)
+
+    val tokens get() = input + output + cacheRead + cacheWrite
+
+    /** The estimate; a chat saved before costs were kept is priced at [model] from its token counts. */
+    fun estimate(model: AssistantModel): Double =
+        if (cost > 0.0 || tokens == 0L) cost else model.cost(input, output, cacheRead, cacheWrite, webSearches)
 }
 
 /** One line in the chats list. */

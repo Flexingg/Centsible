@@ -20,6 +20,11 @@ import app.centsible.core.assistant.MemoryStore
 import app.centsible.core.assistant.TokenUsage
 import app.centsible.core.assistant.ToolGroup
 import app.centsible.core.assistant.Transcript
+import app.centsible.core.assistant.Readable
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.mapLatest
+import kotlinx.coroutines.flow.onStart
 import app.centsible.core.domain.SessionStore
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
@@ -93,6 +98,13 @@ class AssistantChatViewModel @Inject constructor(
 
     private val live = conversationId.flatMapLatest { id -> if (id == null) flowOf(LiveTurn()) else agent.live(id) }
 
+    /** Names for the budget's ids, reloaded when a turn ends (it may have added a merchant or category). */
+    private val labels = combine(conversation.map { it?.budgetId }, live.map { it.running }) { b, running -> b to running }
+        .distinctUntilChanged()
+        .filter { (_, running) -> !running }
+        .mapLatest { (b, _) -> agent.labels(b) }
+        .onStart { emit(emptyMap()) }
+
     private val base = combine(conversation, live, keys.hasKey, settings.settings, sessions.session) { conv, live, hasKey, s, session ->
         ChatUiState(
             conversationId = conv?.id,
@@ -109,8 +121,9 @@ class AssistantChatViewModel @Inject constructor(
         )
     }
 
-    val uiState: StateFlow<ChatUiState> = combine(base, pendingModel) { st, pending ->
-        if (st.conversationId == null && pending != null) st.copy(model = pending) else st
+    val uiState: StateFlow<ChatUiState> = combine(base, pendingModel, labels) { st, pending, names ->
+        val shown = st.copy(items = Readable.items(st.items, names), live = Readable.live(st.live, names))
+        if (st.conversationId == null && pending != null) shown.copy(model = pending) else shown
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ChatUiState())
 
     fun send(text: String) {
