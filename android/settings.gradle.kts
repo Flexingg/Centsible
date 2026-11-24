@@ -22,8 +22,8 @@ dependencyResolutionManagement {
 rootProject.name = "centsible"
 
 include(":app")
-include(":core:model", ":core:domain", ":core:network", ":core:engine-bridge")
+include(":core:model", ":core:domain", ":core:network", ":core:engine-bridge", ":core:assistant")
 include(":core:data", ":core:designsystem", ":core:extensions", ":core:testing", ":core:ui-testing", ":core:ui")
 include(":feature:onboarding", ":feature:dashboard", ":feature:accounts")
 include(":feature:transactions", ":feature:budget", ":feature:settings")
-include(":feature:planning", ":feature:reports")
+include(":feature:planning", ":feature:reports", ":feature:assistant")

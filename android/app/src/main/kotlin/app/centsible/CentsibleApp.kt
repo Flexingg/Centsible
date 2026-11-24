@@ -23,6 +23,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ReceiptLong
 import androidx.compose.material.icons.rounded.AccountBalance
 import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.rounded.PieChart
 import androidx.compose.material.icons.rounded.Menu
@@ -76,12 +77,12 @@ import app.centsible.feature.transactions.TransactionEditorRoute
 import app.centsible.feature.transactions.TransactionEditorViewModel
 import app.centsible.feature.transactions.TransactionsRoute
 
-private enum class Tab(val route: String, val label: String, val icon: ImageVector, val canAdd: Boolean) {
-    Dashboard("dashboard", "Dashboard", Icons.Rounded.Home, canAdd = true),
-    Accounts("accounts", "Accounts", Icons.Rounded.AccountBalance, canAdd = true),
-    Transactions("transactions", "Transactions", Icons.AutoMirrored.Rounded.ReceiptLong, canAdd = true),
-    Budget("budget", "Budget", Icons.Rounded.PieChart, canAdd = false),
-    More("more", "More", Icons.Rounded.Menu, canAdd = false),
+private enum class Tab(val route: String, val label: String, val icon: ImageVector) {
+    Dashboard("dashboard", "Dashboard", Icons.Rounded.Home),
+    Accounts("accounts", "Accounts", Icons.Rounded.AccountBalance),
+    Transactions("transactions", "Transactions", Icons.AutoMirrored.Rounded.ReceiptLong),
+    Budget("budget", "Budget", Icons.Rounded.PieChart),
+    More("more", "More", Icons.Rounded.Menu),
 }
 
 private object Routes {
@@ -105,6 +106,10 @@ private object Routes {
     const val FORECAST = "forecast"
     const val SUBSCRIPTIONS = "subscriptions"
     const val TRENDS = "trends"
+    const val ASSISTANT = "assistant?${app.centsible.feature.assistant.AssistantChatViewModel.ARG_CHAT}={${app.centsible.feature.assistant.AssistantChatViewModel.ARG_CHAT}}"
+    fun assistant(chat: String? = null) = "assistant?${app.centsible.feature.assistant.AssistantChatViewModel.ARG_CHAT}=${chat.orEmpty()}"
+    const val ASSISTANT_CHATS = "assistant/chats"
+    const val ASSISTANT_SETTINGS = "assistant/settings"
     const val NET_WORTH = "net-worth"
     const val YEAR_IN_REVIEW = "year-in-review?period={period}&date={date}"
     fun review(period: String? = null, date: String? = null) = "year-in-review?period=${period.orEmpty()}&date=${date.orEmpty()}"
@@ -203,10 +208,11 @@ private fun MainScaffold(
         onSelect = { haptics.tap(); nav.goToTab(it) },
         snackbarHost = { androidx.compose.material3.SnackbarHost(snackbar) },
         topBar = { if (offline || pending > 0) OfflineBanner(offline, pending) },
-        addButton = if (tab?.canAdd == true) {
+        // The floating button opens the assistant, on every tab.
+        addButton = if (tab != null) {
             {
-                FloatingActionButton(onClick = { haptics.tap(); nav.navigate(Routes.transaction(null)) }, containerColor = colors.accent, contentColor = colors.card) {
-                    Icon(Icons.Rounded.Add, contentDescription = "Add transaction")
+                FloatingActionButton(onClick = { haptics.tap(); nav.navigate(Routes.assistant()) }, containerColor = colors.accent, contentColor = colors.card) {
+                    Icon(Icons.Rounded.AutoAwesome, contentDescription = "Ask the assistant")
                 }
             }
         } else null,
@@ -252,7 +258,9 @@ private fun MainScaffold(
         ) {
             composable(Tab.Dashboard.route) { DashboardRoute(onNavigate = { nav.go(it) }) }
             composable(Tab.Accounts.route) { AccountsRoute(onOpenAccount = { nav.navigate(Routes.account(it)) }) }
-            composable(Tab.Transactions.route) { TransactionsRoute(onOpen = { nav.navigate(Routes.transaction(it)) }, onOpenReview = { nav.navigate(Routes.REVIEW) }) }
+            composable(Tab.Transactions.route) {
+                TransactionsRoute(onOpen = { nav.navigate(Routes.transaction(it)) }, onOpenReview = { nav.navigate(Routes.REVIEW) }, onAdd = { nav.navigate(Routes.transaction(null)) })
+            }
             composable(Tab.Budget.route) { BudgetRoute(
                     onManageCategories = { nav.navigate(Routes.CATEGORIES) },
                     onOpenTransactions = { nav.go(it) },
@@ -292,6 +300,24 @@ private fun MainScaffold(
             composable(Routes.PLAID) { app.centsible.feature.settings.PlaidRoute(onBack = { nav.popBackStack() }) }
             composable(Routes.RECURRING) { RecurringRoute(onBack = { nav.popBackStack() }, onFind = { nav.navigate(Routes.SUBSCRIPTIONS) { launchSingleTop = true } }) }
             composable(Routes.SUBSCRIPTIONS) { app.centsible.feature.planning.SubscriptionsRoute(onBack = { nav.popBackStack() }, onOpenTransactions = { nav.go(it) }) }
+            composable(
+                Routes.ASSISTANT,
+                arguments = listOf(navArgument(app.centsible.feature.assistant.AssistantChatViewModel.ARG_CHAT) { type = NavType.StringType; defaultValue = "" }),
+            ) {
+                app.centsible.feature.assistant.AssistantChatRoute(
+                    onBack = { nav.popBackStack() },
+                    onOpenChats = { nav.navigate(Routes.ASSISTANT_CHATS) },
+                    onOpenSettings = { nav.navigate(Routes.ASSISTANT_SETTINGS) },
+                )
+            }
+            composable(Routes.ASSISTANT_CHATS) {
+                app.centsible.feature.assistant.AssistantChatsRoute(
+                    onBack = { nav.popBackStack() },
+                    // Opening a past chat replaces the one on screen.
+                    onOpen = { id -> nav.navigate(Routes.assistant(id)) { popUpTo(Routes.ASSISTANT) { inclusive = true } } },
+                )
+            }
+            composable(Routes.ASSISTANT_SETTINGS) { app.centsible.feature.assistant.AssistantSettingsRoute(onBack = { nav.popBackStack() }) }
             composable(Routes.TRENDS) { app.centsible.feature.reports.TrendsRoute(onBack = { nav.popBackStack() }, onOpenTransactions = { nav.go(it) }) }
             composable(Routes.NET_WORTH) { app.centsible.feature.reports.NetWorthRoute(onBack = { nav.popBackStack() }) }
             composable(
@@ -445,6 +471,7 @@ private fun NavHostController.open(link: app.centsible.core.domain.AppLink) {
             LinkScreen.NetWorth -> go(Destination.NetWorth)
             LinkScreen.Recurring -> go(Destination.Recurring)
             LinkScreen.Trends -> go(Destination.Trends)
+            LinkScreen.Assistant -> navigate(Routes.assistant()) { launchSingleTop = true }
             LinkScreen.MoneyFlow -> go(Destination.MoneyFlow)
             LinkScreen.BankSync -> navigate(Routes.BANK_SYNC) { launchSingleTop = true }
             LinkScreen.Plaid -> navigate(Routes.PLAID) { launchSingleTop = true }

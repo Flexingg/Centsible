@@ -47,6 +47,7 @@ dependencies {
     implementation(project(":feature:settings"))
     implementation(project(":feature:planning"))
     implementation(project(":feature:reports"))
+    implementation(project(":feature:assistant"))
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)
