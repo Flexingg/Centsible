@@ -10,6 +10,7 @@ android {
 
 dependencies {
     api(project(":core:domain"))
+    api(project(":core:assistant"))
     implementation(project(":core:network"))
     implementation(project(":core:engine-bridge"))
     implementation(libs.androidx.datastore.preferences)

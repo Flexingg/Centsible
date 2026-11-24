@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Search
@@ -64,6 +65,8 @@ import java.time.LocalDate
 
 /** Swipes, multi-select, undo and the review inbox button. */
 data class TransactionsActions(
+    /** Add a transaction (the main list; Home's button opens the assistant now). */
+    val add: (() -> Unit)? = null,
     val toggleSelected: (TransactionId) -> Unit = {},
     val selectAll: () -> Unit = {},
     val clearSelection: () -> Unit = {},
@@ -88,6 +91,7 @@ fun TransactionsRoute(
     onOpen: (TransactionId) -> Unit,
     onOpenReview: () -> Unit = {},
     onBack: (() -> Unit)? = null,
+    onAdd: (() -> Unit)? = null,
     viewModel: TransactionsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -115,6 +119,7 @@ fun TransactionsRoute(
             dismissPicker = viewModel::dismissPicker,
             clearScope = viewModel::clearScope,
             openReview = onOpenReview,
+            add = onAdd,
             messageShown = viewModel::messageShown,
             back = onBack,
         ),
@@ -156,6 +161,9 @@ fun TransactionsScreen(
                     androidx.compose.material3.FilledTonalButton(onClick = actions.openReview, modifier = Modifier.semantics { contentDescription = "Review inbox, $count to review" }) {
                         Text("Review · ${if (count >= 500) "500+" else count}")
                     }
+                }
+                if (actions.back == null) actions.add?.let { add ->
+                    IconButton(onClick = add) { Icon(androidx.compose.material.icons.Icons.Rounded.Add, contentDescription = "Add transaction") }
                 }
             }
         }

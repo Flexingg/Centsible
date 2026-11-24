@@ -40,6 +40,9 @@ class EncryptedSessionStore @Inject constructor(
     @ApplicationContext private val context: Context,
     private val cache: RoomResponseCache,
     private val outbox: RoomOutbox,
+    private val assistantChats: FileConversationStore,
+    private val assistantMemory: EncryptedMemoryStore,
+    private val assistantKey: EncryptedApiKeyStore,
 ) : SessionStore {
     private val json = Json { ignoreUnknownKeys = true }
     private val crypto = KeystoreCipher("centsible.session")
@@ -64,6 +67,10 @@ class EncryptedSessionStore @Inject constructor(
         context.sessionDataStore.edit { it.remove(SESSION) }
         cache.clear() // cached budget data belongs to the session that fetched it
         outbox.clear() // queued changes can't be sent without this session's tokens
+        // The assistant's chats and notes are about this household; the key is this person's.
+        assistantChats.clear()
+        assistantMemory.clear()
+        assistantKey.clear()
     }
 
     private suspend fun write(session: Session) {
