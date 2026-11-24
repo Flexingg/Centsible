@@ -48,6 +48,7 @@ dependencies {
     implementation(project(":feature:planning"))
     implementation(project(":feature:reports"))
     implementation(project(":feature:assistant"))
+    implementation(project(":core:assistant")) // keeps a turn going in the background
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)

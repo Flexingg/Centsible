@@ -2,16 +2,43 @@ package app.centsible.core.assistant
 
 import kotlinx.coroutines.flow.Flow
 
-/** The Claude models the assistant can run on. [fallbacks]: server-side refusal fallback is available. */
-enum class AssistantModel(val id: String, val label: String, val blurb: String, val fallbacks: Boolean) {
-    Opus("claude-opus-5-5", "Claude Opus 5.5", "Deep planning and careful multi-step work. The default.", fallbacks = true),
-    Sonnet("claude-sonnet-5-5", "Claude Sonnet 5.5", "Quick and capable, for everyday questions. Costs about half as much.", fallbacks = true),
-    Haiku("claude-haiku-5-5", "Claude Haiku 5.5", "Fastest and cheapest, for simple lookups.", fallbacks = false),
-    Fable("claude-fable-5-2", "Claude Fable 5.2", "Anthropic's most capable model, for the hardest planning. Costs about twice Opus.", fallbacks = true),
+/**
+ * The Claude models the assistant can run on. [fallbacks]: server-side refusal fallback is
+ * available. Prices are Anthropic's list prices in dollars per million tokens, for the cost
+ * estimate in the chat (the bill is whatever Anthropic charges).
+ */
+enum class AssistantModel(
+    val id: String,
+    val label: String,
+    val blurb: String,
+    val fallbacks: Boolean,
+    val inputPerM: Double,
+    val outputPerM: Double,
+    val cacheReadPerM: Double,
+    /** Prompts longer than this many tokens cost [longMultiplier] times as much (Haiku). */
+    val longPromptOver: Long = Long.MAX_VALUE,
+    val longMultiplier: Double = 1.0,
+) {
+    Opus("claude-opus-5-5", "Claude Opus 5.5", "Deep planning and careful multi-step work. The default.", fallbacks = true, 4.0, 20.0, 0.20),
+    Sonnet("claude-sonnet-5-5", "Claude Sonnet 5.5", "Quick and capable, for everyday questions. Costs about half as much.", fallbacks = true, 2.0, 10.0, 0.10),
+    Haiku("claude-haiku-5-5", "Claude Haiku 5.5", "Fastest and cheapest, for simple lookups.", fallbacks = false, 0.10, 0.50, 0.01, longPromptOver = 100_000, longMultiplier = 5.0),
+    Fable("claude-fable-5-2", "Claude Fable 5.2", "Anthropic's most capable model, for the hardest planning. Costs about twice Opus.", fallbacks = true, 8.0, 40.0, 0.20),
     ;
+
+    /**
+     * What one request cost, in dollars: writing the cache costs 1.25 times input (five-minute
+     * cache), reading it a fraction; a web search is a cent.
+     */
+    fun cost(input: Long, output: Long, cacheRead: Long, cacheWrite: Long, webSearches: Long = 0): Double {
+        val m = if (input + cacheRead + cacheWrite > longPromptOver) longMultiplier else 1.0
+        val tokens = input * inputPerM + output * outputPerM + cacheRead * cacheReadPerM + cacheWrite * inputPerM * 1.25
+        return tokens * m / 1_000_000.0 + webSearches * 0.01
+    }
 
     companion object {
         fun of(id: String?) = entries.firstOrNull { it.id == id } ?: Opus
+        /** The model that answered (a refusal fallback can answer on another one); null when it's none of these. */
+        fun served(id: String?) = entries.firstOrNull { id != null && (id == it.id || id.startsWith(it.id + "-")) }
     }
 }
 

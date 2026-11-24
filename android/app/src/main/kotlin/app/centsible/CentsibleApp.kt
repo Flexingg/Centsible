@@ -178,7 +178,10 @@ private fun MainScaffold(
             OPEN_RECURRING -> nav.navigate(Routes.RECURRING) { launchSingleTop = true }
             OPEN_INSIGHTS -> nav.navigate(Routes.TRENDS) { launchSingleTop = true }
             // "review:<period>:<first day>" from a review notification.
-            else -> if (openScreen?.startsWith("review:") == true) {
+            else -> if (openScreen?.startsWith("assistant:") == true) {
+                // From an assistant notification: that chat.
+                nav.navigate(Routes.assistant(openScreen.removePrefix("assistant:")))
+            } else if (openScreen?.startsWith("review:") == true) {
                 val (_, period, date) = openScreen.split(':') + listOf("", "")
                 nav.navigate(Routes.review(period, date)) { launchSingleTop = true }
             } else if (openScreen != null) {

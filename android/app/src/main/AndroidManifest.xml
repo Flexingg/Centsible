@@ -3,6 +3,9 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Lets the assistant finish a reply after you leave the app. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
     <uses-permission android:name="android.permission.VIBRATE" />
     <!-- In-app updates: hands the downloaded APK to Android's installer (asks once). -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
@@ -106,6 +109,10 @@
         </receiver>
 
         <!-- Quick Settings tiles -->
+        <service
+            android:name=".AssistantWorkService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
         <service
             android:name=".glance.AddTransactionTileService"
             android:exported="true"

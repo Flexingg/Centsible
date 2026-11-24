@@ -50,7 +50,20 @@ class Names(private val engine: BudgetEngine, private val planAhead: PlanAheadGa
 
     fun invalidate() {
         cached = null
+        labelCache = null
     }
+
+    private var labelCache: Map<String, String>? = null
+
+    /** Every id this budget knows (lower-cased) and the name to show for it, for [Readable.humanize]. */
+    suspend fun labels(): Map<String, String> = labelCache ?: get().let { s ->
+        buildMap {
+            s.groups.forEach { g -> put(g.id.raw.lowercase(), g.name) }
+            s.groups.flatMap { it.categories }.forEach { c -> put(c.id.raw.lowercase(), s.tree.pathLabel(c.id).ifEmpty { c.name }) }
+            s.payees.forEach { p -> put(p.id.raw.lowercase(), p.name) }
+            s.accounts.forEach { a -> put(a.id.raw.lowercase(), a.name) }
+        }
+    }.also { labelCache = it }
 
     suspend fun account(id: AccountId?): String? = id?.let { get().accountById[it]?.name }
     suspend fun payee(id: PayeeId?): String? = id?.let { get().payeeById[it]?.name }

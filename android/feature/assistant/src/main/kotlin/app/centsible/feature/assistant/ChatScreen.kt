@@ -139,6 +139,62 @@ private fun rows(items: List<ChatItem>): List<Row> {
     return out
 }
 
+/** "≈ $0.042" for this chat so far; tap for the tokens behind it. */
+@Composable
+private fun CostChip(usage: app.centsible.core.assistant.TokenUsage, model: AssistantModel) {
+    val colors = CentsibleTheme.colors
+    var open by remember { mutableStateOf(false) }
+    val cost = usage.estimate(model)
+    Text(
+        "· ≈ ${dollars(cost)}",
+        style = MaterialTheme.typography.labelSmall,
+        color = colors.textTertiary,
+        maxLines = 1,
+        modifier = Modifier
+            .padding(start = 4.dp)
+            .clip(RoundedCornerShape(6.dp))
+            .clickable(onClickLabel = "Show what this chat cost") { open = true },
+    )
+    if (open) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { open = false },
+            title = { Text("This chat so far") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text("≈ ${dollars(cost)}", style = MaterialTheme.typography.headlineSmall)
+                    UsageRow("Prompt", usage.input)
+                    UsageRow("Reused from cache", usage.cacheRead)
+                    UsageRow("Saved to cache", usage.cacheWrite)
+                    UsageRow("Written by Claude (with thinking)", usage.output)
+                    if (usage.webSearches > 0) Text("${usage.webSearches} web searches", style = MaterialTheme.typography.bodyMedium)
+                    Text(
+                        "An estimate at Anthropic's list prices for the model that answered each message. Code runs and taxes aren't included; your Anthropic bill is what counts.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = colors.textSecondary,
+                        modifier = Modifier.padding(top = 6.dp),
+                    )
+                }
+            },
+            confirmButton = { TextButton(onClick = { open = false }) { Text("OK") } },
+        )
+    }
+}
+
+@Composable
+private fun UsageRow(label: String, tokens: Long) {
+    Row(Modifier.fillMaxWidth()) {
+        Text(label, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+        Text("%,d tokens".format(tokens), style = MaterialTheme.typography.bodyMedium.copy(fontFeatureSettings = "tnum"), color = CentsibleTheme.colors.textSecondary)
+    }
+}
+
+/** Under a dollar: tenths of a cent matter ($0.042); a chat this cheap shows "< $0.001". */
+internal fun dollars(d: Double): String = when {
+    d < 0.001 -> "< $0.001"
+    d < 1.0 -> "$" + "%.3f".format(d)
+    else -> "$" + "%,.2f".format(d)
+}
+
 /** "Claude Opus 5.5 · read only ▾": the chat's model, tap to switch it for this chat. */
 @Composable
 private fun ModelPicker(model: AssistantModel, access: String, enabled: Boolean, default: AssistantModel, onPick: (AssistantModel) -> Unit) {
@@ -217,13 +273,18 @@ fun AssistantChatScreen(state: ChatUiState, actions: ChatActions) {
                 IconButton(onClick = actions.back) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Back") }
                 Column(Modifier.weight(1f)) {
                     Text(state.title ?: "Assistant", style = MaterialTheme.typography.titleLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    ModelPicker(
-                        state.model,
-                        if (state.settings.writable.isEmpty() || !state.canWrite) "read only" else "can propose changes",
-                        enabled = !state.live.running,
-                        default = state.settings.model,
-                        onPick = actions.model,
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(Modifier.weight(1f, fill = false)) {
+                            ModelPicker(
+                                state.model,
+                                if (state.settings.writable.isEmpty() || !state.canWrite) "read only" else "can propose changes",
+                                enabled = !state.live.running,
+                                default = state.settings.model,
+                                onPick = actions.model,
+                            )
+                        }
+                        if (state.usage.tokens > 0) CostChip(state.usage, state.model)
+                    }
                 }
                 IconButton(onClick = actions.newChat) { Icon(Icons.Rounded.EditNote, contentDescription = "New chat") }
                 IconButton(onClick = actions.openChats) { Icon(Icons.Rounded.History, contentDescription = "Past chats") }
