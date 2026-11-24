@@ -29,6 +29,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.Send
+import androidx.compose.material.icons.rounded.ArrowDropDown
 import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.ErrorOutline
@@ -43,6 +44,8 @@ import androidx.compose.material.icons.rounded.Undo
 import androidx.compose.material.icons.rounded.EditNote
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -50,6 +53,7 @@ import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -63,6 +67,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
@@ -71,6 +76,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import app.centsible.core.assistant.AssistantModel
 import app.centsible.core.assistant.ChangeStatus
 import app.centsible.core.assistant.ChatItem
 import app.centsible.core.assistant.LiveBlock
@@ -101,6 +107,7 @@ fun AssistantChatRoute(onBack: () -> Unit, onOpenChats: () -> Unit, onOpenSettin
             openChats = onOpenChats,
             openSettings = onOpenSettings,
             back = onBack,
+            model = viewModel::model,
         ),
     )
 }
@@ -132,6 +139,57 @@ private fun rows(items: List<ChatItem>): List<Row> {
     return out
 }
 
+/** "Claude Opus 5.5 · read only ▾": the chat's model, tap to switch it for this chat. */
+@Composable
+private fun ModelPicker(model: AssistantModel, access: String, enabled: Boolean, default: AssistantModel, onPick: (AssistantModel) -> Unit) {
+    val colors = CentsibleTheme.colors
+    var open by remember { mutableStateOf(false) }
+    Box {
+        Row(
+            Modifier
+                .clip(RoundedCornerShape(6.dp))
+                .clickable(enabled = enabled, onClickLabel = "Change model") { open = true },
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                "${model.label} · $access",
+                style = MaterialTheme.typography.labelSmall,
+                color = colors.textTertiary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f, fill = false),
+            )
+            Icon(Icons.Rounded.ArrowDropDown, contentDescription = null, tint = colors.textTertiary, modifier = Modifier.size(16.dp))
+        }
+        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            Text(
+                "Model for this chat",
+                style = MaterialTheme.typography.labelMedium,
+                color = colors.textTertiary,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
+            )
+            AssistantModel.entries.forEach { m ->
+                DropdownMenuItem(
+                    text = {
+                        Column {
+                            Text(m.label + if (m == default) " (default)" else "", style = MaterialTheme.typography.bodyLarge)
+                            Text(m.blurb, style = MaterialTheme.typography.bodySmall, color = colors.textSecondary)
+                        }
+                    },
+                    leadingIcon = { RadioButton(selected = m == model, onClick = null) },
+                    onClick = { open = false; onPick(m) },
+                )
+            }
+            Text(
+                "The default for new chats is in settings.",
+                style = MaterialTheme.typography.bodySmall,
+                color = colors.textTertiary,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
+            )
+        }
+    }
+}
+
 val SUGGESTIONS = listOf(
     "How am I doing this month?",
     "Where could I cut back?",
@@ -159,10 +217,12 @@ fun AssistantChatScreen(state: ChatUiState, actions: ChatActions) {
                 IconButton(onClick = actions.back) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Back") }
                 Column(Modifier.weight(1f)) {
                     Text(state.title ?: "Assistant", style = MaterialTheme.typography.titleLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text(
-                        "${state.settings.model.label} · " + if (state.settings.writable.isEmpty() || !state.canWrite) "read only" else "can propose changes",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = colors.textTertiary,
+                    ModelPicker(
+                        state.model,
+                        if (state.settings.writable.isEmpty() || !state.canWrite) "read only" else "can propose changes",
+                        enabled = !state.live.running,
+                        default = state.settings.model,
+                        onPick = actions.model,
                     )
                 }
                 IconButton(onClick = actions.newChat) { Icon(Icons.Rounded.EditNote, contentDescription = "New chat") }

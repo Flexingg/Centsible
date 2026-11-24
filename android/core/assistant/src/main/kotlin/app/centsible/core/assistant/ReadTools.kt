@@ -445,11 +445,11 @@ internal fun ToolsBuilder.readTools(gw: Gateways) {
 
     read(
         "get_review_inbox",
-        "Transactions waiting in this person's review inbox (new since they last caught up, plus anything uncategorized).",
+        "Transactions waiting in this person's review inbox. What it holds is their choice (mode): uncategorized (needs a category; the default), uncleared (not yet cleared), or new (added since they last caught up, plus anything uncategorized).",
         schema { integer("limit", "How many (default 50).", min = 1, max = 200) },
     ) { a, ctx ->
         val r = gw.transactions.inbox(ctx.budget, a.optInt("limit") ?: 50)
-        j("total" to r.total, "more" to r.more.takeIf { it }, "since" to r.since, "transactions" to r.items.map { ctx.names.encode(it) })
+        j("mode" to r.mode.wire, "total" to r.total, "more" to r.more.takeIf { it }, "since" to r.since, "transactions" to r.items.map { ctx.names.encode(it) })
     }
 
     read(

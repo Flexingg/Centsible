@@ -82,6 +82,16 @@ Groups are the top level and their categories the second; any category can hold 
 
 Actual itself has two levels, so the bridge keeps the parent links (in its own store, per budget). In Actual's own app, sub-categories show as ordinary categories in their group: budgets, rules and sync are untouched.
 
+## The review inbox
+
+Review shows each person their own inbox, as a stack of cards. Tap the line under the title to choose what it holds:
+
+- **Uncategorized** (the default): transactions that still need a category. Each one leaves when it gets a category.
+- **Uncleared**: everything not yet cleared, to check against the bank. "Cleared" clears it.
+- **New since I caught up**: every new transaction plus anything uncategorized, until you've reviewed it (the old behavior). "Mark all reviewed" lives here.
+
+The choice is kept on the bridge, so the review counts on Home, the widgets, the tiles and Home Assistant all follow it.
+
 ## The assistant (bring your own Claude key)
 
 The round button at the bottom of every tab opens the assistant: a financial planner that works with your real budget. Ask how the month is going, where you could cut back, whether you can afford something, how fast a card or loan gets paid off, or to plan next month's budget.
@@ -89,7 +99,7 @@ The round button at the bottom of every tab opens the assistant: a financial pla
 - **Your own key.** It runs on Claude through your own Anthropic API key (create one at [console.anthropic.com](https://console.anthropic.com) → API keys) and add it in the assistant's settings. You pay Anthropic directly for what it uses. The key is encrypted with this phone's Keystore and is sent only to Anthropic. Each person in the household uses their own.
 - **It reads everything** the app can show, except bank sync: accounts, transactions, the budget and its categories (every level), recurring bills, subscriptions, goals and targets, yearly budgets, budget automations, rules, merchants, tags, reports (cash flow, spending, money flow, net worth, daily spending), insights, period reviews, the forecast, income and pay stubs, mortgages, the review inbox, transfers and duplicates, and the household and server status.
 - **It changes nothing unless you let it.** Read-only by default. In settings, under **Permissions**, turn on what it may change: transactions, budget amounts, categories, rules/merchants/tags, recurring bills, goals and plans, or accounts. Even then, every change shows as a card in the chat with exactly what will change, and only happens when you tap **Approve**. Most changes can be undone from the card. A viewer in the household can't change anything through it.
-- **Model and depth.** Claude Opus 5.5 by default; Sonnet 5.5, Haiku 5.5 or Fable 5.2 can be picked instead, along with how hard it thinks. It can run calculations (projections, amortization) in Anthropic's sandbox, and optionally search the web (off by default).
+- **Model and depth.** Pick the default model for new chats in the assistant's settings: Claude Opus 5.5 (the default), Sonnet 5.5, Haiku 5.5 or Fable 5.2, along with how hard it thinks. Any chat can switch model from its header; the switch applies from its next turn. It can run calculations (projections, amortization) in Anthropic's sandbox, and optionally search the web (off by default).
 - **Memory and history.** It can keep short notes between chats (your goals, when you're paid), which you can see and delete in settings. Chats are kept encrypted on the phone. Signing out removes the key, chats and notes.
 
 What you ask, and the budget data the assistant reads to answer, are sent to Anthropic under your API account's terms. Link: `centsible://open/assistant`.

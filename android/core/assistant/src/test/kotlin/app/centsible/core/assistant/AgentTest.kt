@@ -154,6 +154,29 @@ class AgentTest {
         assertEquals("Thanks", (Transcript.items(store.get(id)!!).filterIsInstance<ChatItem.User>().last()).text)
     }
 
+    @Test fun `a chat can start on another model and switch, keeping its history`() = run {
+        settings.state.value = AssistantSettings(model = AssistantModel.Opus)
+        reply(sse(Block.Thinking("Simple."), Block.Text("Hi!")))
+        val id = agent.send(null, "Hello", AssistantModel.Haiku)
+        agent.awaitIdle(id)
+        assertEquals("claude-haiku-5-5", server.takeRequest().json()["model"]!!.jsonPrimitive.content)
+        assertEquals(AssistantModel.Haiku.id, store.get(id)!!.model)
+
+        agent.setModel(id, AssistantModel.Sonnet).join()
+        reply(sse(Block.Text("Sure.")))
+        agent.send(id, "Now plan my month")
+        agent.awaitIdle(id)
+        val body = server.takeRequest().json()
+        assertEquals("claude-sonnet-5-5", body["model"]!!.jsonPrimitive.content)
+        // The earlier thinking goes back as it was; the API skips what the new model can't read.
+        assertTrue(body.messages().any { m -> m.blocks().any { it["type"]?.jsonPrimitive?.content == "thinking" } })
+        // A new chat with no pick starts on the default.
+        reply(sse(Block.Text("Hello again.")))
+        val other = agent.send(null, "Hi")
+        agent.awaitIdle(other)
+        assertEquals("claude-opus-5-5", server.takeRequest().json()["model"]!!.jsonPrimitive.content)
+    }
+
     private suspend fun budgeted(id: CategoryId) = engine.budgetMonth(SampleHousehold.budget.id, SampleHousehold.month).groups.flatMap { it.categories }.first { it.id == id }.budgeted
 
     @Test fun `with the permission off, Claude is told which one to turn on, and nothing changes`() = run {

@@ -947,7 +947,7 @@ paths:
     get:
       tags: [budgets]
       operationId: getReviewInbox
-      summary: "This person's review inbox: transactions added since they last caught up, plus anything uncategorized, minus what they've reviewed. Each person has their own; your own entries and edits count as reviewed."
+      summary: "This person's review inbox, by their review mode (see /review/settings): uncategorized (the default) or uncleared transactions, which leave as they get a category or are cleared; or `new`, transactions added since they last caught up plus anything uncategorized, minus what they've reviewed (your own entries and edits count as reviewed)."
       parameters:
         - $ref: '#/components/parameters/BudgetId'
         - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 200, default: 50 } }
@@ -960,7 +960,7 @@ paths:
     post:
       tags: [budgets]
       operationId: markReviewed
-      summary: Mark transactions reviewed, or everything (`all`, which also moves the watermark to now).
+      summary: Mark transactions reviewed, or everything (`all`, which also moves the watermark to now). Marks only count in the `new` mode.
       parameters:
         - $ref: '#/components/parameters/BudgetId'
       requestBody:
@@ -978,6 +978,38 @@ paths:
           content:
             application/json:
               schema: { type: object, required: [remaining], properties: { remaining: { type: integer } } }
+
+  /v1/budgets/{budgetId}/review/settings:
+    get:
+      tags: [budgets]
+      operationId: getReviewSettings
+      summary: What this person's review inbox shows.
+      parameters:
+        - $ref: '#/components/parameters/BudgetId'
+      responses:
+        '200':
+          description: Settings
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ReviewSettings' }
+    put:
+      tags: [budgets]
+      operationId: setReviewSettings
+      summary: Choose what this person's review inbox shows. Anyone may, viewers included; it's only their own inbox.
+      parameters:
+        - $ref: '#/components/parameters/BudgetId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ReviewSettings' }
+      responses:
+        '200':
+          description: Saved
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ReviewSettings' }
+        '400': { $ref: '#/components/responses/Problem' }
 
   /v1/budgets/{budgetId}/transactions/duplicates:
     get:
@@ -4008,10 +4040,23 @@ components:
         color: { type: [string, 'null'], description: '#RRGGBB' }
         emoji: { type: [string, 'null'] }
 
+    ReviewMode:
+      type: string
+      enum: [uncategorized, uncleared, new]
+      description: "uncategorized: on-budget transactions waiting for a category. uncleared: not yet cleared. new: added since you last caught up, plus anything uncategorized."
+
+    ReviewSettings:
+      type: object
+      required: [mode]
+      additionalProperties: false
+      properties:
+        mode: { $ref: '#/components/schemas/ReviewMode' }
+
     ReviewInbox:
       type: object
-      required: [items, total, more, since]
+      required: [mode, items, total, more, since]
       properties:
+        mode: { $ref: '#/components/schemas/ReviewMode' }
         items:
           type: array
           items: { $ref: '#/components/schemas/Transaction' }

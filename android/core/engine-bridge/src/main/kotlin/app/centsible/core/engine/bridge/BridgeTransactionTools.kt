@@ -5,10 +5,12 @@ import app.centsible.core.model.BatchChange
 import app.centsible.core.model.BatchResult
 import app.centsible.core.model.BudgetId
 import app.centsible.core.model.ReviewInbox
+import app.centsible.core.model.ReviewMode
 import app.centsible.core.model.TransactionId
 import app.centsible.core.model.TransferMatches
 import app.centsible.core.model.TransferPair
 import app.centsible.core.network.ReviewMarkDto
+import app.centsible.core.network.ReviewSettingsDto
 import app.centsible.core.network.TransferPairRequestDto
 import app.centsible.core.network.TransferSettingsDto
 import app.centsible.core.network.TransactionToolsApi
@@ -22,13 +24,20 @@ import kotlinx.serialization.json.putJsonObject
 class BridgeTransactionTools(private val api: TransactionToolsApi, private val onWrite: () -> Unit) : TransactionTools {
     override suspend fun inbox(budget: BudgetId, limit: Int): ReviewInbox {
         val d = api.inbox(budget.raw, limit)
-        return ReviewInbox(d.items.map { it.toModel() }, d.total, d.more, d.since)
+        return ReviewInbox(d.items.map { it.toModel() }, d.total, d.more, d.since, ReviewMode.of(d.mode))
     }
 
     override suspend fun markReviewed(budget: BudgetId, ids: List<TransactionId>) =
         api.mark(budget.raw, ReviewMarkDto(ids = ids.map { it.raw })).remaining
 
     override suspend fun reviewAll(budget: BudgetId) = api.mark(budget.raw, ReviewMarkDto(all = true)).remaining
+
+    override suspend fun setReviewMode(budget: BudgetId, mode: ReviewMode): ReviewMode {
+        val saved = ReviewMode.of(api.setReviewSettings(budget.raw, ReviewSettingsDto(mode.wire)).mode)
+        // Counts on Home, the widgets and the tiles follow the mode.
+        onWrite()
+        return saved
+    }
 
     override suspend fun batch(budget: BudgetId, ids: List<TransactionId>, change: BatchChange): BatchResult {
         val body = buildJsonObject {

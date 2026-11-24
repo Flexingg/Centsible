@@ -51,8 +51,19 @@ class BridgeTransactionToolsTest {
         assertEquals(1, inbox.items.size)
         assertEquals(inbox.items.size, inbox.total)
         assertEquals("After Catch Up", inbox.items[0].payeeName)
+        assertEquals(app.centsible.core.model.ReviewMode.New, inbox.mode)
         assertEquals("/v1/budgets/b/review", requests.single().url.encodedPath)
         assertEquals("20", requests.single().url.parameters["limit"])
+    }
+
+    @Test
+    fun `sets the review mode and reloads counts`() = runTest {
+        val saved = tools { fixture("review-settings").replace("uncategorized", "uncleared") }.setReviewMode(BudgetId("b"), app.centsible.core.model.ReviewMode.Uncleared)
+        assertEquals(app.centsible.core.model.ReviewMode.Uncleared, saved)
+        assertEquals("/v1/budgets/b/review/settings", requests.single().url.encodedPath)
+        assertEquals("PUT", requests.single().method.value)
+        assertEquals("\"uncleared\"", body(requests.single())["mode"].toString())
+        assertEquals(1, writes)
     }
 
     @Test

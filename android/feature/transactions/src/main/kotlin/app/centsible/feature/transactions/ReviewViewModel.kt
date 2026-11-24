@@ -10,6 +10,7 @@ import app.centsible.core.domain.userMessage
 import app.centsible.core.model.BatchChange
 import app.centsible.core.model.CategoryId
 import app.centsible.core.model.PayeeId
+import app.centsible.core.model.ReviewMode
 import app.centsible.core.model.Transaction
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
@@ -33,6 +34,8 @@ data class ReviewData(
     val categories: List<CategoryChoice>,
     /** Reviewed on this visit, for the progress line. */
     val done: Int = 0,
+    /** What this inbox holds (this person's choice). */
+    val mode: ReviewMode = ReviewMode.Uncategorized,
 )
 
 data class ReviewUiState(
@@ -53,7 +56,7 @@ data class ReviewUiState(
 
 data class RulePrompt(val payeeId: PayeeId, val payeeName: String, val categoryId: CategoryId, val categoryName: String?)
 
-/** The review inbox: new and uncategorized transactions as a stack of cards. */
+/** The review inbox as a stack of cards: what's uncategorized, uncleared or new, as this person chose. */
 @HiltViewModel
 class ReviewViewModel @Inject constructor(
     private val engine: BudgetEngine,
@@ -91,6 +94,7 @@ class ReviewViewModel @Inject constructor(
             total = i.total,
             more = i.more,
             since = i.since,
+            mode = i.mode,
             categoryNames = g.flatMap { it.categories }.associate { it.id.raw to it.name },
             accountNames = accounts.await().associate { it.id.raw to it.name },
             categories = g.filter { !it.hidden }.flatMap { grp -> grp.categories.filter { !it.hidden }.map { CategoryChoice(it.id, it.name, grp.name) } },
@@ -144,8 +148,12 @@ class ReviewViewModel @Inject constructor(
                     t.payeeId == payee && t.categoryId != null && (t.id !in was || was[t.id] != t.categoryId)
                 }
                 if (filed.isNotEmpty()) tools.markReviewed(selectedBudget(), filed.map { it.id })
+                // In the uncategorized inbox, what the rule filed has simply left.
+                val stillThere = fresh.queue.map { it.id }.toSet()
+                val gone = if (fresh.mode == ReviewMode.Uncategorized) before.queue.count { it.payeeId == payee && it.categoryId == null && it.id !in stillThere } else 0
                 val ids = filed.map { it.id }.toSet()
-                fresh.copy(queue = fresh.queue.filter { it.id !in ids }, done = before.done + filed.size, total = fresh.total + before.done) to filed.size
+                val n = filed.size + gone
+                fresh.copy(queue = fresh.queue.filter { it.id !in ids }, done = before.done + n, total = fresh.total + before.done + gone) to n
             }
                 .onSuccess { (d, n) ->
                     val who = name ?: "that merchant"
@@ -158,8 +166,20 @@ class ReviewViewModel @Inject constructor(
     /** Needs a category before it can be approved (on-budget, not a transfer or split). */
     fun needsCategory(t: Transaction) = t.categoryId == null && !t.isTransfer && !t.isParent
 
-    /** "Looks right": reviewed as it is. Asks for a category first when it has none. */
+    private val mode get() = state.value.data.valueOrNull?.mode ?: ReviewMode.Uncategorized
+
+    /**
+     * The main action. Uncleared: it matches the bank, so it's cleared. Otherwise "looks
+     * right": reviewed as it is, asking for a category first when it has none.
+     */
     fun approve(t: Transaction) {
+        if (mode == ReviewMode.Uncleared) {
+            pop(t)
+            viewModelScope.launch {
+                runCatching { tools.batch(selectedBudget(), listOf(t.id), BatchChange.Cleared(true)) }.onFailure { e -> restore(t, e) }
+            }
+            return
+        }
         if (needsCategory(t)) {
             state.update { it.copy(categorizing = t) }
             return
@@ -167,6 +187,17 @@ class ReviewViewModel @Inject constructor(
         pop(t)
         viewModelScope.launch {
             runCatching { tools.markReviewed(selectedBudget(), listOf(t.id)) }.onFailure { e -> restore(t, e) }
+        }
+    }
+
+    /** Switches what the inbox shows (just for this person), then starts over with it. */
+    fun setMode(m: ReviewMode) {
+        if (m == mode && state.value.data is Loadable.Ready) return
+        state.update { it.copy(data = Loadable.Loading) }
+        viewModelScope.launch {
+            runCatching { tools.setReviewMode(selectedBudget(), m) }
+                .onSuccess { load() }
+                .onFailure { e -> state.update { it.copy(message = e.userMessage()) }; load() }
         }
     }
 
@@ -185,6 +216,18 @@ class ReviewViewModel @Inject constructor(
             null
         }
         state.update { it.copy(categorizing = null, rulePrompt = prompt) }
+        if (mode == ReviewMode.Uncleared) {
+            // Still to be cleared: the card stays, now with its category.
+            updateData { d -> d.copy(queue = d.queue.map { if (it.id == t.id) it.copy(categoryId = category) else it }) }
+            viewModelScope.launch {
+                runCatching { tools.batch(selectedBudget(), listOf(t.id), BatchChange.Category(category)) }
+                    .onFailure { e ->
+                        updateData { d -> d.copy(queue = d.queue.map { if (it.id == t.id) t else it }) }
+                        state.update { it.copy(message = e.userMessage()) }
+                    }
+            }
+            return
+        }
         pop(t)
         viewModelScope.launch {
             runCatching {

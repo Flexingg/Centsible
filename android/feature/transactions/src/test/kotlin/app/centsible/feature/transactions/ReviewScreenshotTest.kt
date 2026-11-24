@@ -1,7 +1,10 @@
 package app.centsible.feature.transactions
 
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.performClick
+import app.centsible.core.model.ReviewMode
 import app.centsible.core.designsystem.component.Loadable
 import app.centsible.core.designsystem.theme.CentsibleTheme
 import app.centsible.core.testing.SampleHousehold
@@ -20,7 +23,7 @@ import org.robolectric.annotation.GraphicsMode
 class ReviewScreenshotTest {
     @get:Rule val compose = createComposeRule()
 
-    private fun data(queue: List<app.centsible.core.model.Transaction>, done: Int = 0) = ReviewData(
+    private fun data(queue: List<app.centsible.core.model.Transaction>, done: Int = 0, mode: ReviewMode = ReviewMode.Uncategorized) = ReviewData(
         queue = queue,
         total = queue.size + done,
         more = false,
@@ -29,17 +32,47 @@ class ReviewScreenshotTest {
         accountNames = SampleHousehold.accounts.associate { it.id.raw to it.name },
         categories = emptyList(),
         done = done,
+        mode = mode,
     )
 
     @Test fun review_stack() {
-        // An uncategorized one on top, so the card asks for a category.
-        val top = SampleHousehold.transactions.first { !it.isTransfer && !it.isParent }.copy(categoryId = null)
-        val queue = listOf(top) + SampleHousehold.transactions.filter { it.id != top.id }.take(4)
+        // The default inbox: only what still needs a category.
+        val queue = SampleHousehold.transactions.filter { !it.isTransfer && !it.isParent }.take(5).map { it.copy(categoryId = null) }
         compose.setContent {
             CentsibleTheme(darkTheme = false) { ReviewScreen(ReviewUiState(Loadable.Ready(data(queue, done = 3))), ReviewActions(), today = LocalDate.of(2026, 9, 26)) }
         }
         compose.onRoot().captureRoboImage("screenshots/review_stack.png")
         app.centsible.core.uitesting.A11y.assertOk(compose)
+    }
+
+    @Test fun review_new_stack() {
+        // "New since I caught up": an uncategorized one on top, so the card asks for a category.
+        val top = SampleHousehold.transactions.first { !it.isTransfer && !it.isParent }.copy(categoryId = null)
+        val queue = listOf(top) + SampleHousehold.transactions.filter { it.id != top.id }.take(4)
+        compose.setContent {
+            CentsibleTheme(darkTheme = false) { ReviewScreen(ReviewUiState(Loadable.Ready(data(queue, done = 3, mode = ReviewMode.New))), ReviewActions(), today = LocalDate.of(2026, 9, 26)) }
+        }
+        compose.onRoot().captureRoboImage("screenshots/review_new_stack.png")
+        app.centsible.core.uitesting.A11y.assertOk(compose)
+    }
+
+    @Test fun review_uncleared() {
+        val queue = SampleHousehold.transactions.filter { !it.isTransfer }.take(4).map { it.copy(cleared = false) }
+        compose.setContent {
+            CentsibleTheme(darkTheme = true) { ReviewScreen(ReviewUiState(Loadable.Ready(data(queue, mode = ReviewMode.Uncleared))), ReviewActions(), today = LocalDate.of(2026, 9, 26)) }
+        }
+        compose.onRoot().captureRoboImage("screenshots/review_uncleared_dark.png")
+        app.centsible.core.uitesting.A11y.assertOk(compose)
+    }
+
+    @Test fun review_mode_menu() {
+        val queue = SampleHousehold.transactions.filter { !it.isTransfer && !it.isParent }.take(3).map { it.copy(categoryId = null) }
+        compose.setContent {
+            CentsibleTheme(darkTheme = false) { ReviewScreen(ReviewUiState(Loadable.Ready(data(queue))), ReviewActions(), today = LocalDate.of(2026, 9, 26)) }
+        }
+        compose.onNodeWithText("Uncategorized · 3 to categorize").performClick()
+        compose.waitForIdle()
+        com.github.takahirom.roborazzi.captureScreenRoboImage("screenshots/review_mode_menu.png")
     }
 
     @Test fun review_rule_prompt() {
@@ -48,7 +81,7 @@ class ReviewScreenshotTest {
         val t = queue.first()
         val prompt = RulePrompt(t.payeeId!!, t.payeeName ?: "Merchant", SampleHousehold.budgetMonth.groups.first().categories.first().id, "Groceries")
         compose.setContent {
-            CentsibleTheme(darkTheme = false) { ReviewScreen(ReviewUiState(Loadable.Ready(data(queue, done = 1)), rulePrompt = prompt), ReviewActions(), today = LocalDate.of(2026, 9, 26)) }
+            CentsibleTheme(darkTheme = false) { ReviewScreen(ReviewUiState(Loadable.Ready(data(queue, done = 1, mode = ReviewMode.New)), rulePrompt = prompt), ReviewActions(), today = LocalDate.of(2026, 9, 26)) }
         }
         compose.onRoot().captureRoboImage("screenshots/review_rule_prompt.png")
         app.centsible.core.uitesting.A11y.assertOk(compose)

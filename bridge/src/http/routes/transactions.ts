@@ -1,4 +1,5 @@
 import type { FastifyPluginAsync } from 'fastify';
+import { REVIEW_MODES, type ReviewMode } from '../../actual/review-ops.js';
 import type { NewTransaction, TransactionPatch } from '../../actual/transaction-ops.js';
 import { ApiError } from '../../errors.js';
 import { audit, requireBudget, type Deps } from '../server.js';
@@ -211,6 +212,21 @@ export const transactionRoutes =
       async (req) => {
         const auth = requireBudget(deps, req, req.params.budgetId);
         return review.inbox(req.params.budgetId, auth.member.id, req.query.limit ?? 50);
+      },
+    );
+
+    app.get<{ Params: BudgetParams }>('/v1/budgets/:budgetId/review/settings', async (req) => {
+      const auth = requireBudget(deps, req, req.params.budgetId);
+      return { mode: review.mode(auth.member.id, req.params.budgetId) };
+    });
+
+    app.put<{ Params: BudgetParams; Body: { mode: ReviewMode } }>(
+      '/v1/budgets/:budgetId/review/settings',
+      { schema: { body: { type: 'object', required: ['mode'], additionalProperties: false, properties: { mode: { type: 'string', enum: [...REVIEW_MODES] } } } } },
+      async (req) => {
+        // Anyone, viewers included: it's only what their own inbox shows.
+        const auth = requireBudget(deps, req, req.params.budgetId);
+        return { mode: review.setMode(auth.member.id, req.params.budgetId, req.body.mode) };
       },
     );
 

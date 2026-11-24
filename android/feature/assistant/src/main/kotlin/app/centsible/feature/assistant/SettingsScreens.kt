@@ -163,7 +163,7 @@ fun AssistantSettingsScreen(state: AssistantSettingsUiState, actions: AssistantS
             item(key = "key") { KeySection(state, actions) }
 
             item(key = "model") {
-                Section("Model") {
+                Section("Default model") {
                     AssistantModel.entries.forEach { m ->
                         Row(
                             Modifier.fillMaxWidth().selectable(selected = state.settings.model == m, role = Role.RadioButton) { actions.model(m) }.padding(vertical = 6.dp),
@@ -177,7 +177,7 @@ fun AssistantSettingsScreen(state: AssistantSettingsUiState, actions: AssistantS
                             }
                         }
                     }
-                    Text("A chat keeps the model it started with. Changes here apply to new chats.", style = MaterialTheme.typography.bodySmall, color = colors.textTertiary, modifier = Modifier.padding(top = 4.dp))
+                    Text("New chats start on this one. To change the model of a chat, tap its name at the top of the chat.", style = MaterialTheme.typography.bodySmall, color = colors.textTertiary, modifier = Modifier.padding(top = 4.dp))
                 }
             }
 

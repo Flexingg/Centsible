@@ -37,6 +37,7 @@ class FixtureDecodingTest {
         "category-automations" to CategoryAutomationsDto.serializer(),
         "transactions-running-balance" to TransactionPageDto.serializer(),
         "review-inbox" to ReviewInboxDto.serializer(),
+        "review-settings" to ReviewSettingsDto.serializer(),
         "transaction" to TransactionDto.serializer(),
         "budget-month" to BudgetMonthDto.serializer(),
         "problem-unauthorized" to ProblemDto.serializer(),
