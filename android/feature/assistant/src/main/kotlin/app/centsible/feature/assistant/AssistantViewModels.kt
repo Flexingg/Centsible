@@ -43,6 +43,8 @@ data class ChatUiState(
     /** Null until known. */
     val hasKey: Boolean? = null,
     val settings: AssistantSettings = AssistantSettings(),
+    /** The model this chat runs on (a new chat: the default, unless picked here). */
+    val model: AssistantModel = settings.model,
     val canWrite: Boolean = true,
     val usage: TokenUsage = TokenUsage(),
     /** The last turn never got its answer (the app closed mid-turn): offer to carry on. */
@@ -66,6 +68,8 @@ data class ChatActions(
     val openChats: () -> Unit = {},
     val openSettings: () -> Unit = {},
     val back: () -> Unit = {},
+    /** This chat's model (the default for new chats is in settings). */
+    val model: (AssistantModel) -> Unit = {},
 )
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -84,9 +88,12 @@ class AssistantChatViewModel @Inject constructor(
         // Every save updates the chats list; reload this chat when it does.
         if (id == null) flowOf(null) else store.summaries.map { store.get(id) }
     }
+    /** Picked in the header before the first message of a new chat. */
+    private val pendingModel = MutableStateFlow<AssistantModel?>(null)
+
     private val live = conversationId.flatMapLatest { id -> if (id == null) flowOf(LiveTurn()) else agent.live(id) }
 
-    val uiState: StateFlow<ChatUiState> = combine(conversation, live, keys.hasKey, settings.settings, sessions.session) { conv, live, hasKey, s, session ->
+    private val base = combine(conversation, live, keys.hasKey, settings.settings, sessions.session) { conv, live, hasKey, s, session ->
         ChatUiState(
             conversationId = conv?.id,
             title = conv?.title,
@@ -98,12 +105,24 @@ class AssistantChatViewModel @Inject constructor(
             usage = conv?.usage ?: TokenUsage(),
             unanswered = conv != null && !live.running && live.error == null && !conv.awaitingApproval &&
                 conv.messages.lastOrNull { !it.context }?.role == app.centsible.core.assistant.StoredMessage.Role.User,
+            model = conv?.model?.let(AssistantModel::of) ?: s.model,
         )
+    }
+
+    val uiState: StateFlow<ChatUiState> = combine(base, pendingModel) { st, pending ->
+        if (st.conversationId == null && pending != null) st.copy(model = pending) else st
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ChatUiState())
 
     fun send(text: String) {
         if (text.isBlank()) return
-        conversationId.value = agent.send(conversationId.value, text)
+        conversationId.value = agent.send(conversationId.value, text, pendingModel.value)
+        pendingModel.value = null
+    }
+
+    /** Switches this chat's model; before the first message, picks it for the new chat. */
+    fun model(m: AssistantModel) {
+        val id = conversationId.value
+        if (id == null) pendingModel.value = m else agent.setModel(id, m)
     }
 
     private fun withId(block: (String) -> Unit) = conversationId.value?.let(block)
@@ -116,7 +135,7 @@ class AssistantChatViewModel @Inject constructor(
     fun stop() = withId { agent.stop(it) }
     fun retry() = withId { agent.retry(it) }
     fun dismissError() = withId { agent.dismissError(it) }
-    fun newChat() { conversationId.value = null }
+    fun newChat() { conversationId.value = null; pendingModel.value = null }
     fun open(id: String) { conversationId.value = id }
 
     companion object {

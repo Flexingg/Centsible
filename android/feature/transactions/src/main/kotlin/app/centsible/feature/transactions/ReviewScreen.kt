@@ -4,6 +4,7 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -18,6 +19,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.rounded.ArrowDropDown
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -27,6 +29,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -40,6 +43,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
@@ -68,6 +72,7 @@ import app.centsible.core.designsystem.motion.Motion
 import app.centsible.core.designsystem.motion.reducedMotion
 import app.centsible.core.designsystem.theme.CentsibleTheme
 import app.centsible.core.model.CategoryId
+import app.centsible.core.model.ReviewMode
 import app.centsible.core.model.Transaction
 import app.centsible.core.model.TransactionId
 import java.time.LocalDate
@@ -94,7 +99,22 @@ data class ReviewActions(
     val linkTransfer: (Transaction?) -> Unit = {},
     val transferLinked: (Transaction, TransactionId, String) -> Unit = { _, _, _ -> },
     val findDuplicates: () -> Unit = {},
+    /** What the inbox shows: uncategorized, uncleared or new. */
+    val setMode: (ReviewMode) -> Unit = {},
 )
+
+/** The main action and its swipe, worded for what the inbox holds. */
+internal val ReviewMode.primary get() = when (this) {
+    ReviewMode.Uncategorized -> "Pick category"
+    ReviewMode.Uncleared -> "Cleared"
+    ReviewMode.New -> "Looks right"
+}
+
+private fun ReviewMode.leftLabel(n: Int) = when (this) {
+    ReviewMode.Uncategorized -> "$n to categorize"
+    ReviewMode.Uncleared -> "$n to check"
+    ReviewMode.New -> "$n to go"
+}
 
 @Composable
 fun ReviewRoute(
@@ -131,6 +151,7 @@ fun ReviewRoute(
             linkTransfer = viewModel::linkTransfer,
             transferLinked = viewModel::transferLinked,
             findDuplicates = { viewModel.leaving(); onFindDuplicates() },
+            setMode = viewModel::setMode,
         ),
     )
 }
@@ -141,21 +162,20 @@ fun ReviewScreen(state: ReviewUiState, actions: ReviewActions, today: LocalDate 
     Column(Modifier.fillMaxSize().background(colors.canvas).navigationBarsPadding()) {
         var menu by remember { mutableStateOf(false) }
         Row(Modifier.fillMaxWidth().padding(start = 4.dp, end = 4.dp, top = 16.dp), verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = actions.back) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Back") }
+            IconButton(onClick = actions.back) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Back", tint = colors.textPrimary) }
             Column(Modifier.weight(1f)) {
-                Text("Review", style = MaterialTheme.typography.headlineMedium)
-                val left = state.left
-                if (state.data is Loadable.Ready && left > 0) {
-                    Text("$left to go", style = MaterialTheme.typography.bodyMedium, color = colors.textSecondary)
-                }
+                Text("Review", style = MaterialTheme.typography.headlineMedium, color = colors.textPrimary)
+                (state.data as? Loadable.Ready)?.value?.let { d -> ModePicker(d.mode, state.left, actions.setMode) }
             }
             if (state.data is Loadable.Ready) {
                 Box {
-                    IconButton(onClick = { menu = true }) { Icon(Icons.Rounded.MoreVert, contentDescription = "More") }
+                    IconButton(onClick = { menu = true }) { Icon(Icons.Rounded.MoreVert, contentDescription = "More", tint = colors.textPrimary) }
                     DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
                         DropdownMenuItem(text = { Text("Match transfers") }, onClick = { menu = false; actions.matchTransfers() })
                         DropdownMenuItem(text = { Text("Find duplicates") }, onClick = { menu = false; actions.findDuplicates() })
-                        if (state.left > 0) DropdownMenuItem(text = { Text("Mark all reviewed") }, onClick = { menu = false; actions.askReviewAll(true) })
+                        // The other inboxes empty as the work gets done; only "new" can be caught up on.
+                        val catchUp = (state.data as? Loadable.Ready)?.value?.mode == ReviewMode.New
+                        if (catchUp && state.left > 0) DropdownMenuItem(text = { Text("Mark all reviewed") }, onClick = { menu = false; actions.askReviewAll(true) })
                     }
                 }
             }
@@ -181,7 +201,7 @@ fun ReviewScreen(state: ReviewUiState, actions: ReviewActions, today: LocalDate 
             is Loadable.Ready -> {
                 val d = data.value
                 if (d.queue.isEmpty()) {
-                    CaughtUp(d.done)
+                    CaughtUp(d.done, d.mode)
                     return@Column
                 }
                 // Progress through this visit.
@@ -206,11 +226,18 @@ fun ReviewScreen(state: ReviewUiState, actions: ReviewActions, today: LocalDate 
                 val top = d.queue.first()
                 Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     OutlinedButton(onClick = { actions.later(top) }, modifier = Modifier.weight(1f)) { Text("Later") }
-                    OutlinedButton(onClick = { actions.changeCategory(top) }, modifier = Modifier.weight(1.2f)) { Text("Category") }
-                    Button(onClick = { actions.approve(top) }, modifier = Modifier.weight(1.4f)) { Text("Looks right") }
+                    // Everything here needs a category, so picking one is the main action.
+                    if (d.mode != ReviewMode.Uncategorized) {
+                        OutlinedButton(onClick = { actions.changeCategory(top) }, modifier = Modifier.weight(1.2f)) { Text("Category") }
+                    }
+                    Button(onClick = { actions.approve(top) }, modifier = Modifier.weight(if (d.mode == ReviewMode.Uncategorized) 2f else 1.4f)) { Text(d.mode.primary) }
                 }
                 Text(
-                    "Swipe right when it looks right, left for later.",
+                    when (d.mode) {
+                        ReviewMode.Uncategorized -> "Swipe right to pick a category, left for later."
+                        ReviewMode.Uncleared -> "Swipe right when it matches your bank, left for later."
+                        ReviewMode.New -> "Swipe right when it looks right, left for later."
+                    },
                     style = MaterialTheme.typography.bodySmall,
                     color = colors.textTertiary,
                     textAlign = TextAlign.Center,
@@ -308,7 +335,7 @@ private fun ReviewCard(t: Transaction, d: ReviewData, depth: Int, today: LocalDa
                         }
                         .semantics {
                             customActions = listOf(
-                                CustomAccessibilityAction("Looks right") { actions.approve(t); true },
+                                CustomAccessibilityAction(d.mode.primary) { actions.approve(t); true },
                                 CustomAccessibilityAction("Later") { actions.later(t); true },
                                 CustomAccessibilityAction("Change category") { actions.changeCategory(t); true },
                                 CustomAccessibilityAction("Open") { actions.open(t.id); true },
@@ -362,7 +389,7 @@ private fun ReviewCard(t: Transaction, d: ReviewData, depth: Int, today: LocalDa
                 val right = offset.value > 0
                 val strength = (abs(offset.value) / threshold).coerceIn(0f, 1f)
                 Text(
-                    if (right) "LOOKS RIGHT" else "LATER",
+                    if (right) d.mode.primary.uppercase() else "LATER",
                     style = MaterialTheme.typography.labelLarge,
                     color = if (right) colors.positive else colors.warning,
                     modifier = Modifier
@@ -385,16 +412,70 @@ private fun Chip(text: String, background: androidx.compose.ui.graphics.Color, c
     )
 }
 
+/** "Uncategorized · 12 to categorize ▾": what this inbox holds, and the way to change it. */
 @Composable
-private fun CaughtUp(done: Int) {
+private fun ModePicker(mode: ReviewMode, left: Int, onPick: (ReviewMode) -> Unit) {
+    val colors = CentsibleTheme.colors
+    var open by remember { mutableStateOf(false) }
+    Box {
+        Row(
+            Modifier
+                .clip(RoundedCornerShape(8.dp))
+                .clickable(onClickLabel = "Choose what to review") { open = true }
+                .padding(vertical = 2.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                listOfNotNull(mode.label, left.takeIf { it > 0 }?.let(mode::leftLabel)).joinToString(" · "),
+                style = MaterialTheme.typography.bodyMedium,
+                color = colors.textSecondary,
+            )
+            Icon(Icons.Rounded.ArrowDropDown, contentDescription = null, tint = colors.textSecondary)
+        }
+        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            Text(
+                "Show in Review",
+                style = MaterialTheme.typography.labelMedium,
+                color = colors.textTertiary,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
+            )
+            ReviewMode.entries.forEach { m ->
+                DropdownMenuItem(
+                    text = {
+                        Column {
+                            Text(m.label, style = MaterialTheme.typography.bodyLarge)
+                            Text(m.blurb, style = MaterialTheme.typography.bodySmall, color = colors.textSecondary)
+                        }
+                    },
+                    leadingIcon = { RadioButton(selected = m == mode, onClick = null) },
+                    onClick = { open = false; onPick(m) },
+                )
+            }
+            Text(
+                "Just for you. Counts on Home and widgets follow it.",
+                style = MaterialTheme.typography.bodySmall,
+                color = colors.textTertiary,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun CaughtUp(done: Int, mode: ReviewMode) {
     val colors = CentsibleTheme.colors
     Column(Modifier.fillMaxSize().padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
         AnimatedCheck(size = 72.dp, description = null, haptic = true, celebrate = true)
         Spacer(Modifier.height(20.dp))
         Text("All caught up", style = MaterialTheme.typography.headlineSmall)
         Spacer(Modifier.height(6.dp))
+        val what = when (mode) {
+            ReviewMode.Uncategorized -> "Transactions that need a category will show up here."
+            ReviewMode.Uncleared -> "Transactions not yet cleared will show up here."
+            ReviewMode.New -> "New and uncategorized transactions will show up here."
+        }
         Text(
-            if (done > 0) "You reviewed $done. New and uncategorized transactions will show up here." else "New and uncategorized transactions will show up here.",
+            if (done > 0) "You reviewed $done. $what" else what,
             style = MaterialTheme.typography.bodyMedium,
             color = colors.textSecondary,
             textAlign = TextAlign.Center,

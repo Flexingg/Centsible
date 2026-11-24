@@ -209,7 +209,7 @@ internal fun ToolsBuilder.transactionWrites(gw: Gateways) {
 
     write(
         G, "mark_reviewed",
-        "Mark transactions as reviewed (out of this person's inbox), or all of them.",
+        "Mark transactions as reviewed (out of this person's inbox), or all of them. Only takes effect in the \"new\" inbox: the uncategorized and uncleared ones empty as transactions get a category or are cleared.",
         schema {
             strings("transaction_ids", "These transactions.")
             boolean("all", "Everything in the inbox.")
@@ -217,7 +217,7 @@ internal fun ToolsBuilder.transactionWrites(gw: Gateways) {
         preview = { a, _ -> Preview("Mark as reviewed", listOf(if (a.bool("all", false)) "Everything in your review inbox" else "${a.strings("transaction_ids").size} transactions")) },
     ) { a, ctx ->
         val n = if (a.bool("all", false)) gw.transactions.reviewAll(ctx.budget) else gw.transactions.markReviewed(ctx.budget, a.strings("transaction_ids").map(::TransactionId))
-        done("Marked $n as reviewed")
+        done("Marked as reviewed; $n left in the inbox")
     }
 
     write(

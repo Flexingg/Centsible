@@ -105,6 +105,8 @@ describe('off the books', () => {
     });
     const t = (await spend(`${M}-03`, -5_000, 'Mystery charge', holding)).body;
     const inbox = async () => ((await call('GET', '/review?limit=200', '/review', viewer)).body.items as any[]).map((i) => i.id);
+    // It's categorized, so it's in the "new since you caught up" inbox (the default shows only the uncategorized).
+    expect((await call('PUT', '/review/settings', '/review/settings', viewer, { mode: 'new' })).body).toEqual({ mode: 'new' });
     const spending = async () => ((await call('GET', `/reports/spending?start=${M}&end=${M}`, '/reports/spending', viewer)).body.categories as any[]).map((c) => c.categoryId);
     expect(await inbox()).toContain(t.id);
     expect(await spending()).toContain(holding);

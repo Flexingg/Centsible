@@ -120,12 +120,15 @@ class AssistantAgent @Inject constructor(
 
     // ── What the chat calls ──
 
-    /** Sends a message (starting a new conversation when [conversationId] is null) and returns the conversation's id. */
-    fun send(conversationId: String?, text: String): String {
+    /**
+     * Sends a message (starting a new conversation when [conversationId] is null, on [model]
+     * or else the default model) and returns the conversation's id.
+     */
+    fun send(conversationId: String?, text: String, model: AssistantModel? = null): String {
         val id = conversationId ?: UUID.randomUUID().toString()
         if (isRunning(id)) return id
         launch(id) {
-            var conv = store.get(id) ?: newConversation(id, text)
+            var conv = store.get(id) ?: newConversation(id, text, model)
             conv = addUserMessage(conv, text.trim())
             store.save(conv)
             loop(conv)
@@ -188,12 +191,24 @@ class AssistantAgent @Inject constructor(
 
     fun dismissError(conversationId: String) = setLive(conversationId) { LiveTurn() }
 
+    /**
+     * Moves this chat to another model from its next turn. Earlier thinking stays in the
+     * history as it is: the API skips, unbilled, any thinking the new model can't read.
+     */
+    fun setModel(conversationId: String, model: AssistantModel) = scope.launch {
+        lock(conversationId).withLock {
+            val conv = store.get(conversationId) ?: return@withLock
+            if (conv.model == model.id) return@withLock
+            store.save(conv.copy(model = model.id, updatedAt = now()))
+        }
+    }
+
     // ── The loop ──
 
-    private suspend fun newConversation(id: String, firstText: String): Conversation {
+    private suspend fun newConversation(id: String, firstText: String, model: AssistantModel?): Conversation {
         val budget = sessions.current()?.selectedBudget?.raw
         val title = firstText.trim().lineSequence().first().let { if (it.length > 60) it.take(57).trimEnd() + "…" else it }
-        return Conversation(id = id, title = title, budgetId = budget, createdAt = now(), updatedAt = now(), model = settings.settings.first().model.id)
+        return Conversation(id = id, title = title, budgetId = budget, createdAt = now(), updatedAt = now(), model = (model ?: settings.settings.first().model).id)
     }
 
     /**

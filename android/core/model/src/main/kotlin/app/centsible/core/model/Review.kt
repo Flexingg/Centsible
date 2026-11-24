@@ -1,7 +1,27 @@
 package app.centsible.core.model
 
 /** This person's review inbox (the bridge keeps it per person). */
-data class ReviewInbox(val items: List<Transaction>, val total: Int, val more: Boolean, val since: String)
+data class ReviewInbox(
+    val items: List<Transaction>,
+    val total: Int,
+    val more: Boolean,
+    val since: String,
+    val mode: ReviewMode = ReviewMode.Uncategorized,
+)
+
+/** What a person's review inbox holds; each person picks their own. */
+enum class ReviewMode(val wire: String, val label: String, val blurb: String) {
+    /** Waiting for a category; each leaves as it gets one. */
+    Uncategorized("uncategorized", "Uncategorized", "Transactions that still need a category"),
+    /** Not yet checked against the bank; each leaves as it's cleared. */
+    Uncleared("uncleared", "Uncleared", "Everything not yet cleared, to check against your bank"),
+    /** Everything added since you last caught up, plus anything uncategorized. */
+    New("new", "New since I caught up", "Every new transaction, plus anything uncategorized");
+
+    companion object {
+        fun of(wire: String?) = entries.firstOrNull { it.wire == wire } ?: Uncategorized
+    }
+}
 
 /** One change applied to many transactions at once (multi-select). */
 sealed interface BatchChange {

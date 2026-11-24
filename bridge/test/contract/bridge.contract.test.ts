@@ -614,10 +614,45 @@ describe('phase 1: transactions', () => {
 
   it('keeps a review inbox per person', async () => {
     const REVIEW = '/v1/budgets/{budgetId}/review';
-    type Inbox = { items: Tx[]; total: number; more: boolean; since: string };
+    const SETTINGS = '/v1/budgets/{budgetId}/review/settings';
+    type Inbox = { mode: string; items: Tx[]; total: number; more: boolean; since: string };
     const robinMember = store.createMember({ displayName: 'Robin', role: 'member', budgetIds: [budgetId] });
     const robin = await pair(robinMember.id, 'Robin phone');
     const inbox = async (token: string) => (await call({ method: 'GET', url: `/v1/budgets/${budgetId}/review?limit=200`, path: REVIEW, token })).body as Inbox;
+    const setMode = (token: string, mode: string) => call({ method: 'PUT', url: `/v1/budgets/${budgetId}/review/settings`, path: SETTINGS, token, body: { mode } });
+
+    // By default the inbox is what still needs a category, whoever entered it.
+    const settings = await call({ method: 'GET', url: `/v1/budgets/${budgetId}/review/settings`, path: SETTINGS, token: robin.accessToken });
+    expect(settings.body).toEqual({ mode: 'uncategorized' });
+    recordFixture('review-settings', settings.body);
+    const bare = await create({ accountId: actual.accounts.checking, amount: -1234, payeeName: 'No Category Yet', cleared: true });
+    const filed = await create({ accountId: actual.accounts.checking, amount: -4321, payeeName: 'Filed Already', categoryId: actual.categories['Food'], cleared: false });
+    const own = await inbox(owner.accessToken);
+    expect(own.mode).toBe('uncategorized');
+    expect(own.items.some((x) => x.id === bare.id)).toBe(true);
+    expect(own.items.every((x) => x.categoryId === null)).toBe(true);
+    // Reviewing doesn't take it out; a category does.
+    await call({ method: 'POST', url: `/v1/budgets/${budgetId}/review`, path: REVIEW, token: owner.accessToken, body: { ids: [bare.id] } });
+    expect((await inbox(owner.accessToken)).items.some((x) => x.id === bare.id)).toBe(true);
+
+    // Uncleared: anything not yet cleared, categorized or not.
+    expect((await setMode(owner.accessToken, 'uncleared')).body).toEqual({ mode: 'uncleared' });
+    const uncleared = await inbox(owner.accessToken);
+    expect(uncleared.items.some((x) => x.id === filed.id)).toBe(true);
+    expect(uncleared.items.some((x) => x.id === bare.id)).toBe(false);
+    expect(uncleared.items.every((x) => !x.cleared)).toBe(true);
+    // Mark all doesn't empty a state; clearing does.
+    const left = (await call({ method: 'POST', url: `/v1/budgets/${budgetId}/review`, path: REVIEW, token: owner.accessToken, body: { all: true } })).body as { remaining: number };
+    expect(left.remaining).toBe(uncleared.total);
+    await call({ method: 'PATCH', url: one(filed.id), path: ONE, token: owner.accessToken, body: { cleared: true } });
+    expect((await inbox(owner.accessToken)).items.some((x) => x.id === filed.id)).toBe(false);
+    expect((await setMode(owner.accessToken, 'everything')).status).toBe(400);
+    await setMode(owner.accessToken, 'uncategorized');
+    await call({ method: 'PATCH', url: one(bare.id), path: ONE, token: owner.accessToken, body: { categoryId: actual.categories['Food'] } });
+
+    // New since you caught up: someone else's new transaction is in Robin's inbox; your own isn't in yours.
+    await setMode(robin.accessToken, 'new');
+    await setMode(owner.accessToken, 'new');
 
     const t = await create({ accountId: actual.accounts.checking, amount: -4242, payeeName: 'Review Me', categoryId: actual.categories['Food'] });
     // Someone else's new transaction is in Robin's inbox; your own isn't in yours.
@@ -640,6 +675,7 @@ describe('phase 1: transactions', () => {
     // Editing it counts as reviewing it.
     await call({ method: 'PATCH', url: one(next.id), path: ONE, token: robin.accessToken, body: { categoryId: actual.categories['Food'] } });
     expect((await inbox(robin.accessToken)).total).toBe(0);
+    await setMode(owner.accessToken, 'uncategorized');
   });
 
   it('reports budget preferences with defaults', async () => {
