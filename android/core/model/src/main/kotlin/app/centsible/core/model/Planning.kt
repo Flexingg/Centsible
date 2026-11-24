@@ -127,6 +127,25 @@ data class ImportPreview(
 
 data class ImportResult(val added: Int, val updated: Int, val errors: List<String>)
 
+/** What moving an account on or off budget would do to its transfers with budgeted accounts. */
+data class BudgetSwitchPreview(
+    val accountId: AccountId,
+    /** Where it is now. */
+    val offBudget: Boolean,
+    /** Transfers with budgeted accounts (contributions, payments). */
+    val transfers: Int,
+    /** Of those, how many already have a category. */
+    val categorized: Int,
+    /** The category most of them already use. */
+    val suggestedCategory: CategoryId?,
+    /** Off budget now: its own transactions with no category, which will need one on budget. */
+    val uncategorized: Int,
+    /** Someone chose to keep it on budget although its type usually lives off it. */
+    val keptOnBudget: Boolean,
+)
+
+data class BudgetSwitchResult(val account: Account, val categorized: Int, val cleared: Int)
+
 data class ReconcileStatus(val cleared: Money, val uncleared: Money, val balance: Money)
 
 data class ReconcileResult(val reconciled: Boolean, val difference: Money, val adjustmentId: TransactionId?, val lockedCount: Int)

@@ -60,6 +60,17 @@ interface AccountServices {
     suspend fun importFile(budget: BudgetId, account: AccountId, fileName: String, bytes: ByteArray, options: ImportOptions): ImportResult
     suspend fun reconcileStatus(budget: BudgetId, account: AccountId): ReconcileStatus
     suspend fun reconcile(budget: BudgetId, account: AccountId, statementBalance: Money, createAdjustment: Boolean): ReconcileResult
+
+    /** What moving [account] on or off budget would do to its transfers. */
+    suspend fun budgetSwitch(budget: BudgetId, account: AccountId): app.centsible.core.model.BudgetSwitchPreview
+    /**
+     * Moves [account] off or on budget in Actual. Off budget, its uncategorized transfers
+     * with budgeted accounts get [category]; on budget, those transfers lose their categories.
+     * Asking for on budget also records that it stays there on purpose.
+     */
+    suspend fun switchBudget(budget: BudgetId, account: AccountId, offBudget: Boolean, category: app.centsible.core.model.CategoryId?): app.centsible.core.model.BudgetSwitchResult
+    /** Accounts kept on budget on purpose (no more suggestions to move them). */
+    suspend fun keptOnBudget(budget: BudgetId): Set<AccountId>
 }
 
 interface ReportsGateway {

@@ -58,6 +58,7 @@ fun AccountDetailRoute(
     viewModel: AccountDetailViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val switching by viewModel.switcher.current.collectAsStateWithLifecycle()
     val context = androidx.compose.ui.platform.LocalContext.current
     LaunchedEffect(state.gone) { if (state.gone) onBack() }
     // The system file picker: no storage permission needed.
@@ -84,6 +85,8 @@ fun AccountDetailRoute(
         onClose = { viewModel.close(it) },
         onReopen = { viewModel.reopen() },
         onMessageShown = viewModel::messageShown,
+        switching = switching,
+        switchActions = remember(viewModel) { viewModel.switcher.actions() },
     )
 }
 
@@ -98,6 +101,8 @@ fun AccountDetailScreen(
     onReopen: () -> Unit = {},
     onMessageShown: () -> Unit = {},
     actions: AccountActions = AccountActions(),
+    switching: BudgetSwitchState? = null,
+    switchActions: BudgetSwitchActions = BudgetSwitchActions(),
 ) {
     val colors = CentsibleTheme.colors
     val snackbar = remember { SnackbarHostState() }
@@ -118,6 +123,12 @@ fun AccountDetailScreen(
                     IconButton(onClick = { menu = true }) { Icon(Icons.Rounded.MoreVert, contentDescription = "More") }
                     DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
                         DropdownMenuItem(text = { Text("Rename") }, onClick = { menu = false; renaming = true })
+                        if (!detail.account.closed) {
+                            DropdownMenuItem(
+                                text = { Text(if (detail.account.offBudget) "Move on budget" else "Move off budget") },
+                                onClick = { menu = false; switchActions.start(detail.account, false) },
+                            )
+                        }
                         if (detail.account.closed) DropdownMenuItem(text = { Text("Reopen") }, onClick = { menu = false; onReopen() })
                         else DropdownMenuItem(text = { Text("Close account") }, onClick = { menu = false; closing = true })
                     }
@@ -207,6 +218,8 @@ fun AccountDetailScreen(
             }
         }
     }
+
+    BudgetSwitchHost(switching, switchActions)
 
     if (renaming && detail != null) {
         var name by remember { mutableStateOf(detail.account.name) }

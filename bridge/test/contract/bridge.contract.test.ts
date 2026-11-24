@@ -715,6 +715,66 @@ describe('phase 1: accounts and categories', () => {
     expect((reopened.body as Account).closed).toBe(false);
   });
 
+  it('moves an account off and back on budget, sorting out its transfers', async () => {
+    const SWITCH = '/v1/budgets/{budgetId}/accounts/{id}/budget-switch';
+    type Preview = { accountId: string; offBudget: boolean; transfers: number; categorized: number; suggestedCategoryId: string | null; uncategorized: number; keptOnBudget: boolean };
+    type Switched = { account: Account & { offBudget: boolean }; categorized: number; cleared: number };
+    const make = async (body: object) =>
+      (await call({ method: 'POST', url: `${base()}/accounts`, path: '/v1/budgets/{budgetId}/accounts', token: owner.accessToken, body })).body as Account & { offBudget: boolean; kind: string | null };
+
+    // An investment, mortgage or loan starts off budget unless asked otherwise.
+    expect((await make({ name: 'Roth IRA', kind: 'investment' })).offBudget).toBe(true);
+    expect((await make({ name: 'Car loan', kind: 'loan' })).offBudget).toBe(true);
+    expect((await make({ name: 'Cash jar', kind: 'cash' })).offBudget).toBe(false);
+    const k401 = await make({ name: '401k', kind: 'investment', offBudget: false });
+    expect(k401.offBudget).toBe(false);
+
+    // Two contributions from checking: one already categorized, one not.
+    const payees = (await call({ method: 'GET', url: `${base()}/payees`, path: '/v1/budgets/{budgetId}/payees', token: owner.accessToken })).body as { items: { id: string; transferAccountId: string | null }[] };
+    const to401 = payees.items.find((p) => p.transferAccountId === k401.id)!;
+    const tx = (body: object) =>
+      call({ method: 'POST', url: `${base()}/transactions`, path: '/v1/budgets/{budgetId}/transactions', token: owner.accessToken, body: { id: randomUUID(), date: `${actual.month}-05`, accountId: actual.accounts.checking, ...body } });
+    const first = (await tx({ amount: -50000, payeeId: to401.id })).body as { id: string; categoryId: string | null };
+    const second = (await tx({ amount: -50000, payeeId: to401.id })).body as { id: string };
+    expect(first.categoryId).toBeNull(); // on budget to on budget: no category
+
+    const preview = async () =>
+      (await call({ method: 'GET', url: `${base()}/accounts/${k401.id}/budget-switch`, path: SWITCH, token: owner.accessToken })).body as Preview;
+    const before = await preview();
+    expect(before).toMatchObject({ offBudget: false, transfers: 2, categorized: 0, suggestedCategoryId: null, keptOnBudget: false });
+    recordFixture('budget-switch-preview', before);
+
+    const sw = (body: object) => call({ method: 'POST', url: `${base()}/accounts/${k401.id}/budget-switch`, path: SWITCH, token: owner.accessToken, body });
+    // Money moved out of the budget can't land in an income category.
+    const income = actual.categories['Income'];
+    if (income) expect((await sw({ offBudget: true, categoryId: income })).status).toBe(400);
+    const off = await sw({ offBudget: true, categoryId: actual.categories['General'] });
+    expect(off.status).toBe(200);
+    const offBody = off.body as Switched;
+    expect(offBody.account.offBudget).toBe(true);
+    expect(offBody.categorized).toBe(2);
+    recordFixture('budget-switch', offBody);
+    const cat = async (id: string) =>
+      ((await call({ method: 'GET', url: `${base()}/transactions/${id}`, path: '/v1/budgets/{budgetId}/transactions/{transactionId}', token: owner.accessToken })).body as { categoryId: string | null }).categoryId;
+    expect(await cat(first.id)).toBe(actual.categories['General']);
+    expect(await cat(second.id)).toBe(actual.categories['General']);
+    expect(await preview()).toMatchObject({ offBudget: true, transfers: 2, categorized: 2, suggestedCategoryId: actual.categories['General'] });
+
+    // Back on budget: the transfers are moves between budgeted accounts again.
+    const on = (await sw({ offBudget: false })).body as Switched;
+    expect(on.account.offBudget).toBe(false);
+    expect(on.cleared).toBe(2);
+    expect(await cat(first.id)).toBeNull();
+    // Choosing on budget is remembered, so the app stops suggesting the move.
+    expect((await preview()).keptOnBudget).toBe(true);
+    const kept = await call({ method: 'GET', url: `${base()}/accounts/kept-on-budget`, path: '/v1/budgets/{budgetId}/accounts/kept-on-budget', token: owner.accessToken });
+    expect((kept.body as { accountIds: string[] }).accountIds).toContain(k401.id);
+    recordFixture('kept-on-budget', kept.body);
+    await sw({ offBudget: true });
+    expect((await preview()).keptOnBudget).toBe(false);
+    expect((await sw({ offBudget: 'yes' })).status).toBe(400);
+  });
+
   it('manages category groups and categories', async () => {
     const group = await call({ method: 'POST', url: `${base()}/category-groups`, path: '/v1/budgets/{budgetId}/category-groups', token: owner.accessToken, body: { name: 'Kids' } });
     expect(group.status).toBe(201);

@@ -47,6 +47,10 @@ class PlanningApi(private val client: BridgeClient) {
         client.send(HttpMethod.Post, "${b(budgetId)}/accounts/$accountId/import/preview", body)
     suspend fun importFile(budgetId: String, accountId: String, body: ImportRequestDto): ImportResultDto =
         client.send(HttpMethod.Post, "${b(budgetId)}/accounts/$accountId/import", body)
+    suspend fun budgetSwitch(budgetId: String, accountId: String): BudgetSwitchPreviewDto = client.get("${b(budgetId)}/accounts/$accountId/budget-switch")
+    suspend fun switchBudget(budgetId: String, accountId: String, body: BudgetSwitchRequestDto): BudgetSwitchResultDto =
+        client.send(HttpMethod.Post, "${b(budgetId)}/accounts/$accountId/budget-switch", body)
+    suspend fun keptOnBudget(budgetId: String): KeptOnBudgetDto = client.get("${b(budgetId)}/accounts/kept-on-budget")
     suspend fun reconcileStatus(budgetId: String, accountId: String): ReconcileStatusDto = client.get("${b(budgetId)}/accounts/$accountId/reconcile")
     suspend fun reconcile(budgetId: String, accountId: String, body: ReconcileRequestDto): ReconcileResultDto =
         client.send(HttpMethod.Post, "${b(budgetId)}/accounts/$accountId/reconcile", body)

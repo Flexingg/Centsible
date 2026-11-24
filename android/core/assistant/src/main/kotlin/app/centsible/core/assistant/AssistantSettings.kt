@@ -40,7 +40,7 @@ enum class ToolGroup(val key: String, val title: String, val description: String
     Rules("rules", "Rules, merchants & tags", "Create, edit, run and delete rules; rename, merge and delete merchants; tags."),
     Recurring("recurring", "Recurring & bills", "Create, edit, skip, post and delete scheduled bills and income; dismiss subscriptions."),
     Plans("plans", "Goals & plans", "Savings goals, targets, yearly budgets, budget automations, income settings, pay stubs and mortgages."),
-    Accounts("accounts", "Accounts", "Add, rename, retype, close and reopen accounts; reconcile."),
+    Accounts("accounts", "Accounts", "Add, rename, retype, close and reopen accounts; move them on or off budget; reconcile."),
     ;
 
     companion object {

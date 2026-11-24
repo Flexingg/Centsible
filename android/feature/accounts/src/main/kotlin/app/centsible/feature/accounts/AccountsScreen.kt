@@ -71,8 +71,11 @@ import androidx.compose.ui.semantics.Role
 @Composable
 fun AccountsRoute(onOpenAccount: (AccountId) -> Unit, viewModel: AccountsViewModel = hiltViewModel()) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val switching by viewModel.switcher.current.collectAsStateWithLifecycle()
     AccountsScreen(
         state,
+        switching = switching,
+        switchActions = remember(viewModel) { viewModel.switcher.actions() },
         onRetry = { viewModel.refresh() },
         onOpenAccount = onOpenAccount,
         onAddAccount = { name, offBudget, balance, type -> viewModel.addAccount(name, offBudget, balance, type) },
@@ -91,6 +94,8 @@ fun AccountsScreen(
     onMessageShown: () -> Unit = {},
     /** Start in "Edit types" mode (for screenshots). */
     initiallyEditingTypes: Boolean = false,
+    switching: BudgetSwitchState? = null,
+    switchActions: BudgetSwitchActions = BudgetSwitchActions(),
 ) {
     var adding by remember { mutableStateOf(false) }
     var editingTypes by remember { mutableStateOf(initiallyEditingTypes) }
@@ -123,6 +128,10 @@ fun AccountsScreen(
                         }
                     } else {
                         item { NetWorthCard(data.value) }
+                        val suggest = state.suggestOffBudget
+                        if (state.canWrite && suggest.isNotEmpty()) {
+                            item(key = "off-budget") { OffBudgetCard(suggest) { switchActions.start(it, true) } }
+                        }
                     }
                     items(data.value.sections, key = { it.kind.name }) { SectionCard(it, onOpenAccount, onChooseType = if (editingTypes) { a -> choosingFor = a } else null) }
                     if (data.value.closed.isNotEmpty()) {
@@ -137,6 +146,7 @@ fun AccountsScreen(
             }
         }
     }
+    BudgetSwitchHost(switching, switchActions)
     if (adding) AddAccountDialog(onDismiss = { adding = false }, onAdd = { n, o, b, t -> adding = false; onAddAccount(n, o, b, t) })
     choosingFor?.let { account ->
         AccountTypeSheet(account, onDismiss = { choosingFor = null }, onChoose = { type -> choosingFor = null; if (type != account.type) onSetType(account.id, type) })
@@ -221,7 +231,7 @@ private fun AddAccountDialog(onDismiss: () -> Unit, onAdd: (String, Boolean, Mon
                 Row(Modifier.toggleRow(offBudget) { offBudget = it }, verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
                         Text("Track only (off budget)", style = MaterialTheme.typography.bodyLarge)
-                        Text("For investments, retirement and loans. Can't be changed later.", style = MaterialTheme.typography.bodySmall, color = CentsibleTheme.colors.textSecondary)
+                        Text("For investments, retirement, mortgages and loans. You can change it later.", style = MaterialTheme.typography.bodySmall, color = CentsibleTheme.colors.textSecondary)
                     }
                     Switch(checked = offBudget, onCheckedChange = null)
                 }
@@ -230,6 +240,37 @@ private fun AddAccountDialog(onDismiss: () -> Unit, onAdd: (String, Boolean, Mon
         confirmButton = { TextButton(onClick = { onAdd(name, offBudget, parsed!!, type) }, enabled = name.isNotBlank() && parsed != null) { Text("Add") } },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
     )
+}
+
+/** Investments, mortgages and loans still on budget: each one a tap away from being tracked instead. */
+@Composable
+private fun OffBudgetCard(accounts: List<Account>, onReview: (Account) -> Unit) {
+    val colors = CentsibleTheme.colors
+    CentsibleCard(contentPadding = PaddingValues(16.dp)) {
+        Text(
+            if (accounts.size == 1) "Track this one off budget?" else "Track these ${accounts.size} off budget?",
+            style = MaterialTheme.typography.titleMedium,
+        )
+        Text(
+            "Investments, mortgages and loans usually sit outside the budget: their balances count in net worth, and money moved into them counts as spending.",
+            style = MaterialTheme.typography.bodySmall,
+            color = colors.textSecondary,
+            modifier = Modifier.padding(top = 2.dp, bottom = 6.dp),
+        )
+        accounts.forEach { a ->
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text(a.name, style = MaterialTheme.typography.bodyLarge)
+                    Text(
+                        a.kind().singular + if (a.type == null) " (guessed from the name)" else "",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = colors.textSecondary,
+                    )
+                }
+                TextButton(onClick = { onReview(a) }) { Text("Review") }
+            }
+        }
+    }
 }
 
 @Composable

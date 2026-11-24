@@ -1226,6 +1226,39 @@ internal fun ToolsBuilder.accountWrites(gw: Gateways) {
     }
 
     write(
+        G, "move_account_budget",
+        "Move an account off budget (tracked only: investments, mortgages, loans) or back on budget, in Actual. Off budget, its transfers with budgeted accounts count as spending: transfer_category_id fills the ones without a category. On budget, those transfers lose their categories.",
+        schema {
+            string("account_id", "The account.", required = true)
+            boolean("off_budget", "True to track it off budget, false to budget it.", required = true)
+            string("transfer_category_id", "Off budget: a spending category for its uncategorized transfers (contributions, payments).")
+        },
+        preview = { a, ctx ->
+            val acct = ctx.names.requireAccount(a.account("account_id"))
+            val off = a.bool("off_budget", true)
+            val p = gw.accounts.budgetSwitch(ctx.budget, acct.id)
+            val open = p.transfers - p.categorized
+            Preview(
+                if (off) "Move ${acct.name} off budget" else "Move ${acct.name} on budget",
+                listOfNotNull(
+                    if (off == p.offBudget) "It's already ${if (off) "off" else "on"} budget" else null,
+                    if (off && open > 0) "$open transfers from budgeted accounts: ${a.optCategory("transfer_category_id")?.let { ctx.names.category(it) } ?: "left uncategorized"}" else null,
+                    if (!off && p.categorized > 0) "${p.categorized} transfers lose their categories" else null,
+                    if (!off && p.uncategorized > 0) "${p.uncategorized} of its transactions will need a category" else null,
+                ),
+            )
+        },
+    ) { a, ctx ->
+        val off = a.bool("off_budget", true)
+        val r = gw.accounts.switchBudget(ctx.budget, a.account("account_id"), off, if (off) a.optCategory("transfer_category_id") else null)
+        done(
+            if (off) "Off budget; categorized ${r.categorized} transfers" else "On budget; cleared ${r.cleared} transfer categories",
+            // Back on budget clears exactly what moving it off filled in; the other way can't restore each transfer's old category.
+            if (off) call("move_account_budget", "account_id" to a.string("account_id"), "off_budget" to false) else null,
+        )
+    }
+
+    write(
         G, "close_account", "Close an account. If it has a balance, move it to another account (and, for on-budget money, a category).",
         schema {
             string("account_id", "The account.", required = true)

@@ -1,6 +1,7 @@
 import type { FastifyPluginAsync } from 'fastify';
 import { audit, requireBudget, type Deps } from '../server.js';
 import { ACCOUNT_KINDS, type AccountKind } from '../../actual/account-kinds.js';
+import { belongsOffBudget } from '../../actual/budget-switch-ops.js';
 import { MONEY, type BudgetParams } from './budgets.js';
 
 type IdParams = BudgetParams & { id: string };
@@ -31,7 +32,8 @@ export const structureRoutes =
         requireBudget(deps, req, req.params.budgetId, 'member');
         const account = await structure.createAccount(req.params.budgetId, {
           name: req.body.name,
-          offBudget: req.body.offBudget ?? false,
+          // Investments, mortgages and loans are tracked, not budgeted, unless asked otherwise.
+          offBudget: req.body.offBudget ?? belongsOffBudget(req.body.kind),
           initialBalance: req.body.initialBalance ?? 0,
           kind: req.body.kind ?? null,
         });
@@ -68,6 +70,36 @@ export const structureRoutes =
         audit(deps, req, req.params.budgetId, 'account.closed', req.params.id);
         // null when Actual deleted an account that had no transactions
         return account ? account : reply.status(204).send();
+      },
+    );
+
+    app.get<{ Params: BudgetParams }>('/v1/budgets/:budgetId/accounts/kept-on-budget', async (req) => {
+      requireBudget(deps, req, req.params.budgetId);
+      return { accountIds: deps.budgetSwitch.keptOnBudget(req.params.budgetId) };
+    });
+
+    app.get<{ Params: IdParams }>('/v1/budgets/:budgetId/accounts/:id/budget-switch', async (req) => {
+      requireBudget(deps, req, req.params.budgetId);
+      return deps.budgetSwitch.preview(req.params.budgetId, req.params.id);
+    });
+
+    app.post<{ Params: IdParams; Body: { offBudget: boolean; categoryId?: string | null } }>(
+      '/v1/budgets/:budgetId/accounts/:id/budget-switch',
+      {
+        schema: {
+          body: {
+            type: 'object',
+            required: ['offBudget'],
+            additionalProperties: false,
+            properties: { offBudget: { type: 'boolean' }, categoryId: { type: ['string', 'null'] } },
+          },
+        },
+      },
+      async (req) => {
+        requireBudget(deps, req, req.params.budgetId, 'member');
+        const r = await deps.budgetSwitch.setOffBudget(req.params.budgetId, req.params.id, req.body.offBudget, req.body.categoryId);
+        audit(deps, req, req.params.budgetId, req.body.offBudget ? 'account.off_budget' : 'account.on_budget', req.params.id, { categorized: r.categorized, cleared: r.cleared });
+        return r;
       },
     );
 

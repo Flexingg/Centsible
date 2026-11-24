@@ -73,17 +73,28 @@ data class AccountsUiState(
     val data: Loadable<AccountsSummary> = Loadable.Loading,
     val canWrite: Boolean = false,
     val message: String? = null,
-)
+    /** Kept on budget on purpose, so not suggested again. */
+    val keptOnBudget: Set<AccountId> = emptySet(),
+) {
+    /** Investments, mortgages and loans still on budget: offered a move off it. */
+    val suggestOffBudget: List<Account>
+        get() = (data as? Loadable.Ready)?.value?.sections.orEmpty().flatMap { it.accounts }.filter { it.shouldBeOffBudget(keptOnBudget) }
+}
 
 @HiltViewModel
 class AccountsViewModel @Inject constructor(
     private val engine: BudgetEngine,
     private val selectedBudget: SelectedBudget,
     private val sessions: SessionStore,
+    services: app.centsible.core.domain.AccountServices,
     changes: BudgetChanges,
 ) : ViewModel() {
     private val state = MutableStateFlow(AccountsUiState())
     val uiState: StateFlow<AccountsUiState> = state.asStateFlow()
+
+    /** Moving an account on or off budget. */
+    val switcher = BudgetSwitcher(viewModelScope, engine, services, selectedBudget) { msg -> state.update { it.copy(message = msg) } }
+    private val keptLoader: suspend () -> Set<AccountId> = { runCatching { services.keptOnBudget(selectedBudget()) }.getOrDefault(emptySet()) }
 
     init {
         refresh()
@@ -96,6 +107,7 @@ class AccountsViewModel @Inject constructor(
             runCatching { engine.capabilities().has(Feature.AccountsWrite) }.getOrDefault(false)
         runCatching { engine.accounts(budget) }
             .onSuccess { a -> state.update { it.copy(data = Loadable.Ready(AccountsSummary.from(a)), canWrite = canWrite) } }
+            .onSuccess { if (canWrite) { val kept = keptLoader(); state.update { it.copy(keptOnBudget = kept) } } }
             .onFailure { e -> state.update { it.copy(data = Loadable.Failed(e.userMessage())) } }
     }
 
@@ -108,7 +120,11 @@ class AccountsViewModel @Inject constructor(
     /** Sets (or, with null, clears) an account's type; the list regroups when the change arrives. */
     fun setType(id: AccountId, type: AccountType?) = viewModelScope.launch {
         runCatching { engine.setAccountType(selectedBudget(), id, type) }
-            .onSuccess { a -> state.update { it.copy(message = if (type == null) "${a.name}: type cleared (guessed from the name)" else "${a.name} is now ${type.singular.lowercase()}") } }
+            .onSuccess { a ->
+                state.update { it.copy(message = if (type == null) "${a.name}: type cleared (guessed from the name)" else "${a.name} is now ${type.singular.lowercase()}") }
+                // Just called it an investment, mortgage or loan: offer to track it off budget.
+                if (a.shouldBeOffBudget(state.value.keptOnBudget)) switcher.start(a, suggested = true)
+            }
             .onFailure { e -> state.update { it.copy(message = e.userMessage()) } }
     }
 

@@ -1,0 +1,16 @@
+{
+  "account": {
+    "id": "a81026c3-5637-4de3-bfe8-85b8a44d9010",
+    "name": "401k",
+    "offBudget": true,
+    "closed": false,
+    "balance": 100000,
+    "accountGroupId": null,
+    "syncSource": null,
+    "bankSyncStatus": null,
+    "lastSync": null,
+    "kind": "investment"
+  },
+  "categorized": 2,
+  "cleared": 0
+}

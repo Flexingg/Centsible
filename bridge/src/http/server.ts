@@ -1,6 +1,7 @@
 import type { RuleTools } from '../actual/rule-tools.js';
 import type { AutomationOps } from '../actual/automation-ops.js';
 import type { ReviewOps } from '../actual/review-ops.js';
+import type { BudgetSwitchOps } from '../actual/budget-switch-ops.js';
 import type { AnnualOps } from '../actual/annual-ops.js';
 import type { OffBooks } from '../actual/off-books.js';
 import type { MortgageOps } from '../actual/mortgage-ops.js';
@@ -54,6 +55,7 @@ export type Deps = {
   ops: BudgetOps;
   transactions: TransactionOps;
   review: ReviewOps;
+  budgetSwitch: BudgetSwitchOps;
   transfers: TransferOps;
   targets: TargetOps;
   mortgages: MortgageOps;
