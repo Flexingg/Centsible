@@ -35,6 +35,34 @@ class AccountsScreenshotTest {
         app.centsible.core.uitesting.A11y.assertOk(compose)
     }
 
+    @Test fun accounts_off_budget_suggestions() {
+        // Two still on budget: a Roth IRA guessed from its name, and a car loan set by hand.
+        val accounts = SampleHousehold.accounts + listOf(
+            app.centsible.core.model.Account(app.centsible.core.model.AccountId("acc-roth"), "Roth IRA", offBudget = false, closed = false, balance = app.centsible.core.model.Money(2_310_000)),
+            app.centsible.core.model.Account(app.centsible.core.model.AccountId("acc-car"), "Honda Financial", offBudget = false, closed = false, balance = app.centsible.core.model.Money(-1_420_000), type = app.centsible.core.model.AccountType.Loan),
+        )
+        compose.setContent { CentsibleTheme(darkTheme = false) { AccountsScreen(AccountsUiState(Loadable.Ready(AccountsSummary.from(accounts)), canWrite = true), onRetry = {}) } }
+        compose.onRoot().captureRoboImage("screenshots/accounts_off_budget_suggestions.png")
+        app.centsible.core.uitesting.A11y.assertOk(compose)
+    }
+
+    @Test fun budget_switch_sheet_off() {
+        val roth = app.centsible.core.model.Account(app.centsible.core.model.AccountId("acc-roth"), "Roth IRA", offBudget = false, closed = false, balance = app.centsible.core.model.Money(2_310_000))
+        val preview = app.centsible.core.model.BudgetSwitchPreview(roth.id, false, transfers = 14, categorized = 2, suggestedCategory = null, uncategorized = 0, keptOnBudget = false)
+        val state = BudgetSwitchState(roth, preview, category = app.centsible.core.model.CategoryId("c-inv"), categoryNames = mapOf("c-inv" to "Investing"), suggested = true)
+        compose.setContent { CentsibleTheme(darkTheme = false) { AccountsScreen(AccountsUiState(Loadable.Ready(AccountsSummary.from(SampleHousehold.accounts)), canWrite = true), onRetry = {}, switching = state) } }
+        compose.waitForIdle()
+        captureScreenRoboImage("screenshots/budget_switch_sheet_off.png")
+    }
+
+    @Test fun budget_switch_sheet_on_dark() {
+        val k401 = SampleHousehold.accounts.first { it.name == "401(k)" }
+        val preview = app.centsible.core.model.BudgetSwitchPreview(k401.id, true, transfers = 24, categorized = 24, suggestedCategory = null, uncategorized = 3, keptOnBudget = false)
+        compose.setContent { CentsibleTheme(darkTheme = true) { AccountsScreen(AccountsUiState(Loadable.Ready(AccountsSummary.from(SampleHousehold.accounts)), canWrite = true), onRetry = {}, switching = BudgetSwitchState(k401, preview)) } }
+        compose.waitForIdle()
+        captureScreenRoboImage("screenshots/budget_switch_sheet_on_dark.png")
+    }
+
     @Test fun accounts_large_text() {
         compose.setContent { CentsibleTheme(darkTheme = false) { app.centsible.core.uitesting.LargeText { AccountsScreen(AccountsUiState(Loadable.Ready(AccountsSummary.from(SampleHousehold.accounts)), canWrite = true), onRetry = {}) } } }
         compose.onRoot().captureRoboImage("screenshots/accounts_large_text.png")

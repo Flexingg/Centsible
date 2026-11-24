@@ -881,7 +881,7 @@ paths:
               required: [name]
               properties:
                 name: { type: string, minLength: 1, maxLength: 100 }
-                offBudget: { type: boolean, default: false }
+                offBudget: { type: boolean, description: "Left out: off budget for an investment, mortgage or loan kind, on budget otherwise" }
                 initialBalance: { $ref: '#/components/schemas/Money' }
                 kind: { $ref: '#/components/schemas/AccountKindInput' }
       responses:
@@ -1416,6 +1416,66 @@ paths:
         '400': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
         '423': { $ref: '#/components/responses/Problem' }
+
+  /v1/budgets/{budgetId}/accounts/kept-on-budget:
+    get:
+      tags: [budgets]
+      operationId: getKeptOnBudget
+      summary: Accounts someone chose to keep on budget although their type (investment, mortgage, loan) usually lives off budget, so the app stops suggesting the move.
+      parameters:
+        - $ref: '#/components/parameters/BudgetId'
+      responses:
+        '200':
+          description: Account ids
+          content:
+            application/json:
+              schema: { type: object, required: [accountIds], properties: { accountIds: { type: array, items: { type: string } } } }
+
+  /v1/budgets/{budgetId}/accounts/{id}/budget-switch:
+    get:
+      tags: [budgets]
+      operationId: previewBudgetSwitch
+      summary: What moving this account on or off budget would do to its transfers with budgeted accounts.
+      parameters:
+        - $ref: '#/components/parameters/BudgetId'
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '200':
+          description: Preview
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BudgetSwitchPreview' }
+        '404': { $ref: '#/components/responses/Problem' }
+    post:
+      tags: [budgets]
+      operationId: switchBudget
+      summary: >-
+        Moves the account off or on budget in Actual. Off budget, its transfers with budgeted accounts that have no category
+        get `categoryId` (money moved there leaves the budget); on budget, those transfers lose their categories (a move between
+        budgeted accounts has none). Asking for on budget also records that it stays there on purpose.
+      parameters:
+        - $ref: '#/components/parameters/BudgetId'
+        - $ref: '#/components/parameters/Id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [offBudget]
+              additionalProperties: false
+              properties:
+                offBudget: { type: boolean }
+                categoryId: { type: [string, 'null'], description: A spending category for its uncategorized transfers (off budget only) }
+      responses:
+        '200':
+          description: Switched
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BudgetSwitchResult' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
 
   /v1/budgets/{budgetId}/accounts/{id}/reopen:
     post:
@@ -3852,6 +3912,26 @@ components:
           oneOf:
             - type: 'null'
             - { type: string, enum: [cash, savings, credit, investment, mortgage, loan] }
+
+    BudgetSwitchPreview:
+      type: object
+      required: [accountId, offBudget, transfers, categorized, suggestedCategoryId, uncategorized, keptOnBudget]
+      properties:
+        accountId: { type: string }
+        offBudget: { type: boolean, description: Where it is now }
+        transfers: { type: integer, description: Transfers with budgeted accounts }
+        categorized: { type: integer, description: Of those, how many have a category }
+        suggestedCategoryId: { type: [string, 'null'], description: The category most of them already use }
+        uncategorized: { type: integer, description: "Off budget now: its own transactions with no category, which will need one on budget" }
+        keptOnBudget: { type: boolean }
+
+    BudgetSwitchResult:
+      type: object
+      required: [account, categorized, cleared]
+      properties:
+        account: { $ref: '#/components/schemas/Account' }
+        categorized: { type: integer, description: Transfers given the category }
+        cleared: { type: integer, description: Transfers whose category was cleared }
 
     AccountKindInput:
       description: An account type, or null to clear it.

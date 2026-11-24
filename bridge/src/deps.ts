@@ -14,6 +14,7 @@ import { StructureOps } from './actual/structure-ops.js';
 import { RuleTools } from './actual/rule-tools.js';
 import { AutomationOps } from './actual/automation-ops.js';
 import { ReviewOps } from './actual/review-ops.js';
+import { BudgetSwitchOps } from './actual/budget-switch-ops.js';
 import { AnnualOps } from './actual/annual-ops.js';
 import { CategoryTree } from './actual/category-tree.js';
 import { OffBooks } from './actual/off-books.js';
@@ -80,6 +81,7 @@ export function createDeps(config: BridgeConfig, store: HouseholdStore, host: Ac
     insights: new InsightsOps(host, store),
     transactions: new TransactionOps(host, categoryTree),
     review: new ReviewOps(host, store),
+    budgetSwitch: new BudgetSwitchOps(host, store),
     transfers,
     duplicates: new DuplicateOps(host, store),
     targets: new TargetOps(host, store),

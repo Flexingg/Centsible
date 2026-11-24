@@ -118,6 +118,18 @@ import kotlinx.serialization.json.JsonObject
     val matchedCount: Int = 0,
 )
 @Serializable data class ImportResultDto(val added: Int = 0, val updated: Int = 0, val errors: List<String> = emptyList())
+@Serializable data class BudgetSwitchPreviewDto(
+    val accountId: String,
+    val offBudget: Boolean,
+    val transfers: Int = 0,
+    val categorized: Int = 0,
+    val suggestedCategoryId: String? = null,
+    val uncategorized: Int = 0,
+    val keptOnBudget: Boolean = false,
+)
+@Serializable data class BudgetSwitchRequestDto(val offBudget: Boolean, val categoryId: String? = null)
+@Serializable data class BudgetSwitchResultDto(val account: AccountDto, val categorized: Int = 0, val cleared: Int = 0)
+@Serializable data class KeptOnBudgetDto(val accountIds: List<String> = emptyList())
 @Serializable data class ReconcileStatusDto(val clearedBalance: Long, val unclearedBalance: Long, val balance: Long)
 @Serializable data class ReconcileRequestDto(val statementBalance: Long, val createAdjustment: Boolean)
 @Serializable data class ReconcileResultDto(val reconciled: Boolean, val difference: Long, val adjustmentTransactionId: String? = null, val lockedCount: Int = 0)

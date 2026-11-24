@@ -81,6 +81,9 @@ class AccountDetailViewModel @Inject constructor(
     private val state = MutableStateFlow(AccountDetailUiState())
     val uiState: StateFlow<AccountDetailUiState> = state.asStateFlow()
 
+    /** Moving this account on or off budget. */
+    val switcher = BudgetSwitcher(viewModelScope, engine, services, selectedBudget) { msg -> state.update { it.copy(message = msg) } }
+
     init {
         refresh()
         viewModelScope.launch { changes.changes.collect { refresh() } }

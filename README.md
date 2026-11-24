@@ -70,6 +70,16 @@ Set up the mortgage in **More → Mortgage** for its terms (rate, schedule, payo
 
 Actual has no account types, so Centsible keeps them on the bridge: **Cash, Savings, Credit card, Investment, Mortgage, Loan**. They decide how the Accounts page groups accounts. On **Accounts → Edit types**, tap an account's type to change it, or choose **Automatic** to go back to guessing from the name and balance. Linking an account through Plaid sets its type from what the bank reports, and **Add account** asks for one.
 
+### On and off budget
+
+Investments, mortgages and loans are tracked, not budgeted: their balances count in net worth, and money moved into them from a budgeted account counts as spending.
+
+- **New accounts** of those types start off budget.
+- **Existing ones still on budget** are listed at the top of the Accounts page, including those whose type is only guessed from the name. **Review** moves one off budget, or **Keep it on budget** stops the suggestion for everyone in the household. Setting one of those types in **Edit types** asks the same question.
+- **Any account** can be moved either way from its menu: **Move off budget** or **Move on budget**. The change is made in Actual.
+
+When an account moves off budget, its transfers from budgeted accounts (contributions, payments) need a category to count in. Centsible asks which one, offering the one most of them already use, and fills it in on the past transfers that have none. When it moves back on budget, those transfers lose their categories again, since moving money between two budgeted accounts isn't spending.
+
 ## Categories in up to five levels
 
 Groups are the top level and their categories the second; any category can hold sub-categories, down to level 5 (say **Needs › Food › Groceries › Costco › Bulk snacks**). Every level from 2 down holds its own transactions and its own envelope, so a transaction can stay on **Food** while others go on **Groceries**. A transaction with no category at all is uncategorized.

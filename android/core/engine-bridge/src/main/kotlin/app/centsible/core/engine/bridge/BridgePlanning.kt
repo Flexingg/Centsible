@@ -76,6 +76,19 @@ class BridgeAccountServices(private val api: PlanningApi, private val onWrite: (
         api.reconcile(budget.raw, account.raw, ReconcileRequestDto(statementBalance.minor, createAdjustment)).let {
             ReconcileResult(it.reconciled, Money(it.difference), it.adjustmentTransactionId?.let(::TransactionId), it.lockedCount)
         }.also { if (it.reconciled) onWrite() }
+
+    override suspend fun budgetSwitch(budget: BudgetId, account: AccountId) = api.budgetSwitch(budget.raw, account.raw).let {
+        app.centsible.core.model.BudgetSwitchPreview(
+            AccountId(it.accountId), it.offBudget, it.transfers, it.categorized, it.suggestedCategoryId?.let(::CategoryId), it.uncategorized, it.keptOnBudget,
+        )
+    }
+
+    override suspend fun switchBudget(budget: BudgetId, account: AccountId, offBudget: Boolean, category: CategoryId?) =
+        api.switchBudget(budget.raw, account.raw, app.centsible.core.network.BudgetSwitchRequestDto(offBudget, category?.raw)).let {
+            app.centsible.core.model.BudgetSwitchResult(it.account.toModel(), it.categorized, it.cleared)
+        }.also { onWrite() }
+
+    override suspend fun keptOnBudget(budget: BudgetId) = api.keptOnBudget(budget.raw).accountIds.map(::AccountId).toSet()
 }
 
 class BridgeReports(private val api: PlanningApi) : ReportsGateway {

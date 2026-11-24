@@ -217,6 +217,23 @@ class FakeAccountServices : AccountServices {
         val diff = statementBalance - Money(-58_234)
         return if (!diff.isZero && !createAdjustment) ReconcileResult(false, diff, null, 0) else ReconcileResult(true, diff, null, 14)
     }
+
+    /** Kept on budget on purpose, by account. */
+    val kept = mutableSetOf<AccountId>()
+    val switched = mutableListOf<Triple<AccountId, Boolean, app.centsible.core.model.CategoryId?>>()
+    val offBudget = mutableMapOf<AccountId, Boolean>()
+    override suspend fun budgetSwitch(budget: BudgetId, account: AccountId) = app.centsible.core.model.BudgetSwitchPreview(
+        account, offBudget[account] ?: false, transfers = 12, categorized = 3,
+        suggestedCategory = app.centsible.core.model.CategoryId("c-savings"), uncategorized = 0, keptOnBudget = account in kept,
+    )
+    override suspend fun switchBudget(budget: BudgetId, account: AccountId, offBudget: Boolean, category: app.centsible.core.model.CategoryId?): app.centsible.core.model.BudgetSwitchResult {
+        switched += Triple(account, offBudget, category)
+        if (offBudget) kept -= account else kept += account
+        this.offBudget[account] = offBudget
+        val a = SampleHousehold.accounts.firstOrNull { it.id == account } ?: app.centsible.core.model.Account(account, "Account", offBudget, false, Money.Zero)
+        return app.centsible.core.model.BudgetSwitchResult(a.copy(offBudget = offBudget), categorized = if (offBudget && category != null) 9 else 0, cleared = if (offBudget) 0 else 12)
+    }
+    override suspend fun keptOnBudget(budget: BudgetId) = kept.toSet()
 }
 
 class FakeReports : ReportsGateway {
